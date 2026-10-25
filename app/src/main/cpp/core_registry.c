@@ -28,6 +28,17 @@ static bool valid_core_id(const char *id) {
     return id[0] != '\0';
 }
 
+static void set_system_id(cr_core_descriptor *core) {
+    if (strcmp(core->id, "corvus.gb") == 0)
+        snprintf(core->system_id, sizeof(core->system_id), "nintendo.game_boy");
+    else if (strcmp(core->id, "corvus.gbc") == 0)
+        snprintf(core->system_id, sizeof(core->system_id), "nintendo.game_boy_color");
+    else if (strcmp(core->id, "corvus.gba") == 0)
+        snprintf(core->system_id, sizeof(core->system_id), "nintendo.game_boy_advance");
+    else
+        snprintf(core->system_id, sizeof(core->system_id), "%s", core->id);
+}
+
 static void register_module(const char *name) {
     if (!name || registry_size == CR_MAX_CORES) return;
     char path[256];
@@ -74,6 +85,7 @@ static void register_module(const char *name) {
                 if (strcmp(registry[i].id, descriptor.id) == 0)
                     unique = false;
             if (unique) {
+                set_system_id(&descriptor);
                 descriptor.max_players = info.max_players;
                 descriptor.state_support = api.serialize_size && api.serialize && api.unserialize;
                 descriptor.battery_support = api.battery_size && api.battery_dirty &&
@@ -101,6 +113,33 @@ size_t cr_registry_count(void) {
 const cr_core_descriptor *cr_registry_get(int index) {
     discover();
     return index >= 0 && (size_t)index < registry_size ? &registry[index] : NULL;
+}
+
+int cr_registry_find(const char *core_id) {
+    if (!core_id || !*core_id) return -1;
+    discover();
+    for (size_t i = 0; i < registry_size; ++i)
+        if (strcmp(registry[i].id, core_id) == 0) return (int)i;
+    return -1;
+}
+
+bool cr_registry_content_id(char *out, size_t cap, const char *sha256,
+                            const char *core_id) {
+    if (!out || cap < 83 || !sha256 || !core_id || !*core_id) return false;
+    if (strlen(sha256) != 64) return false;
+    for (size_t i = 0; i < 64; ++i)
+        if (!((sha256[i] >= '0' && sha256[i] <= '9') ||
+              (sha256[i] >= 'a' && sha256[i] <= 'f'))) return false;
+    /* FNV-1a here is a deterministic filename namespace, NOT a security hash.
+     * The ROM identity remains the full SHA-256 digest above. */
+    uint64_t suffix = UINT64_C(14695981039346656037);
+    for (const unsigned char *p = (const unsigned char *)core_id; *p; ++p) {
+        suffix ^= *p;
+        suffix *= UINT64_C(1099511628211);
+    }
+    int n = snprintf(out, cap, "%s-c%016llx", sha256,
+                     (unsigned long long)suffix);
+    return n == 82 && (size_t)n < cap;
 }
 
 bool cr_registry_accepts(int index, const char *extension) {
