@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- CorvusRetro - CorvusSoftware
+     Copyright (C) 2026 CorvusSoftware
+     SPDX-License-Identifier: AGPL-3.0-only -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fr">
+    <string name="app_name">CorvusRetro</string>
+    <string name="library">Bibliothèque</string>
+    <string name="library_subtitle">Vos souvenirs ont une nouvelle maison.</string>
+    <string name="lab">Corvus Lab</string>
+    <string name="settings">Réglages</string>
+    <string name="settings_subtitle">Un espace qui vous ressemble.</string>
+    <string name="original">CORVUS ORIGINAL</string>
+    <string name="hero_title">Le plaisir de\n(re)jouer.</string>
+    <string name="hero_caption">Prenez les commandes de notre démo interactive.</string>
+    <string name="launch_demo">Lancer la démo</string>
+    <string name="collection">Votre collection</string>
+    <string name="game_count">0 jeu</string>
+    <string name="empty_title">Tout commence ici.</string>
+    <string name="empty_caption">Votre bibliothèque est encore vide.</string>
+    <string name="availability">Les jeux ne sont pas encore pris en charge.\nLa démo Corvus est disponible dès maintenant.</string>
+    <string name="local_caption">SANS COMPTE. SANS PUBLICITÉ.</string>
+    <string name="appearance">APPARENCE</string>
+    <string name="theme">Thème</string>
+    <string name="dark_theme">Sombre</string>
+    <string name="about_section">LE PROJET</string>
+    <string name="about">À propos de CorvusRetro</string>
+    <string name="about_caption">Une création indépendante de CorvusSoftware.</string>
+    <string name="about_body">CorvusRetro 0.2.0\n\nUne application rétro indépendante, développée par CorvusSoftware.\n\nCette version propose une bibliothèque vide et une démo interactive originale. Elle ne lance pas encore de jeux et ne contient aucun code de RetroArch.</string>
+    <string name="license">Licence et crédits</string>
+    <string name="license_caption">AGPL-3.0-only · Code original</string>
+    <string name="license_notice">© 2026 CorvusSoftware\nAGPL-3.0-only · Aucune garantie.\n\n%1$s</string>
+    <string name="license_unavailable">Licence indisponible. Consultez le fichier LICENSE du dépôt.</string>
+    <string name="close">Fermer</string>
+    <string name="version">CORVUSSOFTWARE / VERSION 0.2.0</string>
+    <string name="selected_tab">%1$s, sélectionné</string>
+    <string name="demo_subtitle">Démo interactive</string>
+    <string name="back">Retour à la bibliothèque</string>
+    <string name="playing">EN JEU</string>
+    <string name="paused">EN PAUSE</string>
+    <string name="screen_label">CORVUS / POCKET</string>
+    <string name="game_hint">Un carré. Quatre directions. À vous de jouer.</string>
+    <string name="controls">Commandes</string>
+    <string name="controls_hint">Maintenez une direction pour vous déplacer.</string>
+    <string name="pause">Pause</string>
+    <string name="resume">Reprendre</string>
+    <string name="reset">Recentrer</string>
+    <string name="demo_note">Une démo maison, sans ROM ni BIOS.</string>
+    <string name="up">Haut</string>
+    <string name="down">Bas</string>
+    <string name="left">Gauche</string>
+    <string name="right">Droite</string>
+    <string name="demo_description">Démo interactive : carré mobile sur une grille</string>
+</resources>

@@ -3,25 +3,37 @@
 Application mobile rétro originale de **CorvusSoftware**, Android d'abord.
 Code original sous **AGPL-3.0-only**, Copyright (C) 2026 CorvusSoftware.
 
-## Première version : laboratoire natif
+## Version 0.2 : bibliothèque et laboratoire
 
-- Accueil Android avec affichage d'une démo native C sur une grille 256 × 192.
+- Bibliothèque avec état vide explicite, cartes arrondies et navigation inférieure.
+- Interface anthracite et citron, icônes et illustration vectorielle originales.
+- Réglages avec informations du projet et licence consultable hors ligne.
+- Laboratoire séparé avec démo native C sur une grille 256 × 192.
 - Commandes directionnelles tactiles, pause/reprise et réinitialisation.
 - Arrêt de la boucle d'affichage lorsque l'application passe en arrière-plan.
-- Licence consultable hors ligne depuis l'application.
 - APK de développement pour Android 8.0+ : ARM64 et x86_64.
 
 Cette première base **n'émule aucune console**. Elle n'importe pas de ROM, de BIOS
 ou de cœur externe et ne produit pas encore de son.
 
+Captures réelles sur émulateur Android 10 (480 × 960) :
+
+<p>
+  <img src="docs/screenshots/library.png" width="240" alt="Bibliothèque CorvusRetro" />
+  <img src="docs/screenshots/lab.png" width="240" alt="Laboratoire et commandes de jeu" />
+  <img src="docs/screenshots/settings.png" width="240" alt="Réglages CorvusRetro" />
+</p>
+
 ## Architecture
 
 ```text
-app/   Interface Android Java, affichage Canvas, pont JNI et packaging
+app/   Bibliothèque/réglages, laboratoire Java/Canvas, pont JNI et packaging
 core/  État et rendu C11 portable, sans dépendance Android
 tests/ Tests du noyau exécutables sur ordinateur
 ```
 
+`MainActivity` affiche la bibliothèque et les réglages ; `GameActivity` héberge
+la démo et sa croix directionnelle. Le moteur ne tourne pas dans la bibliothèque.
 L'interface transmet un masque de boutons au noyau via JNI. Le noyau avance d'un
 pas puis fournit une image ARGB. Toutes les opérations Android/JNI restent sur
 le thread d'interface ; le noyau n'alloue aucune mémoire dynamique.
@@ -66,6 +78,12 @@ make jni-test
 
 Les tests couvrent les déplacements, les entrées opposées, les limites, la pause,
 le reset, les pixels ARGB et les buffers insuffisants.
+
+La version 0.2 a également été exercée sur un émulateur Android 10 : navigation,
+licence, lancement de la démo, direction maintenue, absence de mouvement en pause,
+recentrage, arrière-plan/reprise avec conservation de la pause et retour Android.
+Les captures ci-dessus proviennent de cette exécution. Un téléphone physique,
+TalkBack et le multitouch simultané n'ont pas été testés.
 
 Sur appareil : maintenir chaque direction, atteindre les quatre bords, mettre en
 pause, reprendre, réinitialiser, changer d'orientation, passer en arrière-plan

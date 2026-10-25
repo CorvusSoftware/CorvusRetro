@@ -1,10 +1,8 @@
-# Première base Android
-
-Objectif : application maison C11 + Java/JNI, signature CorvusSoftware, AGPL-3.0-only.
-Périmètre : démo interactive native, commandes tactiles, pause/reset, licence, build reproductible.
-Pas de code RetroArch repris ; pas de moteur d'émulation à cette étape.
-Plan : noyau portable → interface Android → tests natifs → APK/lint → review.
-P0 : déplacement, limites, pause/reset, protection du framebuffer via make test et sanitizers.
-P1 : compilation JNI et APK arm64-v8a/x86_64 ; lint Android.
-P2 : interaction/lifecycle sur appareil si disponible.
-Risque : frontière JNI, lifecycle Android, absence éventuelle d'appareil.
+# Refonte Android
+Objectif : remplacer le banc de test par une interface mobile originale et cohérente.
+Portée : bibliothèque vide, réglages, démo séparée ; noyau C/JNI inchangé.
+Direction : anthracite, accent citron, cartes arrondies, typographie et icônes maison.
+P0 : APK/lint ; tests C/JNI ; revue des entrées et du lifecycle.
+P1 : essai visuel/navigation sur émulateur logiciel si démarrage possible.
+Plan : styles/ressources → écrans → build/revue → captures → main/CI.
+Ne pas présenter l'import, les jeux ou l'émulation comme disponibles.
