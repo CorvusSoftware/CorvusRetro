@@ -6,6 +6,26 @@ Révisions étudiées :
 - [retroarch-assets d9f9690](https://github.com/libretro/retroarch-assets/tree/d9f969054dc7fbb6fa89519036d2b971e0855b51).
 - [SDK CorvusCore 0.14.0](https://github.com/CorvusSoftware/CorvusCore/blob/38829d4935bbdcf4b13261714352362065b78551/sdk/include/corvuscore/bridge.h).
 
+## Architecture native 0.5
+
+Fichiers effectivement examinés dans RetroArch :
+
+- [frontend/drivers/platform_unix.c](https://github.com/libretro/RetroArch/blob/master/frontend/drivers/platform_unix.c) : callbacks NativeActivity, fenêtres, entrées et Looper Android.
+- [gfx/drivers_context/android_ctx.c](https://github.com/libretro/RetroArch/blob/master/gfx/drivers_context/android_ctx.c) : contexte EGL et surface Android.
+- [gfx/drivers/gl2.c](https://github.com/libretro/RetroArch/blob/master/gfx/drivers/gl2.c) : pilote graphique natif OpenGL.
+- [input/drivers/android_input.c](https://github.com/libretro/RetroArch/blob/master/input/drivers/android_input.c) : événements natifs Android et routage des commandes.
+- [audio/drivers/aaudio.c](https://github.com/libretro/RetroArch/blob/master/audio/drivers/aaudio.c) : sortie audio native.
+- [RetroActivityFuture.java](https://github.com/libretro/RetroArch/blob/master/pkg/android/phoenix/src/com/retroarch/browser/retroactivity/RetroActivityFuture.java) : intégration Android et gestion des surfaces.
+
+CorvusRetro reprend cette approche de frontend C et de pilotes natifs. Ses menus,
+son modèle d'entrée, shaders, batch de quads, cache de glyphes, boucle native,
+tampon audio et gestionnaire de moteurs sont des implémentations originales.
+La colle standard native_app_glue est compilée depuis le NDK avec sa notice
+Apache-2.0 conservée. Java fournit des services du système, sans menus ni boucle
+d'émulation : SAF, index et préférences Android, polices et ressources en atlas.
+Le SDK C de CorvusCore reste l'interface des moteurs ; libretro n'est pas l'ABI
+utilisée par cette intégration.
+
 ## Chargement et déchargement
 
 Dans [command.c](https://github.com/libretro/RetroArch/blob/ca3f823755762005b393ec7ce7b46b0310bdf0db/command.c), `command_unload_core` libère le moteur, efface le dernier chemin de cœur et rafraîchit le menu. `command_close_content` utilise aussi le mécanisme de libération du menu.

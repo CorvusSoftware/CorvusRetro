@@ -8,12 +8,7 @@ import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.net.Uri;
 import android.provider.OpenableColumns;
-import android.util.AtomicFile;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -21,11 +16,12 @@ import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
-/** Imported content lives in app-private storage; external filenames are display-only. */
+/** Android document/storage adapter. Core validation belongs to the native frontend. */
 final class GameLibrary {
-    static final int MAX_ROM = 32 * 1024 * 1024;
+    private static final int MAX_ROM = 32 * 1024 * 1024;
     private static final Object INDEX_LOCK = new Object();
     final Context context;
     final SharedPreferences preferences;
@@ -36,6 +32,14 @@ final class GameLibrary {
         final long played;
         Game(String id, String title, int system, long played) {
             this.id = id; this.title = title; this.system = system; this.played = played;
+        }
+    }
+    static final class Pending {
+        final Game game;
+        final File temporary;
+        Pending(Game game, File temporary) { this.game = game; this.temporary = temporary; }
+        void discard() {
+            if (temporary.exists() && !temporary.delete()) temporary.deleteOnExit();
         }
     }
     GameLibrary(Context context) {
@@ -67,47 +71,51 @@ final class GameLibrary {
         if (!folder.isDirectory() && !folder.mkdirs()) throw new IOException("Dossier de stockage indisponible");
         return folder;
     }
-    File rom(Game game) throws IOException { return new File(directory("roms"), game.id + ".rom"); }
-    File battery(Game game) throws IOException { return new File(directory("saves"), game.id + ".sav"); }
-    File state(Game game) throws IOException { return new File(directory("states"), game.id + "-" + CoreCatalog.VERSION + ".state"); }
-    void record(Game game) throws IOException {
+    private void record(Game game) throws IOException {
         synchronized (INDEX_LOCK) {
-        List<Game> records = games();
-        for (Game previous : records) {
-            if (previous.id.equals(game.id) && previous.played > game.played)
-                game = new Game(game.id, game.title, game.system, previous.played);
-        }
-        String id = game.id;
-        records.removeIf(existing -> existing.id.equals(id));
-        records.add(game);
-        JSONArray array = new JSONArray();
-        try {
-            for (Game item : records) {
-                JSONObject object = new JSONObject();
-                object.put("id", item.id).put("title", item.title).put("system", item.system).put("played", item.played);
-                array.put(object);
+            List<Game> records = games();
+            for (Game previous : records) {
+                if (previous.id.equals(game.id) && previous.played > game.played)
+                    game = new Game(game.id, game.title, game.system, previous.played);
             }
-        } catch (org.json.JSONException error) { throw new IOException(error); }
-        if (!preferences.edit().putString("games", array.toString()).commit()) throw new IOException("Bibliothèque non enregistrée");
+            String id = game.id;
+            records.removeIf(existing -> existing.id.equals(id));
+            records.add(game);
+            JSONArray array = new JSONArray();
+            try {
+                for (Game item : records) {
+                    JSONObject object = new JSONObject();
+                    object.put("id", item.id).put("title", item.title).put("system", item.system).put("played", item.played);
+                    array.put(object);
+                }
+            } catch (org.json.JSONException error) { throw new IOException(error); }
+            String oldIndex = preferences.getString("games", "[]");
+            if (!preferences.edit().putString("games", array.toString()).commit()) {
+                // SharedPreferences also updates its memory on disk failure. Restore that view.
+                preferences.edit().putString("games", oldIndex).commit();
+                throw new IOException("Bibliothèque non enregistrée");
+            }
         }
     }
-    void touch(Game game) throws IOException {
+    void touch(String id) throws IOException {
         synchronized (INDEX_LOCK) {
-            Game current = find(game.id);
-            if (current == null) current = game;
-            record(new Game(current.id, current.title, current.system, System.currentTimeMillis()));
+            Game current = find(id);
+            if (current != null) record(new Game(current.id, current.title, current.system, System.currentTimeMillis()));
         }
     }
-    Game importContent(Uri uri, int selected) throws Exception {
+    Pending prepare(Uri uri, int selected) throws Exception {
         String title = "Contenu";
         try (Cursor cursor = context.getContentResolver().query(uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null)) {
             if (cursor != null && cursor.moveToFirst() && !cursor.isNull(0)) title = cursor.getString(0);
         }
-        if (title.length() > 128) title = title.substring(0, 128);
-        String extension = title.toLowerCase(Locale.ROOT);
-        int system = extension.endsWith(".gba") ? 2 : extension.endsWith(".gbc") ? 1
-                : extension.endsWith(".gb") && selected == 2 ? 0 : CoreCatalog.valid(selected);
+        if (title.isEmpty()) title = "Contenu";
+        if (title.length() > 128) {
+            int end = Character.isHighSurrogate(title.charAt(127)) ? 127 : 128;
+            title = title.substring(0, end);
+        }
+        int system = selected >= 0 && selected < 3 ? selected : 0;
         File temporary = File.createTempFile("import-", ".part", directory("roms"));
+        boolean copied = false;
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             int total = 0;
@@ -121,47 +129,32 @@ final class GameLibrary {
                     if (total > MAX_ROM) throw new IOException("Contenu trop volumineux (maximum 32 Mio)");
                     output.write(buffer, 0, count); digest.update(buffer, 0, count);
                 }
+                output.getFD().sync();
             }
             if (total == 0) throw new IOException("Le contenu est vide");
             StringBuilder hash = new StringBuilder();
-            for (byte value : digest.digest()) hash.append(String.format(Locale.ROOT, "%02x", value & 255));
-            Game game = new Game(hash + "-" + system, title, system, 0);
-            // Reject malformed/incompatible content before adding a playlist entry.
-            try (NativeCore validation = new NativeCore(system, temporary.getAbsolutePath(), null)) {
-                if (validation.width <= 0) throw new IOException("Contenu incompatible");
-            }
-            File destination = rom(game);
-            if (!destination.exists() && !temporary.renameTo(destination)) throw new IOException("Import impossible");
-            Game previous = find(game.id);
-            if (previous != null) game = new Game(game.id, title, system, previous.played);
-            record(game);
-            return game;
+            for (byte value : digest.digest()) hash.append(String.format(java.util.Locale.ROOT, "%02x", value & 255));
+            Pending result = new Pending(new Game(hash + "-" + system, title, system, 0), temporary);
+            copied = true;
+            return result;
         } finally {
-            if (temporary.exists() && !temporary.delete()) temporary.deleteOnExit();
+            if (!copied && temporary.exists() && !temporary.delete()) temporary.deleteOnExit();
         }
     }
-    static byte[] read(File file, int maximum) throws IOException {
-        AtomicFile atomic = new AtomicFile(file);
-        try (FileInputStream input = atomic.openRead()) {
-            long size = input.getChannel().size();
-            if (size < 0 || size > maximum) throw new IOException("Sauvegarde trop volumineuse");
-            byte[] bytes = new byte[(int)size];
-            int at = 0;
-            while (at < bytes.length) {
-                int count = input.read(bytes, at, bytes.length - at);
-                if (count < 0) throw new IOException("Sauvegarde incomplète");
-                at += count;
-            }
-            return bytes;
-        } catch (FileNotFoundException error) {
-            if (!file.exists() && !new File(file.getPath() + ".bak").exists()) return null;
-            throw error;
+    void commit(Pending pending, int system) throws IOException {
+        if (system < 0 || system > 2) throw new IOException("Cœur inconnu");
+        Game accepted = new Game(pending.game.id.substring(0, 64) + "-" + system, pending.game.title, system, 0);
+        synchronized (INDEX_LOCK) {
+            File destination = new File(directory("roms"), accepted.id + ".rom");
+            boolean created = !destination.exists();
+            try {
+                if (created && !pending.temporary.renameTo(destination)) throw new IOException("Import impossible");
+                try { record(accepted); }
+                catch (IOException error) {
+                    if (created && destination.exists() && !destination.delete()) destination.deleteOnExit();
+                    throw error;
+                }
+            } finally { pending.discard(); }
         }
-    }
-    static void write(File file, byte[] bytes) throws IOException {
-        AtomicFile atomic = new AtomicFile(file);
-        FileOutputStream output = atomic.startWrite();
-        try { output.write(bytes); atomic.finishWrite(output); }
-        catch (IOException error) { atomic.failWrite(output); throw error; }
     }
 }

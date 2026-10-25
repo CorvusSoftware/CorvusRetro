@@ -14,10 +14,4 @@
         <item name="android:statusBarColor">#000000</item>
         <item name="android:navigationBarColor">#000000</item>
     </style>
-    <style name="CorvusThemeDark" parent="CorvusBase">
-        <item name="android:colorAccent">#81C7FF</item>
-        <item name="android:windowBackground">#202124</item>
-        <item name="android:statusBarColor">#292B30</item>
-        <item name="android:navigationBarColor">#292B30</item>
-    </style>
 </resources>

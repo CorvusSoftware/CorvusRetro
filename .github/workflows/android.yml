@@ -77,8 +77,11 @@ jobs:
           print('PASS repository text policy')
           PYCODE
 
-      - name: Test real CorvusCore engines through JNI
-        run: make core-jni-test CMAKE="$ANDROID_HOME/cmake/3.22.1/bin/cmake"
+      - name: Test native C frontend and CorvusCore engines
+        run: make test CMAKE="$ANDROID_HOME/cmake/3.22.1/bin/cmake"
+
+      - name: Check original C code with memory sanitizers
+        run: make test SANITIZE=ON CMAKE="$ANDROID_HOME/cmake/3.22.1/bin/cmake"
 
       - name: Build APK and run Android lint
         run: ./gradlew --no-daemon :app:assembleDebug :app:lintDebug

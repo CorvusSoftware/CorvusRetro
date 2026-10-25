@@ -1,118 +1,123 @@
 # CorvusRetro
 
-Application Android originale de **CorvusSoftware**, avec navigation inspirée de
-**MaterialUI de RetroArch** et les moteurs maison
+Application Android native originale de **CorvusSoftware**, inspirée de l'approche
+C/C++ et de la navigation MaterialUI de RetroArch. Les moteurs sont ceux de
 [CorvusCore](https://github.com/CorvusSoftware/CorvusCore).
 Code applicatif sous **AGPL-3.0-only**, Copyright (C) 2026 CorvusSoftware.
 
-## Version 0.4
+## Version 0.5 : frontend natif en C
+
+Les menus, leur état, la navigation, les commandes, le rendu et la boucle
+d'émulation sont maintenant en **C11**. Une `NativeActivity` héberge la boucle
+native ; le rendu passe par **EGL et OpenGL ES 2**, l'audio par **AAudio**.
+Les menus et le lecteur Java de la version 0.4 ont été remplacés.
+
+| Partie | Implémentation |
+| --- | --- |
+| Menus, thèmes, navigation et commandes | C11, `frontend.c` |
+| Boucle Android et cycle de vie | C11, `native_main.c` |
+| Rendu des menus et des frames | C11, EGL/OpenGL ES 2 |
+| Audio PCM stéréo | C11, AAudio et tampon circulaire |
+| Chargement, états et batterie | C11, SDK C CorvusCore |
+| Moteurs GB/GBC/GBA | C++20, CorvusCore |
+| Services du système Android | Java : SAF, stockage/préférences, polices et ressources |
+
+Java ne construit aucun menu et ne fait tourner aucun moteur. Les polices système
+et les icônes originales sont rasterisées par le service Android dans un atlas ;
+le frontend C compose et dessine le texte et les icônes en OpenGL.
+Le cache de glyphes natif accepte aussi les noms de contenus Unicode.
+
+## Fonctions
 
 - Listes tactiles et onglets Menu principal, Listes de lecture et Réglages.
-- **Charger un cœur** crée un moteur natif, même sans contenu ; **Décharger le cœur** le libère et revient à **Aucun cœur**.
-- Cœurs intégrés : **CorvusGB**, **CorvusGBC**, **CorvusGBA (expérimental)**, version 0.14.0.
-- Thème **NVIDIA Shield** par défaut : fond noir, en-tête anthracite, icônes et sélection vertes. Thème **MaterialUI sombre** bleu disponible dans les réglages.
-- Icônes vectorielles originales de style MaterialUI ; module de cœur avec une tête de corbeau découpée, également utilisée comme identité de l'application.
-- Import local, listes par console, historique, audio stéréo et commandes tactiles.
-- Menu rapide : reprendre, redémarrer, sauvegarder ou charger un état et fermer le contenu.
-- Sauvegardes batterie automatiques et suspension de l'émulation en arrière-plan.
+- Chargement d'un cœur sans contenu et déchargement réel, avec état **Aucun cœur**.
+- **CorvusGB**, **CorvusGBC** et **CorvusGBA expérimental**, version 0.14.0.
+- Thème **NVIDIA Shield** noir/vert et thème **MaterialUI sombre** bleu.
+- Icônes originales, module de cœur avec une tête de corbeau et identité CorvusRetro.
+- Import local par le sélecteur Android, listes par console et historique.
+- Commandes tactiles simultanées, clavier/manette, audio stéréo et proportions vidéo conservées.
+- Menu rapide natif : reprendre, redémarrer, sauvegarder, charger un état, menu principal et fermeture.
+- Suspension en arrière-plan et conservation de la session lors d'une rotation.
 - APK debug Android 8.0+, ARM64 et x86_64.
 
-Captures réelles sur émulateur Android 10 :
-
 <p>
-  <img src="docs/screenshots/menu.png" width="240" alt="Cœur chargé et thème NVIDIA Shield" />
-  <img src="docs/screenshots/cores.png" width="240" alt="Sélection des cœurs CorvusCore" />
-  <img src="docs/screenshots/settings.png" width="240" alt="Réglages du thème et du lecteur" />
+  <img src="docs/screenshots/menu.png" width="240" alt="Menu dessiné en C et OpenGL" />
+  <img src="docs/screenshots/cores.png" width="240" alt="Liste native des cœurs" />
+  <img src="docs/screenshots/player.png" width="240" alt="Programme original exécuté dans le lecteur natif" />
 </p>
 
-Autres captures : [lecteur](docs/screenshots/player.png),
-[liste de contenus](docs/screenshots/playlist.png), [menu rapide](docs/screenshots/quick-menu.png),
-[aucun cœur](docs/screenshots/menu-empty.png), [thème sombre bleu](docs/screenshots/theme-dark.png).
+Autres captures : [réglages](docs/screenshots/settings.png),
+[menu rapide](docs/screenshots/quick-menu.png), [thème bleu](docs/screenshots/theme-dark.png).
 
-## Charger et décharger
+## Utilisation et données
 
-L'application démarre avec **Aucun cœur**. Choisir **Charger un cœur** initialise
-le moteur sélectionné. Son nom apparaît dans la barre d'état. Il peut être
-remplacé par un autre cœur ou libéré avec **Décharger le cœur**.
-Ce choix est un état de la session : après arrêt du processus, aucun cœur n'est chargé.
+L'application démarre avec **Aucun cœur**. **Charger un cœur** prépare une instance
+native ; **Décharger le cœur** enregistre la batterie puis libère cette instance.
+**Charger du contenu** ouvre le sélecteur système pour un fichier décompressé de
+32 Mio au maximum. Le frontend C associe `.gbc` à GBC et `.gba` à GBA ; `.gb`
+utilise GB/GBC selon le choix courant, ou GB si GBA était sélectionné.
 
-**Charger du contenu** ouvre le sélecteur Android. Les extensions `.gbc` et `.gba`
-sélectionnent le système correspondant ; `.gb` utilise le cœur GB/GBC choisi,
-ou GB si GBA était sélectionné. Sans cœur chargé, les contenus sont associés
-à leur console. Les fichiers doivent être décompressés et limités à 32 Mio.
+Les listes peuvent charger directement le cœur associé. Le bouton Retour Android
+ouvre ou ferme le menu rapide pendant le jeu. **Menu principal** suspend le jeu
+et donne accès aux autres menus ; **Reprendre le contenu** y retourne.
+**Fermer le contenu** persiste la batterie et libère le moteur.
 
-Les listes et l'historique peuvent lancer directement un contenu, avec chargement
-automatique de son moteur. Le menu rapide s'ouvre par son icône ou Retour Android.
-**Fermer le contenu** enregistre la batterie, libère le moteur et revient aux menus.
-Un changement de cœur demandé depuis une autre activité est refusé si un lecteur
-en est encore propriétaire : fermer d'abord le contenu.
+Les fichiers privés et l'index des versions 0.3/0.4 sont conservés : contenus,
+historique, préférences, batterie et états associés à CorvusCore 0.14.0.
+Les écritures de batterie sont atomiques et acquittées auprès du cœur après leur
+réussite. Un échec de persistance bloque un remplacement ou déchargement demandé
+pour permettre une nouvelle tentative. La batterie est aussi enregistrée à la
+pause et périodiquement. Un emplacement d'état est disponible par contenu.
 
-Les fichiers importés, la batterie et les états résident dans le stockage privé.
-La batterie est enregistrée périodiquement, à la pause et à la fermeture.
-Un emplacement d'état par contenu est associé à la version de CorvusCore.
-Une mise à jour avec la même signature conserve les données ; la désinstallation
-les supprime. L'export de sauvegardes reste à ajouter.
-
-Commandes tactiles : directions, A/B, Start/Select et L/R sur GBA.
-Événements clavier/manette pris en charge : flèches, Z/X, Entrée/Espace,
-A/B, Start/Select et L1/R1. Le son et la veille se règlent avant le lancement.
-Le thème se choisit dans **Réglages → Thème de l'interface** et reste mémorisé.
-
-La compatibilité dépend de CorvusCore. GBA reste expérimental.
-Aucun jeu commercial ou BIOS constructeur n'est fourni.
+Une mise à jour avec la même signature conserve les données ; une désinstallation
+les supprime. L'export des sauvegardes reste à ajouter. La compatibilité dépend
+de CorvusCore, GBA reste expérimental et aucun jeu commercial ou BIOS constructeur
+n'est fourni.
 
 ## Construire et tester
 
-Prérequis : JDK 17 ou 21, SDK Android 35, Build Tools 35.0.0,
-NDK 27.2.12479018 et CMake 3.22.1. Gradle 8.13 et AGP 8.9.1 sont fixés.
+JDK 17 ou 21, SDK Android 35, Build Tools 35.0.0, NDK 27.2.12479018 et CMake 3.22.1.
+Gradle 8.13 et AGP 8.9.1 sont fixés.
 
 ```sh
 git clone --recurse-submodules https://github.com/CorvusSoftware/CorvusRetro.git
 cd CorvusRetro
-# Pour un clone existant :
 git submodule update --init --recursive
 export ANDROID_HOME=/chemin/vers/android-sdk
 ./gradlew :app:assembleDebug :app:lintDebug
-# Tests natifs sur Linux, avec JAVA_HOME vers un JDK complet :
+# Tests du frontend C et des vrais moteurs, sur Linux :
 make test CMAKE="$ANDROID_HOME/cmake/3.22.1/bin/cmake"
+make test SANITIZE=ON CMAKE="$ANDROID_HOME/cmake/3.22.1/bin/cmake"
 ```
 
 APK : `app/build/outputs/apk/debug/app-debug.apk`, signé avec la clé Android debug.
-Android Studio peut ouvrir la racine du projet avec ces versions du SDK/NDK/CMake.
-Les preuves d'exécution et leurs limites sont dans [la validation Android](docs/validation-android.md).
+Les tests hôtes n'ont plus besoin d'une JVM ou d'un pont JNI : ils exercent le C
+et le SDK directement. Le test mémoire instrumente notre code C portable ; le SDK
+CorvusCore n'est pas instrumenté par cette option.
+Voir [les preuves et limites Android](docs/validation-android.md).
 
 ## APK automatique
 
 Le workflow [Android APK](https://github.com/CorvusSoftware/CorvusRetro/actions/workflows/android.yml)
-s'exécute à chaque push sur `main`, sur les pull requests et manuellement.
-Il initialise CorvusCore, contrôle la ponctuation du dépôt, teste les vrais moteurs
-via JNI, construit l'application et exécute lint, puis vérifie signature et alignement 16 Ko.
+s'exécute sur `main`, sur les pull requests et manuellement. Il initialise les
+sous-modules, contrôle la ponctuation, teste le C et les moteurs avec et sans
+sanitizers, construit l'APK, exécute lint et vérifie signature et alignement 16 Ko.
 
 Téléchargement : **Actions → Android APK → exécution réussie → Artifacts →
-CorvusRetro-debug-…**, puis extraire l'APK du ZIP. Conservation : 14 jours.
+CorvusRetro-debug-…**. Extraire l'APK du ZIP ; artefacts conservés 14 jours.
 
-## Architecture
+## Architecture et origine
 
-```text
-app/                      Menus Java, lecteur, audio et pont JNI C++
-third_party/CorvusCore/    Moteurs C++20 et SDK C, sous-module figé
-tests/                    Tests Java/JNI et génération de contenus synthétiques
-```
+`app/src/main/cpp/` contient le frontend C, ses pilotes Android/GL/audio et le
+contrat portable de plateforme. `app/src/main/java/` contient uniquement les
+services Android. `third_party/CorvusCore/` fournit les moteurs C++20 figés au
+commit `38829d4935bbdcf4b13261714352362065b78551` ; son API C préliminaire version 0
+est vérifiée avant utilisation. Le frontend utilise ce SDK, sans adaptateur libretro.
 
-`CoreManager` possède le cœur sans contenu et transfère son handle à un seul
-`EmulationSession`. Création, émulation, sauvegardes et destruction passent par
-une même file FIFO. `MainActivity` observe l'état chargé ; `PlayerActivity`
-présente les images et commandes. Les fichiers et préférences restent dans `GameLibrary`.
-
-CorvusCore 0.14.0 est figé au commit `38829d4935bbdcf4b13261714352362065b78551`.
-Le pont vérifie son API C préliminaire version 0. Toute mise à jour exige une nouvelle
-validation. Les sources du sous-module restent intactes.
-
-## Inspiration et conventions
-
-Le pilote MaterialUI, son thème Shield et les ressources GLUI ont été étudiés
-pour la navigation, les couleurs et les métaphores d'icônes. Les icônes et le
-code applicatif sont originaux. Voir [les références précises](docs/retroarch-reference.md).
+L'architecture, les pilotes et MaterialUI de RetroArch ont été étudiés. Les
+implémentations applicatives, shaders et icônes sont originaux. Voir
+[les références](docs/retroarch-reference.md). La colle standard `native_app_glue`
+provient du NDK Android et conserve sa notice Apache-2.0 dans l'APK.
 
 Tout fichier source original porte :
 
@@ -122,8 +127,6 @@ Tout fichier source original porte :
 // SPDX-License-Identifier: AGPL-3.0-only
 ```
 
-Les tirets Unicode longs sont interdits dans les fichiers du dépôt parent.
-Les licences et crédits tiers restent conservés, notamment ceux de CorvusCore
-et du wrapper Gradle. Les notices embarquées utilisent le tiret ASCII pour les
-plages d'années, sans modification des crédits. Elles sont consultables hors ligne
-via **Réglages → Licence et crédits**.
+Les tirets Unicode longs sont interdits dans les fichiers du dépôt parent et
+contrôlés par CI. Les licences et attributions de CorvusCore, du NDK et du wrapper
+Gradle restent conservées. Elles sont consultables dans **Réglages → Licence et crédits**.

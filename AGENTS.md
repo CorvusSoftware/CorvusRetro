@@ -1,9 +1,9 @@
 # Conventions CorvusRetro
 
-- Android d'abord, moteurs C++20 dans `third_party/CorvusCore/`, interface Java et pont JNI dans `app/`.
-- Écrire le code applicatif pour CorvusRetro. Étudier RetroArch comme référence et dessiner les ressources originales.
-- Charger et décharger les handles uniquement sur la file FIFO CoreManager ; un seul lecteur propriétaire à la fois. Persister la batterie avant libération.
-- Tous les fichiers source originaux commencent par les mentions suivantes, adaptées aux commentaires du langage :
+- Frontend natif original en C11 : menus, navigation, input, boucle Android, EGL/OpenGL ES2, audio AAudio, états et batterie.
+- Moteurs C++20 dans `third_party/CorvusCore/`, SDK C figé ; Java limité aux services Android NativeActivity, SAF, index/préférences, glyphes et ressources. Aucun menu, widget applicatif ou moteur piloté par Java.
+- Un seul thread frontend possède les handles. Le callback audio ne lit qu'un tampon PCM protégé. Persister la batterie avant remplacement ou libération ; conserver le moteur si une écriture demandée échoue.
+- Toutes les sources originales portent les trois mentions, adaptées aux commentaires du langage :
 
 ```c
 // CorvusRetro - CorvusSoftware
@@ -11,7 +11,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 ```
 
-- Les tirets Unicode longs sont interdits dans les fichiers du dépôt parent. Utiliser la ponctuation française ou le tiret ASCII. La CI contrôle cette règle.
-- Préserver les licences et attributions de CorvusCore et du wrapper Gradle. Ne pas modifier les sources du sous-module.
-- Validation : `JAVA_HOME=... make test CMAKE=...` pour les vrais moteurs, puis `./gradlew :app:assembleDebug :app:lintDebug`.
-- Version 0.4 : menus MaterialUI originaux, thèmes NVIDIA Shield et sombre, CorvusCore 0.14.0 GB/GBC/GBA expérimental. Distinguer tests hôtes, compilation, émulateur et téléphone physique.
+- Aucun tiret Unicode long dans les fichiers du dépôt parent ; règle vérifiée par CI.
+- Préserver les licences et crédits de CorvusCore, du NDK et du wrapper Gradle. Ne pas modifier les sources du sous-module.
+- Références RetroArch pour l'architecture et la navigation ; écrire notre code et nos ressources.
+- Validation : `make test CMAKE=...`, `make test SANITIZE=ON CMAKE=...`, puis `./gradlew :app:assembleDebug :app:lintDebug`.
+- Distinguer les preuves hôtes, la compilation APK, l'émulateur et le téléphone physique. La migration conserve les données et chemins 0.4.
