@@ -198,7 +198,7 @@ public final class MainActivity extends NativeActivity {
             pending = null;
             if (ready == null) return accept ? "Import interrompu" : null;
             if (!accept || destroyed) { ready.discard(); return accept ? "Import interrompu" : null; }
-            if (system < 0 || system > 2) { ready.discard(); return "Cœur inconnu"; }
+            if (system < 0 || system >= 32) { ready.discard(); return "Cœur inconnu"; }
             try { library.commit(ready, system); return null; }
             catch (IOException error) { return error.getMessage() == null ? "Import impossible" : error.getMessage(); }
         }
