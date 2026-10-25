@@ -46,10 +46,18 @@ static void register_module(const char *name) {
 
     corvus_core_api api = {.struct_size = sizeof(api)};
     corvus_core_info info = {.struct_size = sizeof(info)};
-    if (entry && entry(CORVUS_API_VERSION, &api) &&
-        api.api_version == CORVUS_API_VERSION && api.struct_size >= sizeof(api) &&
-        api.get_info && api.create && api.destroy && api.load_game && api.unload_game &&
-        api.get_av_info && api.set_button && api.run_frame && api.get_info(&info) &&
+    const bool negotiated = entry && entry(CORVUS_API_VERSION, &api);
+    const bool has_state = api.serialize_size && api.serialize && api.unserialize;
+    const bool any_state = api.serialize_size || api.serialize || api.unserialize;
+    const bool has_battery = api.battery_size && api.battery_dirty &&
+                             api.battery_copy && api.battery_acknowledge;
+    const bool any_battery = api.battery_size || api.battery_dirty ||
+                             api.battery_copy || api.battery_acknowledge;
+    if (negotiated && api.api_version == CORVUS_API_VERSION &&
+        api.struct_size >= sizeof(api) && has_state == any_state &&
+        has_battery == any_battery && api.get_info && api.create &&
+        api.destroy && api.load_game && api.unload_game && api.get_av_info &&
+        api.set_button && api.run_frame && api.get_info(&info) &&
         info.struct_size >= sizeof(info)) {
         cr_core_descriptor descriptor = {0};
         if (copy_string(descriptor.module, sizeof(descriptor.module), name) &&
