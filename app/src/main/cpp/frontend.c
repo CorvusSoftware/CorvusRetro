@@ -375,6 +375,10 @@ static void activate(cr_ui *u, row r) {
         break;
     case ACT_GAME: {
         cr_game *g = &u->games[r.value];
+        if (g->system < 0) {
+            cr_ui_message(u, "Le cœur associé à ce jeu n'est plus installé");
+            break;
+        }
         char path[4200];
         snprintf(path, sizeof(path), "%s/roms/%s.rom", u->engine.root, g->id);
         char title[512], id[80];
@@ -443,17 +447,26 @@ void cr_ui_import(cr_ui *u, const cr_import *item) {
     }
     cr_import resolved = *item;
     resolved.system = cr_content_system(item->title, item->system);
-    bool id_ok = cr_game_id_valid(item->id) && resolved.system >= 0;
-    if (id_ok)
+    const cr_core_descriptor *core = cr_registry_get(resolved.system);
+    bool id_ok = cr_game_id_valid(item->id) && core != NULL;
+    if (id_ok && resolved.system < 3) {
+        /* Preserve historic GB/GBC/GBA storage keys and saves exactly. */
         snprintf(resolved.id + 65, sizeof(resolved.id) - 65, "%d", resolved.system);
+    } else if (id_ok) {
+        char hash[65];
+        memcpy(hash, item->id, 64);
+        hash[64] = '\0';
+        id_ok = cr_registry_content_id(resolved.id, sizeof(resolved.id), hash, core->id);
+    }
     bool valid = id_ok && cr_engine_check(&u->engine, resolved.system, resolved.path);
     char error[512] = {0};
     if (!valid)
         snprintf(error, sizeof(error), "%s",
                  u->engine.error[0] ? u->engine.error : "Contenu incompatible");
     bool committed = u->platform.finish_import &&
-                     u->platform.finish_import(u->platform.context, valid, resolved.system, error,
-                                               sizeof(error));
+                     u->platform.finish_import(u->platform.context, valid, resolved.system,
+                                               core ? core->id : "", core ? core->system_id : "",
+                                               error, sizeof(error));
     if (!valid || !committed) {
         cr_ui_message(u, error);
         return;
