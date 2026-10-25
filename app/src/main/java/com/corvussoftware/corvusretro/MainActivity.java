@@ -215,7 +215,7 @@ public final class MainActivity extends NativeActivity {
         }
     }
     public String credits() {
-        try { return asset("LICENSE.txt") + "\n\n" + asset("CORVUSCORE-NOTICE.txt") + "\n\n" + asset("CORVUSCORE-COPYRIGHT.txt") + "\n\n" + asset("ANDROID-NATIVE-GLUE-NOTICE.txt"); }
+        try { return asset("LICENSE.txt") + "\n\n" + asset("CORVUSCORE-NOTICE.txt") + "\n\n" + asset("CORVUSCORE-COPYRIGHT.txt") + "\n\n" + asset("CORVUSAPI-LICENSE.txt") + "\n\n" + asset("ANDROID-NATIVE-GLUE-NOTICE.txt"); }
         catch (IOException error) { return "Licence indisponible. Consultez LICENSE dans le dépôt."; }
     }
     public void appearance(int color, boolean keepAwake) {
