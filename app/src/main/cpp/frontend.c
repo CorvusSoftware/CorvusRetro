@@ -379,9 +379,9 @@ static void activate(cr_ui *u, row r) {
             cr_ui_message(u, "Le cœur associé à ce jeu n'est plus installé");
             break;
         }
-        char path[4200];
+        char path[4256];
         snprintf(path, sizeof(path), "%s/roms/%s.rom", u->engine.root, g->id);
-        char title[512], id[80];
+        char title[512], id[96];
         snprintf(title, sizeof(title), "%s", g->title);
         snprintf(id, sizeof(id), "%s", g->id);
         open_game(u, g->system, id, title, path);
@@ -472,7 +472,7 @@ void cr_ui_import(cr_ui *u, const cr_import *item) {
         return;
     }
     cr_ui_reload(u);
-    char path[4200];
+    char path[4256];
     snprintf(path, sizeof(path), "%s/roms/%s.rom", u->engine.root, resolved.id);
     open_game(u, resolved.system, resolved.id, resolved.title, path);
 }
