@@ -104,6 +104,30 @@ int main(void) {
     }
     check(!cr_game_id_valid(NULL) && !cr_game_id_valid("../unsafe") && !cr_game_id_valid("A"),
           "reject unsafe IDs", NULL);
+    check(cr_registry_find("corvus.gb") == 0 &&
+              cr_registry_find("corvus.gbc") == 1 &&
+              cr_registry_find("corvus.gba") == 2 &&
+              cr_registry_find("corvus.missing") == -1,
+          "permanent core names are resolved independently of storage indexes", NULL);
+    char original_hash[65], stable_a[96], stable_b[96], stable_repeat[96];
+    memcpy(original_hash, ids[0], 64);
+    original_hash[64] = '\0';
+    check(cr_registry_content_id(stable_a, sizeof(stable_a), original_hash, "community.nes") &&
+              cr_registry_content_id(stable_repeat, sizeof(stable_repeat),
+                                     original_hash, "community.nes") &&
+              cr_registry_content_id(stable_b, sizeof(stable_b),
+                                     original_hash, "other.nes") &&
+              cr_game_id_valid(stable_a) && strcmp(stable_a, stable_repeat) == 0 &&
+              strcmp(stable_a, stable_b) != 0,
+          "community game key depends on permanent core ID, not module order", NULL);
+    check(cr_game_id_valid(ids[0]) && cr_game_id_valid(ids[1]) &&
+              cr_game_id_valid(ids[2]) &&
+              cr_game_id_valid("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-31"),
+          "legacy game keys remain valid even if their core disappears", NULL);
+    check(!cr_game_id_valid("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-32") &&
+              !cr_game_id_valid("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-c123"),
+          "invalid core-scoped storage keys rejected", NULL);
+
     cr_engine engine;
     cr_engine_init(&engine, root);
     check(!engine.handle && engine.system == -1, "start unloaded", &engine);
