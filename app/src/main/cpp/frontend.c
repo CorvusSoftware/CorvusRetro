@@ -463,7 +463,24 @@ void cr_ui_import(cr_ui *u, const cr_import *item) {
     snprintf(path, sizeof(path), "%s/roms/%s.rom", u->engine.root, resolved.id);
     open_game(u, resolved.system, resolved.id, resolved.title, path);
 }
-static void quick_action(cr_ui *u, int i) {
+static int quick_action_at(const cr_ui *u, int row) {
+    for (int action = 0; action < 6; ++action) {
+        if (action == 1 && !u->engine.api.reset) continue;
+        if ((action == 2 || action == 3) &&
+            (!u->engine.api.serialize_size ||
+             !u->engine.api.serialize || !u->engine.api.unserialize)) continue;
+        if (row-- == 0) return action;
+    }
+    return -1;
+}
+static int quick_count(const cr_ui *u) {
+    int count = 0;
+    while (quick_action_at(u, count) >= 0) ++count;
+    return count;
+}
+static void quick_action(cr_ui *u, int row) {
+    int i = quick_action_at(u, row);
+    if (i < 0) return;
     if (i == 0)
         u->quick = false;
     if (i == 1 && result(u, cr_engine_reset(&u->engine))) {
@@ -523,7 +540,7 @@ void cr_ui_confirm(cr_ui *u) {
         activate(u, get_row(u, u->focus));
 }
 void cr_ui_move(cr_ui *u, int direction) {
-    int count = u->quick ? 6 : rows(u);
+    int count = u->quick ? quick_count(u) : rows(u);
     if (count <= 0)
         return;
     u->focus = (u->focus + direction + count) % count;
@@ -562,10 +579,11 @@ static unsigned button_at(const cr_ui *u, float x, float y) {
     return cr_play_hit(&layout, x, y);
 }
 static float quick_height(const cr_ui *u) {
-    return fminf(392, u->height - 16);
+    return fminf((float)(56 + quick_count(u) * 56), u->height - 16);
 }
 static void quick_clamp(cr_ui *u) {
-    u->quick_scroll = fmaxf(0, fminf(u->quick_scroll, 336 - (quick_height(u) - 56)));
+    u->quick_scroll = fmaxf(0, fminf(u->quick_scroll,
+                       quick_count(u) * 56 - (quick_height(u) - 56)));
 }
 static int target(const cr_ui *u, float x, float y) {
     if (x < 0 || y < 0 || x >= u->width || y >= u->height)
@@ -577,7 +595,8 @@ static int target(const cr_ui *u, float x, float y) {
             return -4;
         if (y < top + 56)
             return -1;
-        return 10000 + (int)((y - top - 56 + u->quick_scroll) / 56);
+        int row = (int)((y - top - 56 + u->quick_scroll) / 56);
+        return row >= 0 && row < quick_count(u) ? 10000 + row : -4;
     }
     if (u->page == CR_PLAY) {
         cr_play_layout layout = play_layout(u);
@@ -968,7 +987,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         rect(p, x, y, qw, qh, theme->surface);
         if (p->clip)
             p->clip(p->context, x, y + 56, qw, qh - 56);
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < quick_count(u); i++) {
             float top = y + 56 + i * 56 - u->quick_scroll;
             if (top + 56 < y + 56 || top > y + qh)
                 continue;
@@ -976,7 +995,8 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
                 rect(p, x, top, qw, 56, focus);
             else if (u->feedback_target == 10000 + i && u->feedback_alpha > 0)
                 rect(p, x, top, qw, 56, alpha_color(focus, u->feedback_alpha));
-            text(p, quick_labels[i], x + 20, top + 35, 16, fg, qw - 40);
+            int action = quick_action_at(u, i);
+            text(p, quick_labels[action], x + 20, top + 35, 16, fg, qw - 40);
         }
         if (p->clip)
             p->clip(p->context, 0, 0, w, h);
