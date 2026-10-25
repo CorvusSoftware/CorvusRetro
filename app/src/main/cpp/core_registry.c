@@ -15,7 +15,8 @@ static bool initialized;
 
 static bool copy_string(char *dest, size_t capacity, const char *source) {
     if (!source) return false;
-    size_t length = strnlen(source, capacity);
+    size_t length = 0;
+    while (length < capacity && source[length]) ++length;
     if (!length || length >= capacity) return false;
     memcpy(dest, source, length + 1);
     return true;
