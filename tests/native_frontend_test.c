@@ -69,9 +69,11 @@ int main(void) {
     tap(&u, 330, 670);
     check(u.page == CR_SETTINGS, "native bottom tab");
     tap(&u, 100, 100);
+    check(u.page == CR_UI_SETTINGS, "interface settings category");
+    tap(&u, 100, 100);
     check(u.page == CR_THEMES, "native theme list");
     tap(&u, 100, 176);
-    check(theme == CR_THEME_SHIELD && u.theme == CR_THEME_SHIELD && u.page == CR_SETTINGS,
+    check(theme == CR_THEME_SHIELD && u.theme == CR_THEME_SHIELD && u.page == CR_UI_SETTINGS,
           "Shield selection remains stable");
     tap(&u, 100, 100);
     tap(&u, 100, 252);
@@ -79,6 +81,8 @@ int main(void) {
     tap(&u, 100, 100);
     tap(&u, 100, 100);
     check(theme == CR_THEME_CORVUS && u.theme == CR_THEME_CORVUS, "Corvus is selectable and saved");
+    cr_ui_back(&u);
+    check(u.page == CR_SETTINGS, "back restores settings root");
     cr_ui_back(&u);
     check(u.page == CR_MAIN, "back navigation");
     // Multiple pointers and cancellation are independent of the rendering driver.

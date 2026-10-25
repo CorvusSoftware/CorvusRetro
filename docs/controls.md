@@ -43,3 +43,5 @@ trois systèmes et dix tailles, les diagonales, puis le toucher des coordonnées
 réellement transmises au dessinateur. Il couvre aussi le menu avec un autre
 doigt sur A, la reprise sans bouton coincé, le déplacement et l'annulation.
 Les essais Android et leurs limites sont détaillés dans [la validation](validation-android.md).
+
+Le retour visuel et les catégories de réglages sont décrits dans [la navigation](navigation.md).

@@ -1,5 +1,30 @@
 # Validation Android
 
+## Version 0.9 : feedback et catégories
+
+Cinq suites CTest passent normalement et sous ASan/UBSan. `native_menu` couvre :
+arborescence réelle, informations d'un cœur chargé, retour avec filtre/sélection
+conservés, fondu du toucher, tap/maintien/reset, timestamps indépendants du rendu,
+menu à un doigt, annulation et défilement. Il vérifie aussi le premier flash d'un
+tap malgré une frame lente et la consommation des pulses moteur, son extinction
+sans entrée coincée, et la désactivation du feedback sans perte d'entrée.
+Revue indépendante et compléments latch visuel/reset : aucun problème bloquant.
+APK ARM64/x86_64 et lint sans erreur ; signature et alignement 16Ko vérifiés.
+
+Sur Android15 x86_64 (480x960, densité200, sans KVM), données 0.8 conservées :
+
+- Nouveaux réglages et retour dans les parents ; maintien d'une catégorie sans ouverture, puis tap pour l'ouvrir.
+- Réglage audio : maintien court sans modification, tap modifie la valeur sauvegardée, restauration de la valeur initiale.
+- Afficher les appuis désactivé, choix conservé après redémarrage, puis réactivé.
+- Historique dans Listes de lecture ; GB existant réellement relancé depuis sa liste.
+- Commande A tenue : comparaison des pixels de sa zone entre repos/appui/relâchement ; l'appui diffère, le relâchement retrouve exactement le repos.
+- Informations du vrai cœur GB, accès au menu rapide depuis le menu principal et reprise, menu central après rotation.
+- APK final réinstallé : appui de1200ms sur Audio désactivé restaure effectivement la préférence activée ; retour Audio/Réglages/Menu principal correct.
+- Aucun crash fatal de CorvusRetro observé ; le démarrage de l'émulateur a de nouveau présenté une boîte SystemUI avant stabilisation et essais valides.
+
+[Références et captures](navigation.md). Les gestes multitouch simultanés restent
+vérifiés dans le modèle C ; pas de qualification sur téléphone physique.
+
 ## Version 0.8 : écran et commandes
 
 Quatre suites CTest passent normalement et sous ASan/UBSan, dont `native_controls`.

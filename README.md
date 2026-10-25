@@ -5,18 +5,23 @@ C/C++ et de la navigation MaterialUI de RetroArch. Les moteurs sont ceux de
 [CorvusCore](https://github.com/CorvusSoftware/CorvusCore).
 Code applicatif sous **AGPL-3.0-only**, Copyright (C) 2026 CorvusSoftware.
 
-## Version 0.8 : écran de jeu et commandes recalibrés
+## Version 0.9 : appuis et catégories
 
-Le bouton du menu rapide est au centre des commandes, entre **Select** et **Start**.
-Le lecteur utilise toute la surface utile, sans barre de titre. En portrait, la
-vidéo et les commandes occupent des zones séparées ; en paysage, les commandes
-se superposent à la vidéo, comme les overlays de RetroArch. La croix accepte
-les huit directions et les boutons s'adaptent à la taille de la fenêtre.
-Les proportions GB/GBC/GBA et les marges des barres système restent respectées.
-Voir [les commandes et leurs références](docs/controls.md).
+Les commandes de jeu deviennent plus visibles pendant l'appui, puis reviennent
+progressivement au repos. Les menus donnent un retour visuel au toucher : un tap
+valide au relâchement, un maintien court sélectionne, et un appui long rétablit
+le défaut des réglages booléens concernés.
 
-Les thèmes **CorvusRetro** par défaut, **NVIDIA Shield** et **ASUS** restent
-disponibles : [palettes](docs/themes.md).
+Les réglages sont regroupés en **Interface utilisateur**, **Vidéo**, **Audio** et
+**Affichage à l'écran**. L'historique se trouve dans **Listes de lecture** ;
+les informations et licences sont dans **Menu principal > Informations**.
+Le retour conserve la sélection et le défilement du parent.
+Voir [l'organisation et les références RetroArch](docs/navigation.md).
+
+Le menu de jeu reste au centre, entre **Select** et **Start**. Vidéo proportionnelle,
+croix à huit directions, disposition adaptative portrait/paysage et marges Android
+restent en place : [commandes](docs/controls.md). Les trois
+[thèmes](docs/themes.md) sont CorvusRetro par défaut, NVIDIA Shield et ASUS.
 
 Les menus, leur état, la navigation, les commandes, le rendu et la boucle
 d'émulation sont maintenant en **C11**. Une `NativeActivity` héberge la boucle

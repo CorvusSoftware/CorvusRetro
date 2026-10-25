@@ -1,5 +1,4 @@
-Ancien lecteur : titre 56dp, positions fixes, quatre disques directionnels, Select/Start adjacents.
-Références publiques consultées : common-overlays retropad, flat/gba, neo-retropad. Configurations normalisées portrait/paysage ; flat/gba portrait place son menu à x=.5/y=.94792. Corvus garde son code et ses ressources originaux.
-play_layout.c/h fournit vidéo, panneau portrait, croix et cibles ; frontend dessine et touche le même résultat. Croix diagonale sur les neuf secteurs avec centre neutre, A/B radiaux, menu isolé des entrées moteur. Échelle bornée pour éviter les collisions sur petites fenêtres.
-Un glissement démarré sur Menu ne devient pas un bouton moteur ; l’ouverture du menu efface toutes les entrées. Rotation conserve le moteur et annule les appuis.
-Android15 sans KVM : ANR SystemUI au démarrage avant essais valides ; aucun crash fatal de CorvusRetro pendant les essais GB/GBA.
+Références RetroArch : MaterialUI touch_feedback et pointer_up, menu_input.h seuils200ms/1s, input_overlay_alpha alpha_mod, menu_displaylist catégories et informations.
+Corvus : UI/Vidéo/Audio/OSD fonctionnels, historique dans listes, InfoMain->About/Core(si chargé)/Licences. Pile8vues restaure page/focus/filtre/scroll, onglet dérivé de page. IDs publics existants préservés, nouvelles pages9..15.
+Appuis jeu : opacité, couleurs et cibles constantes, feedback_pulses indépendant du moteur pour premier flash puis fondu100ms. Menus : une touche, fondu200ms, tap au relâchement, maintien sélection et long>=1s remet Audio/Awake/ShowInput au défaut activé. Timestamps MotionEvent en ns vers secondes pour éviter dépendance aux frames.
+Ancienne mention du thème sombre dans À propos retirée. show_input persisté comme int par service Java générique. Aucun changement SDK/moteurs/données.

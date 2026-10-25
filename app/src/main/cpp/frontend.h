@@ -4,9 +4,9 @@
 #ifndef CORVUS_FRONTEND_H
 #define CORVUS_FRONTEND_H
 #include "engine.h"
-#include "theme.h"
 #include "platform.h"
 #include "render.h"
+#include "theme.h"
 enum {
     CR_MAIN,
     CR_LISTS,
@@ -16,34 +16,51 @@ enum {
     CR_ABOUT,
     CR_LICENSE,
     CR_THEMES,
-    CR_PLAY
+    CR_PLAY,
+    CR_UI_SETTINGS,
+    CR_VIDEO_SETTINGS,
+    CR_AUDIO_SETTINGS,
+    CR_OSD_SETTINGS,
+    CR_OVERLAY_SETTINGS,
+    CR_INFORMATION,
+    CR_CORE_INFO
 };
 enum { CR_TOUCH_DOWN, CR_TOUCH_MOVE, CR_TOUCH_UP, CR_TOUCH_CANCEL };
 typedef struct {
     bool active, dragged;
-    float x, y, last_y;
+    float x, y, last_x, last_y, held;
+    double started;
     int target;
     unsigned mask;
 } cr_pointer;
+typedef struct {
+    int page, focus, filter;
+    float scroll;
+} cr_navigation;
 typedef struct {
     cr_engine engine;
     cr_platform platform;
     cr_game *games;
     size_t game_count;
-    int page, return_page, detail_parent, filter, theme, focus;
-    bool quick, audio, awake, importing;
+    int page, return_page, filter, theme, focus, tab, menu_pointer, feedback_target;
+    bool quick, audio, awake, importing, show_input;
     float width, height, scroll, quick_scroll, text_height;
+    float feedback_alpha, control_feedback[10];
+    cr_navigation history[8];
+    unsigned depth;
     cr_pointer pointers[32];
-    unsigned keys, pulses;
+    unsigned keys, pulses, feedback_pulses;
     char title[512], message[512];
     char *license;
-    double message_time;
+    double message_time, time;
 } cr_ui;
 void cr_ui_init(cr_ui *, cr_platform, const char *);
 void cr_ui_destroy(cr_ui *);
 void cr_ui_size(cr_ui *, float, float);
 void cr_ui_draw(cr_ui *, const cr_painter *);
 void cr_ui_touch(cr_ui *, int, int, float, float);
+/* Platform event time keeps tap/hold classification independent of rendering speed. */
+void cr_ui_touch_at(cr_ui *, int, int, float, float, double);
 void cr_ui_back(cr_ui *);
 void cr_ui_confirm(cr_ui *);
 void cr_ui_move(cr_ui *, int);

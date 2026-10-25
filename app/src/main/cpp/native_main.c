@@ -174,7 +174,8 @@ static int32_t input(struct android_app *app, AInputEvent *event) {
                 continue;
             float x = (AMotionEvent_getX(event, i) - a->gl.left) / a->gl.density,
                   y = (AMotionEvent_getY(event, i) - a->gl.top) / a->gl.density;
-            cr_ui_touch(u, AMotionEvent_getPointerId(event, i), phase, x, y);
+            cr_ui_touch_at(u, AMotionEvent_getPointerId(event, i), phase, x, y,
+                           AMotionEvent_getEventTime(event) / 1000000000.0);
         }
         return 1;
     }
@@ -204,7 +205,7 @@ void android_main(struct android_app *app) {
     a->applied_theme = -1;
 #ifndef NDEBUG
     int last_page = -1, last_core = -2, last_content = -1, last_quick = -1, last_theme = -1,
-        last_active = -1;
+        last_active = -1, last_show_input = -1;
 #endif
     while (!app->destroyRequested) {
         bool active = a->window && a->resumed && a->focused;
@@ -240,17 +241,18 @@ void android_main(struct android_app *app) {
 #ifndef NDEBUG
         if (last_page != a->ui.page || last_core != a->ui.engine.system ||
             last_content != a->ui.engine.loaded || last_quick != a->ui.quick ||
-            last_theme != a->ui.theme || last_active != active) {
+            last_theme != a->ui.theme || last_active != active || last_show_input != a->ui.show_input) {
             __android_log_print(ANDROID_LOG_DEBUG, "CorvusRetro",
-                                "frontend page=%d core=%d content=%d quick=%d theme=%d active=%d",
+                                "frontend page=%d core=%d content=%d quick=%d theme=%d active=%d show_input=%d",
                                 a->ui.page, a->ui.engine.system, a->ui.engine.loaded, a->ui.quick,
-                                a->ui.theme, active);
+                                a->ui.theme, active, a->ui.show_input);
             last_page = a->ui.page;
             last_core = a->ui.engine.system;
             last_content = a->ui.engine.loaded;
             last_quick = a->ui.quick;
             last_theme = a->ui.theme;
             last_active = active;
+            last_show_input = a->ui.show_input;
         }
 #endif
         if (running != a->was_running) {
