@@ -4,7 +4,7 @@
 #ifndef CORVUSRETRO_ENGINE_H
 #define CORVUSRETRO_ENGINE_H
 
-#include <corvuscore/bridge.h>
+#include <corvus/api.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -12,7 +12,10 @@
 #define CR_CORE_VERSION "0.14.0"
 
 typedef struct cr_engine {
-    corvuscore_bridge *handle;
+    void *handle;
+    void *module;
+    struct cr_engine_output *output;
+    corvus_core_api api;
     int system;
     bool loaded;
     int width, height, rate;
