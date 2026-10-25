@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #define _POSIX_C_SOURCE 200809L
 #include "engine.h"
+#include "core_registry.h"
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -64,18 +65,26 @@ static void success(cr_engine *engine) {
     engine->error[0] = '\0';
 }
 static bool valid_system(cr_engine *engine, int system) {
-    return (system >= 0 && system <= 2) || fail(engine, "Cœur inconnu");
+    return cr_registry_get(system) != NULL || fail(engine, "Cœur incompatible ou indisponible");
 }
 static bool ready(cr_engine *engine) {
     return (engine->handle && engine->loaded) || fail(engine, "Aucun contenu chargé");
 }
 bool cr_game_id_valid(const char *id) {
-    if (!id || strlen(id) != 66 || id[64] != '-' || id[65] < '0' || id[65] > '2')
+    if (!id || strlen(id) < 66 || strlen(id) >= 80 || id[64] != '-')
         return false;
     for (size_t i = 0; i < 64; ++i)
         if (!((id[i] >= '0' && id[i] <= '9') || (id[i] >= 'a' && id[i] <= 'f')))
             return false;
-    return true;
+    const char *digits = id + 65;
+    if (!*digits || (digits[0] == '0' && digits[1])) return false;
+    unsigned number = 0;
+    for (; *digits; ++digits) {
+        if (*digits < '0' || *digits > '9') return false;
+        number = number * 10u + (unsigned)(*digits - '0');
+        if (number >= CR_MAX_CORES) return false;
+    }
+    return cr_registry_get((int)number) != NULL;
 }
 void cr_engine_init(cr_engine *engine, const char *root) {
     memset(engine, 0, sizeof(*engine));
@@ -234,17 +243,16 @@ static void release_handle(cr_engine *engine) {
 }
 
 static bool create_handle(cr_engine *engine, int system) {
-    static const char *module_names[] = {
-        "libcorvus_gb.so", "libcorvus_gbc.so", "libcorvus_gba.so"
-    };
-    static const char *core_ids[] = {"corvus.gb", "corvus.gbc", "corvus.gba"};
-    if (!valid_system(engine, system)) return false;
-    char module_path[128];
+    const cr_core_descriptor *descriptor = cr_registry_get(system);
+    if (!descriptor) return fail(engine, "Cœur inconnu ou incompatible");
+    char module_path[256];
 #if defined(__ANDROID__)
-    snprintf(module_path, sizeof(module_path), "%s", module_names[system]);
+    int n = snprintf(module_path, sizeof(module_path), "%s", descriptor->module);
 #else
-    snprintf(module_path, sizeof(module_path), "./%s", module_names[system]);
+    int n = snprintf(module_path, sizeof(module_path), "./%s", descriptor->module);
 #endif
+    if (n <= 0 || (size_t)n >= sizeof(module_path))
+        return fail(engine, "Nom de module invalide");
     engine->module = dlopen(module_path, RTLD_NOW | RTLD_LOCAL);
     if (!engine->module)
         return fail(engine, "Module CorvusAPI introuvable");
@@ -258,15 +266,11 @@ static bool create_handle(cr_engine *engine, int system) {
         engine->api.struct_size < sizeof(engine->api) ||
         !engine->api.get_info || !engine->api.create || !engine->api.destroy ||
         !engine->api.load_game || !engine->api.unload_game ||
-        !engine->api.get_av_info || !engine->api.set_button || !engine->api.run_frame ||
-        !engine->api.serialize_size || !engine->api.serialize ||
-        !engine->api.unserialize || !engine->api.battery_size ||
-        !engine->api.battery_dirty || !engine->api.battery_copy ||
-        !engine->api.battery_acknowledge)
+        !engine->api.get_av_info || !engine->api.set_button || !engine->api.run_frame)
         return fail(engine, "Version ou fonctions CorvusAPI incompatibles");
     corvus_core_info info = {.struct_size = sizeof(info)};
     if (!engine->api.get_info(&info) || !info.id ||
-        strcmp(info.id, core_ids[system]) != 0)
+        strcmp(info.id, descriptor->id) != 0)
         return fail(engine, "Identifiant de cœur CorvusAPI invalide");
     engine->output = calloc(1, sizeof(*engine->output));
     if (!engine->output) return fail(engine, "Mémoire insuffisante");
@@ -340,7 +344,7 @@ bool cr_engine_select(cr_engine *engine, int system) {
 bool cr_engine_open(cr_engine *engine, int system, const char *id, const char *path) {
     if (!valid_system(engine, system))
         return false;
-    if (!cr_game_id_valid(id) || id[65] != '0' + system)
+    if (!cr_game_id_valid(id) || atoi(id + 65) != system)
         return fail(engine, "Identifiant de contenu invalide");
     cr_engine candidate;
     cr_engine_init(&candidate, engine->root);
@@ -424,7 +428,8 @@ bool cr_engine_step(cr_engine *engine, unsigned mask) {
     return true;
 }
 bool cr_engine_save_battery(cr_engine *engine) {
-    if (!engine->handle || !engine->loaded || !engine->api.battery_dirty(engine->handle)) {
+    if (!engine->handle || !engine->loaded || !engine->api.battery_dirty ||
+        !engine->api.battery_dirty(engine->handle)) {
         success(engine);
         return true;
     }
@@ -465,6 +470,8 @@ bool cr_engine_reset(cr_engine *engine) {
 bool cr_engine_save_state(cr_engine *engine) {
     if (!ready(engine))
         return false;
+    if (!engine->api.serialize_size || !engine->api.serialize)
+        return fail(engine, "Ce cœur ne prend pas en charge les états de sauvegarde");
     size_t size = engine->api.serialize_size(engine->handle);
     if (!size || size > MAX_STATE)
         return fail(engine, "État de sauvegarde invalide");
@@ -486,6 +493,8 @@ bool cr_engine_save_state(cr_engine *engine) {
 bool cr_engine_load_state(cr_engine *engine) {
     if (!ready(engine))
         return false;
+    if (!engine->api.unserialize)
+        return fail(engine, "Ce cœur ne prend pas en charge les états de sauvegarde");
     char path[4096];
     uint8_t *bytes = NULL;
     size_t size = 0;

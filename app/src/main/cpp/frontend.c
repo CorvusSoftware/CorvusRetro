@@ -3,14 +3,22 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "frontend.h"
 #include "play_layout.h"
+#include "core_registry.h"
 #include <ctype.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-static const char *cores[] = {"CorvusGB", "CorvusGBC", "CorvusGBA"};
-static const char *systems[] = {"Game Boy", "Game Boy Color", "Game Boy Advance"};
+static const char *core_name(int index) {
+    const cr_core_descriptor *core = cr_registry_get(index);
+    return core ? core->name : "Cœur indisponible";
+}
+static const char *system_name(int index) {
+    const cr_core_descriptor *core = cr_registry_get(index);
+    return core ? core->system_name : "Système indisponible";
+}
+
 static const char *quick_labels[] = {"Reprendre le contenu", "Redémarrer le contenu",
                                      "Sauvegarder l’état",   "Charger l’état",
                                      "Menu principal",       "Fermer le contenu"};
@@ -58,9 +66,9 @@ static int rows(const cr_ui *u) {
     if (u->page == CR_MAIN)
         return 3 + (u->engine.handle ? 1 : 0) + (u->engine.loaded ? 1 : 0);
     if (u->page == CR_LISTS)
-        return 4;
+        return 1 + (int)cr_registry_count();
     if (u->page == CR_CORES)
-        return 3;
+        return (int)cr_registry_count();
     if (u->page == CR_SETTINGS)
         return 4;
     if (u->page == CR_INFORMATION)
@@ -96,7 +104,7 @@ static row get_row(const cr_ui *u, int index) {
                 fill(&r, "Menu rapide", u->title, CR_ICON_MENU, ACT_QUICK, 0);
         }
         if (index == n++)
-            fill(&r, "Charger un cœur", u->engine.handle ? cores[u->engine.system] : "Aucun cœur",
+            fill(&r, "Charger un cœur", u->engine.handle ? core_name(u->engine.system) : "Aucun cœur",
                  CR_ICON_CORE, ACT_CORES, 0);
         if (u->engine.handle) {
             if (index == n++)
@@ -104,7 +112,7 @@ static row get_row(const cr_ui *u, int index) {
         }
         if (index == n++)
             fill(&r, "Charger du contenu",
-                 u->importing ? "Import du contenu…" : "Ouvrir un fichier .gb, .gbc ou .gba",
+                 u->importing ? "Import du contenu…" : "Ouvrir un fichier de jeu compatible",
                  CR_ICON_CONTENT, ACT_PICK, 0);
         if (index == n)
             fill(&r, "Informations", "Application, cœur et licences", CR_ICON_INFO, ACT_PAGE,
@@ -121,11 +129,11 @@ static row get_row(const cr_ui *u, int index) {
                 n++;
         char hint[64];
         snprintf(hint, sizeof(hint), "%d contenu(s)", n);
-        fill(&r, systems[index], hint, CR_ICON_LIST, ACT_SYSTEM, index);
+        fill(&r, system_name(index), hint, CR_ICON_LIST, ACT_SYSTEM, index);
     } else if (u->page == CR_CORES) {
-        fill(&r, cores[index], systems[index], CR_ICON_CORE, ACT_SELECT, index);
-        if (index == 2)
-            snprintf(r.hint, sizeof(r.hint), "%s · Expérimental", systems[index]);
+        fill(&r, core_name(index), system_name(index), CR_ICON_CORE, ACT_SELECT, index);
+        if (index == 2 && strcmp(cr_registry_get(index)->id, "corvus.gba") == 0)
+            snprintf(r.hint, sizeof(r.hint), "%s · Expérimental", system_name(index));
         r.checked = u->engine.handle && u->engine.system == index;
     } else if (u->page == CR_SETTINGS) {
         const char *labels[] = {"Interface utilisateur", "Vidéo", "Audio", "Affichage à l’écran"};
@@ -157,7 +165,7 @@ static row get_row(const cr_ui *u, int index) {
             fill(&r, "À propos de CorvusRetro", "Application native de CorvusSoftware",
                  CR_ICON_INFO, ACT_ABOUT, 0);
         else if (u->engine.handle && index == 1)
-            fill(&r, "Informations sur le cœur", cores[u->engine.system], CR_ICON_CORE, ACT_PAGE,
+            fill(&r, "Informations sur le cœur", core_name(u->engine.system), CR_ICON_CORE, ACT_PAGE,
                  CR_CORE_INFO);
         else
             fill(&r, "Licence et crédits", "AGPL-3.0-only · Code original", CR_ICON_FILE,
@@ -172,7 +180,7 @@ static row get_row(const cr_ui *u, int index) {
         for (size_t i = 0; i < u->game_count; i++)
             if (u->filter < 0 ? u->games[i].played > 0 : u->games[i].system == u->filter) {
                 if (n++ == index) {
-                    fill(&r, u->games[i].title, cores[u->games[i].system], CR_ICON_FILE, ACT_GAME,
+                    fill(&r, u->games[i].title, core_name(u->games[i].system), CR_ICON_FILE, ACT_GAME,
                          (int)i);
                     break;
                 }
@@ -369,7 +377,7 @@ static void activate(cr_ui *u, row r) {
         cr_game *g = &u->games[r.value];
         char path[4200];
         snprintf(path, sizeof(path), "%s/roms/%s.rom", u->engine.root, g->id);
-        char title[512], id[68];
+        char title[512], id[80];
         snprintf(title, sizeof(title), "%s", g->title);
         snprintf(id, sizeof(id), "%s", g->id);
         open_game(u, g->system, id, title, path);
@@ -423,19 +431,8 @@ static void activate(cr_ui *u, row r) {
     }
 }
 int cr_content_system(const char *title, int selected) {
-    const char *extension = strrchr(title, '.');
-    char suffix[8] = {0};
-    if (extension && strlen(extension) < sizeof(suffix)) {
-        for (size_t i = 0; extension[i]; i++)
-            suffix[i] = (char)tolower((unsigned char)extension[i]);
-    }
-    if (strcmp(suffix, ".gbc") == 0)
-        return 1;
-    if (strcmp(suffix, ".gba") == 0)
-        return 2;
-    if (strcmp(suffix, ".gb") == 0 && selected == 2)
-        return 0;
-    return selected >= 0 && selected <= 2 ? selected : 0;
+    const char *extension = title ? strrchr(title, '.') : NULL;
+    return cr_registry_choose(extension, selected);
 }
 void cr_ui_import(cr_ui *u, const cr_import *item) {
     u->importing = false;
@@ -446,9 +443,9 @@ void cr_ui_import(cr_ui *u, const cr_import *item) {
     }
     cr_import resolved = *item;
     resolved.system = cr_content_system(item->title, item->system);
-    bool id_ok = cr_game_id_valid(item->id);
+    bool id_ok = cr_game_id_valid(item->id) && resolved.system >= 0;
     if (id_ok)
-        resolved.id[65] = (char)('0' + resolved.system);
+        snprintf(resolved.id + 65, sizeof(resolved.id) - 65, "%d", resolved.system);
     bool valid = id_ok && cr_engine_check(&u->engine, resolved.system, resolved.path);
     char error[512] = {0};
     if (!valid)
@@ -466,7 +463,24 @@ void cr_ui_import(cr_ui *u, const cr_import *item) {
     snprintf(path, sizeof(path), "%s/roms/%s.rom", u->engine.root, resolved.id);
     open_game(u, resolved.system, resolved.id, resolved.title, path);
 }
-static void quick_action(cr_ui *u, int i) {
+static int quick_action_at(const cr_ui *u, int row) {
+    for (int action = 0; action < 6; ++action) {
+        if (action == 1 && !u->engine.api.reset) continue;
+        if ((action == 2 || action == 3) &&
+            (!u->engine.api.serialize_size ||
+             !u->engine.api.serialize || !u->engine.api.unserialize)) continue;
+        if (row-- == 0) return action;
+    }
+    return -1;
+}
+static int quick_count(const cr_ui *u) {
+    int count = 0;
+    while (quick_action_at(u, count) >= 0) ++count;
+    return count;
+}
+static void quick_action(cr_ui *u, int row) {
+    int i = quick_action_at(u, row);
+    if (i < 0) return;
     if (i == 0)
         u->quick = false;
     if (i == 1 && result(u, cr_engine_reset(&u->engine))) {
@@ -526,7 +540,7 @@ void cr_ui_confirm(cr_ui *u) {
         activate(u, get_row(u, u->focus));
 }
 void cr_ui_move(cr_ui *u, int direction) {
-    int count = u->quick ? 6 : rows(u);
+    int count = u->quick ? quick_count(u) : rows(u);
     if (count <= 0)
         return;
     u->focus = (u->focus + direction + count) % count;
@@ -565,10 +579,11 @@ static unsigned button_at(const cr_ui *u, float x, float y) {
     return cr_play_hit(&layout, x, y);
 }
 static float quick_height(const cr_ui *u) {
-    return fminf(392, u->height - 16);
+    return fminf((float)(56 + quick_count(u) * 56), u->height - 16);
 }
 static void quick_clamp(cr_ui *u) {
-    u->quick_scroll = fmaxf(0, fminf(u->quick_scroll, 336 - (quick_height(u) - 56)));
+    u->quick_scroll = fmaxf(0, fminf(u->quick_scroll,
+                       quick_count(u) * 56 - (quick_height(u) - 56)));
 }
 static int target(const cr_ui *u, float x, float y) {
     if (x < 0 || y < 0 || x >= u->width || y >= u->height)
@@ -580,7 +595,8 @@ static int target(const cr_ui *u, float x, float y) {
             return -4;
         if (y < top + 56)
             return -1;
-        return 10000 + (int)((y - top - 56 + u->quick_scroll) / 56);
+        int row = (int)((y - top - 56 + u->quick_scroll) / 56);
+        return row >= 0 && row < quick_count(u) ? 10000 + row : -4;
     }
     if (u->page == CR_PLAY) {
         cr_play_layout layout = play_layout(u);
@@ -836,7 +852,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
             title = "Charger un cœur";
             break;
         case CR_GAMES:
-            title = u->filter < 0 ? "Historique" : systems[u->filter];
+            title = u->filter < 0 ? "Historique" : system_name(u->filter);
             break;
         case CR_ABOUT:
             title = "CorvusRetro";
@@ -907,19 +923,25 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
             u->text_height = paragraphs(
                 p,
                 "CorvusRetro 0.9.0\n\nFrontend original en C, rendu OpenGL ES et audio "
-                "AAudio.\n\nCorvusSoftware\nCœurs CorvusCore 0.14.0 : Game Boy, Game "
+                "AAudio.\n\nCorvusSoftware\nCœurs officiels CorvusCore 0.14.0 : Game Boy, Game "
                 "Boy Color, Game Boy Advance (expérimental).\n\nNavigation inspirée de "
                 "MaterialUI. Thèmes CorvusRetro, ASUS et NVIDIA Shield.\n\nCopyright (C) 2026 "
                 "CorvusSoftware\nSPDX-License-Identifier: AGPL-3.0-only",
                 20, 92, w - 40, 24, fg, u->scroll);
         if (u->page == CR_CORE_INFO) {
-            char info[1024];
-            if (u->engine.handle)
+            char info[2048];
+            if (u->engine.handle) {
+                const cr_core_descriptor *desc = cr_registry_get(u->engine.system);
                 snprintf(info, sizeof(info),
-                         "%s\n\nSystème : %s\nVersion : %s\nAPI C : 0\nContenu : %s%s",
-                         cores[u->engine.system], systems[u->engine.system], CR_CORE_VERSION,
-                         u->engine.loaded ? u->title : "Aucun contenu",
-                         u->engine.system == 2 ? "\n\nCœur expérimental" : "");
+                         "%s\n\nSystème : %s\nVersion : %s\nCorvusAPI : %u\nExtensions : %s\n"
+                         "États de sauvegarde : %s\nBatterie : %s\nContenu : %s",
+                         core_name(u->engine.system), system_name(u->engine.system),
+                         desc ? desc->version : "?", CORVUS_API_VERSION,
+                         desc ? desc->extensions : "?",
+                         desc && desc->state_support ? "Oui" : "Non",
+                         desc && desc->battery_support ? "Oui" : "Non",
+                         u->engine.loaded ? u->title : "Aucun contenu");
+            }
             else
                 snprintf(info, sizeof(info), "Aucun cœur chargé");
             u->text_height = paragraphs(p, info, 20, 92, w - 40, 24, fg, u->scroll);
@@ -938,10 +960,10 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         text(p, title, has_back(u) ? 56 : 20, 35, 19, theme->header_text, w - 100);
         p->icon(p->context, CR_ICON_CROW, w - 44, 16, 24, theme->header_icon);
         rect(p, 0, body_bottom(u), w, 100, bg);
-        char footer[160];
+        char footer[256];
         if (u->engine.handle)
-            snprintf(footer, sizeof(footer), "Cœur chargé : %s · %s", cores[u->engine.system],
-                     CR_CORE_VERSION);
+            snprintf(footer, sizeof(footer), "Cœur chargé : %s · %s", core_name(u->engine.system),
+                     cr_registry_get(u->engine.system)->version);
         else
             snprintf(footer, sizeof(footer), "Aucun cœur");
         text(p, footer, 20, h - 84, 11, muted, w - 40);
@@ -965,7 +987,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         rect(p, x, y, qw, qh, theme->surface);
         if (p->clip)
             p->clip(p->context, x, y + 56, qw, qh - 56);
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < quick_count(u); i++) {
             float top = y + 56 + i * 56 - u->quick_scroll;
             if (top + 56 < y + 56 || top > y + qh)
                 continue;
@@ -973,7 +995,8 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
                 rect(p, x, top, qw, 56, focus);
             else if (u->feedback_target == 10000 + i && u->feedback_alpha > 0)
                 rect(p, x, top, qw, 56, alpha_color(focus, u->feedback_alpha));
-            text(p, quick_labels[i], x + 20, top + 35, 16, fg, qw - 40);
+            int action = quick_action_at(u, i);
+            text(p, quick_labels[action], x + 20, top + 35, 16, fg, qw - 40);
         }
         if (p->clip)
             p->clip(p->context, 0, 0, w, h);

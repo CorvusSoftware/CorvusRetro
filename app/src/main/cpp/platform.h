@@ -7,12 +7,12 @@
 #include <stddef.h>
 #include <stdint.h>
 typedef struct {
-    char id[68], title[512];
+    char id[80], title[512];
     int system;
     int64_t played;
 } cr_game;
 typedef struct {
-    char id[68], title[512], path[4096], error[512];
+    char id[80], title[512], path[4096], error[512];
     int system;
 } cr_import;
 typedef struct {

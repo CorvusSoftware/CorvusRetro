@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #define _POSIX_C_SOURCE 200809L
 #include "engine.h"
+#include "core_registry.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -72,6 +73,22 @@ static void path(char out[4096], const char *root, const char *folder, const cha
     check(count > 0 && count < 4096, "test path", NULL);
 }
 int main(void) {
+    check(cr_registry_count() == 3, "official modules discovered dynamically", NULL);
+    const char *expected_ids[] = {"corvus.gb", "corvus.gbc", "corvus.gba"};
+    const char *expected_names[] = {"CorvusGB", "CorvusGBC", "CorvusGBA"};
+    for (int i = 0; i < 3; ++i) {
+        const cr_core_descriptor *core = cr_registry_get(i);
+        check(core && strcmp(core->id, expected_ids[i]) == 0 &&
+                  strcmp(core->name, expected_names[i]) == 0,
+              "stable official core catalog", NULL);
+        check(core->state_support && core->battery_support,
+              "official core capabilities", NULL);
+    }
+    check(!cr_registry_get(3) && !cr_registry_get(-1),
+          "invalid core index unavailable", NULL);
+    check(cr_registry_accepts(0, ".gb") && cr_registry_accepts(1, ".GBC") &&
+              cr_registry_accepts(2, ".gba") && !cr_registry_accepts(2, ".nes"),
+          "extensions from core metadata", NULL);
     /* Verify actual core metadata through CorvusAPI after loading the module. */
     char root[] = "/tmp/corvus-native-engine-XXXXXX";
     check(mkdtemp(root) != NULL, "temporary storage", NULL);

@@ -22,6 +22,7 @@ import org.json.JSONObject;
 /** Android document/storage adapter. Core validation belongs to the native frontend. */
 final class GameLibrary {
     private static final int MAX_ROM = 32 * 1024 * 1024;
+    private static final int MAX_BUNDLED_CORES = 32;
     private static final Object INDEX_LOCK = new Object();
     final Context context;
     final SharedPreferences preferences;
@@ -55,7 +56,7 @@ final class GameLibrary {
                 if (record == null) continue;
                 String id = record.optString("id");
                 int system = record.optInt("system", -1);
-                if (!id.matches("[0-9a-f]{64}-[012]") || system < 0 || system > 2 || !id.endsWith("-" + system)) continue;
+                if (!id.matches("[0-9a-f]{64}-(?:[0-9]|[12][0-9]|3[01])") || system < 0 || system >= MAX_BUNDLED_CORES || !id.endsWith("-" + system)) continue;
                 result.add(new Game(id, record.optString("title", id), system, record.optLong("played", 0)));
             }
         } catch (org.json.JSONException ignored) { /* An unreadable index is shown as empty. */ }
@@ -113,7 +114,7 @@ final class GameLibrary {
             int end = Character.isHighSurrogate(title.charAt(127)) ? 127 : 128;
             title = title.substring(0, end);
         }
-        int system = selected >= 0 && selected < 3 ? selected : 0;
+        int system = selected >= 0 && selected < MAX_BUNDLED_CORES ? selected : 0;
         File temporary = File.createTempFile("import-", ".part", directory("roms"));
         boolean copied = false;
         try {
@@ -142,7 +143,7 @@ final class GameLibrary {
         }
     }
     void commit(Pending pending, int system) throws IOException {
-        if (system < 0 || system > 2) throw new IOException("Cœur inconnu");
+        if (system < 0 || system >= MAX_BUNDLED_CORES) throw new IOException("Cœur inconnu");
         Game accepted = new Game(pending.game.id.substring(0, 64) + "-" + system, pending.game.title, system, 0);
         synchronized (INDEX_LOCK) {
             File destination = new File(directory("roms"), accepted.id + ".rom");
