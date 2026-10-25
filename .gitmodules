@@ -1,0 +1,3 @@
+[submodule "third_party/CorvusCore"]
+	path = third_party/CorvusCore
+	url = https://github.com/CorvusSoftware/CorvusCore.git

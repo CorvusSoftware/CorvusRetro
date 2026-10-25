@@ -20,11 +20,15 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 final class Ui {
-    static final int BG = 0xff0d1117, SURFACE = 0xff171d26, BORDER = 0xff29313d;
-    static final int TEXT = 0xfff2f5f8, MUTED = 0xff919dac, ACCENT = 0xffc5f277;
+    static final int BG = 0xff202124, SURFACE = 0xff292b30, BORDER = 0xff36383e;
+    static final int TEXT = 0xfff1f3f4, MUTED = 0xffa4abb5, ACCENT = 0xff81c7ff;
     private Ui() {}
     static int dp(Context c, int value) {
         return Math.round(value * c.getResources().getDisplayMetrics().density);
+    }
+    static boolean compactViewport(Context c) {
+        android.content.res.Configuration config = c.getResources().getConfiguration();
+        return config.screenWidthDp <= 340 || config.screenHeightDp < 640;
     }
     static GradientDrawable shape(Context c, int color, int radius, boolean border) {
         GradientDrawable result = new GradientDrawable();
@@ -34,7 +38,7 @@ final class Ui {
         return result;
     }
     static RippleDrawable ripple(Context c, int color, int radius) {
-        return new RippleDrawable(ColorStateList.valueOf(0x335e7953),
+        return new RippleDrawable(ColorStateList.valueOf(0x336c9ac7),
                 shape(c, color, radius, false), shape(c, 0xffffffff, radius, false));
     }
     static LinearLayout column(Context c) {

@@ -23,6 +23,7 @@ public final class GameActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         NativeBridge.reset();
+        boolean compact = Ui.compactViewport(this);
         LinearLayout root = Ui.column(this);
         root.setBackgroundColor(Ui.BG);
         LinearLayout header = Ui.row(this);
@@ -43,11 +44,11 @@ public final class GameActivity extends Activity {
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         LinearLayout body = Ui.column(this);
-        body.setPadding(dp(20), dp(16), dp(20), dp(24));
+        body.setPadding(dp(20), dp(compact ? 8 : 16), dp(20), dp(24));
         scroll.addView(body);
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         LinearLayout screen = Ui.card(this);
-        screen.setPadding(dp(12), dp(16), dp(12), dp(12));
+        screen.setPadding(dp(12), dp(compact ? 12 : 16), dp(12), dp(12));
         LinearLayout screenHeading = Ui.row(this);
         TextView name = Ui.text(this, R.string.screen_label, 10, Ui.MUTED, true);
         name.setLetterSpacing(.12f);
@@ -63,11 +64,11 @@ public final class GameActivity extends Activity {
         TextView hint = Ui.text(this, R.string.game_hint, 13, Ui.MUTED, false);
         hint.setGravity(Gravity.CENTER);
         body.addView(hint);
-        Ui.space(body, 30);
+        Ui.space(body, compact ? 16 : 30);
         body.addView(Ui.text(this, R.string.controls, 19, Ui.TEXT, true));
         Ui.space(body, 8);
         body.addView(Ui.text(this, R.string.controls_hint, 13, Ui.MUTED, false));
-        Ui.space(body, 20);
+        Ui.space(body, compact ? 10 : 20);
         LinearLayout controls = Ui.row(this);
         LinearLayout dpad = Ui.column(this);
         String[][] symbols = {{"", "↑", ""}, {"←", "", "→"}, {"", "↓", ""}};

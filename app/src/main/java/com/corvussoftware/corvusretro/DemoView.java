@@ -48,7 +48,11 @@ final class DemoView extends View {
     @Override protected void onDetachedFromWindow() { stop(); super.onDetachedFromWindow(); }
     @Override protected void onMeasure(int widthSpec, int heightSpec) {
         int width = getDefaultSize(Ui.dp(getContext(), 256), widthSpec);
-        setMeasuredDimension(width, resolveSize(width * 192 / 256, heightSpec));
+        int height = width * 192 / 256;
+        if (Ui.compactViewport(getContext())) {
+            height = Math.min(height, Ui.dp(getContext(), 144));
+        }
+        setMeasuredDimension(width, resolveSize(height, heightSpec));
     }
     @Override protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);

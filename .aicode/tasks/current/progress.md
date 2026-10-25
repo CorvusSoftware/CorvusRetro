@@ -1,13 +1,7 @@
-État : ACTIVE
-Dernière étape : refonte implémentée, revue indépendante et essais Android 10 réussis.
-Prochaine étape : publier sur main et attendre la CI APK.
-
-Quality Gate : PASS pour la refonte sur Android 10 (émulateur logiciel).
-Preuves : make test ; make jni-test -Xcheck:jni ; assembleDebug ; lintDebug (0 erreur, 2 avertissements).
-Runtime : bibliothèque/réglages, licence hors ligne, lancement laboratoire, pause/reprise, reset et retour Android vérifiés.
-Direction maintenue : position écran du carré déplacée de (231,354) à (303,354) ; entrée ignorée en pause vérifiée par pixels.
-Arrière-plan/reprise via lanceur : laboratoire et état pause conservés ; retour à la bibliothèque réussi.
-Revue indépendante : aucun finding bloquant. Rotation réinitialise toujours volontairement la démo.
-Captures réelles : docs/screenshots/ (Android 10, 480x960).
-Limites : téléphone physique, TalkBack, multitouch simultané et autres versions Android non testés.
-Avertissements lint : règles de sauvegarde Android 12 ; constructeur spécialisé de DirectionButton utilisé uniquement par code.
+État : LIVRABLE VALIDÉ
+Implémentation MaterialUI et intégration CorvusCore 0.14.0 terminées.
+Tests C, ASan/UBSan, Java/JNI des trois moteurs, APK, lint, signature et alignements validés.
+Android 10 x86_64 : imports GB/GBC/GBA, commandes GB, états, batterie GBA, reset, reprise, rotation, listes, historique, crédits et import invalide validés. Aucun crash observé.
+Documentation et captures réelles actualisées ; détails et limites dans docs/validation-android.md.
+Publication autorisée sur main ; consulter le workflow Android APK pour le résultat distant et l'artefact de cette révision.
+Configuration cloud actualisée et enregistrée en brouillon ; publication des réglages disponible dans l'interface utilisateur.

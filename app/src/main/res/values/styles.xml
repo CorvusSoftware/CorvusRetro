@@ -5,10 +5,10 @@
 <resources>
     <style name="CorvusTheme" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">#C5F277</item>
-        <item name="android:windowBackground">#0D1117</item>
-        <item name="android:statusBarColor">#0D1117</item>
-        <item name="android:navigationBarColor">#0D1117</item>
+        <item name="android:colorAccent">#81C7FF</item>
+        <item name="android:windowBackground">#202124</item>
+        <item name="android:statusBarColor">#292B30</item>
+        <item name="android:navigationBarColor">#292B30</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowActionModeOverlay">true</item>
     </style>
