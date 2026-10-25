@@ -4,6 +4,7 @@
 #include "android_backend.h"
 #include "viewport.h"
 #include "engine.h"
+#include "core_registry.h"
 #include <android/bitmap.h>
 #include <android/log.h>
 #include <math.h>
@@ -121,7 +122,7 @@ bool cr_android_init(cr_android *p, struct android_app *app) {
     METHOD(preference, "preference", "(Ljava/lang/String;I)I");
     METHOD(set_preference, "preferenceSet", "(Ljava/lang/String;I)V");
     METHOD(pick, "pickContent", "(I)V");
-    METHOD(finish, "finishImport", "(ZI)Ljava/lang/String;");
+    METHOD(finish, "finishImport", "(ZILjava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
     METHOD(touch, "touchGame", "(Ljava/lang/String;)V");
     METHOD(appearance, "appearance", "(IZ)V");
     METHOD(quit, "quit", "()V");
@@ -176,10 +177,21 @@ static void pick(void *ctx, int system) {
     (*p->env)->CallVoidMethod(p->env, p->app->activity->clazz, p->pick, system);
     clear_error(p);
 }
-static bool finish(void *ctx, bool accept, int system, char *error, size_t cap) {
+static bool finish(void *ctx, bool accept, int system, const char *core_id,
+                   const char *system_id, char *error, size_t cap) {
     cr_android *p = ctx;
+    jstring core = (*p->env)->NewStringUTF(p->env, core_id ? core_id : "");
+    jstring machine = (*p->env)->NewStringUTF(p->env, system_id ? system_id : "");
+    if (!core || !machine || clear_error(p)) {
+        if (core) (*p->env)->DeleteLocalRef(p->env, core);
+        if (machine) (*p->env)->DeleteLocalRef(p->env, machine);
+        snprintf(error, cap, "Identité du cœur indisponible");
+        return false;
+    }
     jstring result = (*p->env)->CallObjectMethod(p->env, p->app->activity->clazz, p->finish,
-                                                 (jboolean)accept, (jint)system);
+                                                 (jboolean)accept, (jint)system, core, machine);
+    (*p->env)->DeleteLocalRef(p->env, core);
+    (*p->env)->DeleteLocalRef(p->env, machine);
     if (clear_error(p)) {
         snprintf(error, cap, "Import Android indisponible");
         return false;
@@ -198,38 +210,40 @@ static cr_game *games(void *ctx, size_t *count) {
     if (clear_error(p) || !records)
         return NULL;
     jsize length = (*p->env)->GetArrayLength(p->env, records);
-    if (length < 0 || length / 4 > 16384) {
+    if (length < 0 || length % 6 != 0 || length / 6 > 16384) {
         (*p->env)->DeleteLocalRef(p->env, records);
         return NULL;
     }
-    cr_game *result = calloc((size_t)length / 4, sizeof(*result));
+    cr_game *result = calloc((size_t)length / 6, sizeof(*result));
     if (length && !result) {
         (*p->env)->DeleteLocalRef(p->env, records);
         return NULL;
     }
-    for (jsize i = 0; i + 3 < length; i += 4) {
+    for (jsize i = 0; i + 5 < length; i += 6) {
         cr_game game;
         memset(&game, 0, sizeof(game));
         char number[64];
-        for (int f = 0; f < 4; f++) {
+        for (int f = 0; f < 6; f++) {
             jstring s = (*p->env)->GetObjectArrayElement(p->env, records, i + f);
             if (f == 0)
                 string_copy(p->env, s, game.id, sizeof(game.id));
             if (f == 1)
                 string_copy(p->env, s, game.title, sizeof(game.title));
-            if (f >= 2) {
+            if (f == 2 || f == 3) {
                 string_copy(p->env, s, number, sizeof(number));
-                if (f == 2)
-                    game.system = (int)strtol(number, NULL, 10);
-                else
-                    game.played = strtoll(number, NULL, 10);
+                if (f == 2) game.system = (int)strtol(number, NULL, 10);
+                else game.played = strtoll(number, NULL, 10);
             }
+            if (f == 4) string_copy(p->env, s, game.core_id, sizeof(game.core_id));
+            if (f == 5) string_copy(p->env, s, game.system_id, sizeof(game.system_id));
             if (s)
                 (*p->env)->DeleteLocalRef(p->env, s);
         }
-        if (cr_game_id_valid(game.id) && game.system >= 0 && game.system <= 2 &&
-            game.id[65] == '0' + game.system)
+        if (cr_game_id_valid(game.id)) {
+            /* Do not discard a title when its original core is not installed. */
+            game.system = cr_registry_find(game.core_id);
             result[(*count)++] = game;
+        }
     }
     (*p->env)->DeleteLocalRef(p->env, records);
     clear_error(p);
