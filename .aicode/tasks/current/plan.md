@@ -1,8 +1,1 @@
-# Thèmes CorvusRetro et ASUS
-
-Objectif : thème CorvusRetro par défaut inspiré du logo fourni (noir, bleu nuit, violet/lavande), ajout du thème ASUS corporate et conservation des thèmes existants.
-Périmètre : catalogue de palettes C, menus/rendu C, adaptation des préférences Android et couleurs des barres, icône de lancement, validation et captures.
-Compatibilité : conserver les IDs0Shield/1Sombre et les clés enregistrées shield/dark ; défautCorvus uniquement en absence de choix. Ne pas modifier les moteurs ou sauvegardes.
-Étapes réalisées : référence logotypeASUSpublique consultée, quatrepalettes cataloguées, rôlesappliqués, tests/persistance/rendu/build/lint/revue validés. Publication autorisée surmain avec vérificationCI.
-Preuves : tests du changement de thème et des anciens choix, buildAPK/lint, captures Android par thème et conservation après relance.
-Contrainte : rester en C natif pour les thèmes et le rendu, Java se limite à stocker les choix et appliquer les couleurs de fenêtre fournies par C ; signatures et règles de ponctuation inchangées.
+Version 0.7 : respecter les barres système et encoches dans la surface NativeActivity et les zones tactiles. Fournir les WindowInsets Android au rendu C, sans marges fixes. Supprimer le thème sombre, conserver les IDs Shield0/Corvus2/ASUS3 et migrer ancien choix dark vers corvus. Valider tests natifs normaux et instrumentés, APK/lint, Android29 et Android35 portrait/paysage/navigation, revue, puis publication main et CI.

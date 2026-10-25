@@ -2,6 +2,7 @@
 // Copyright (C) 2026 CorvusSoftware
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "android_backend.h"
+#include "viewport.h"
 #include "engine.h"
 #include <android/bitmap.h>
 #include <android/log.h>
@@ -109,6 +110,7 @@ bool cr_android_init(cr_android *p, struct android_app *app) {
     if (clear_error(p) || !p->field)                                                               \
     return false
     METHOD(density, "density", "()F");
+    METHOD(safe_area, "safeWindowArea", "()[I");
     METHOD(atlas, "atlas", "()Landroid/graphics/Bitmap;");
     METHOD(advances, "advances", "()[F");
     METHOD(glyph, "glyph", "(I)Landroid/graphics/Bitmap;");
@@ -575,13 +577,28 @@ static void game(void *ctx, const uint32_t *pixels, int width, int height, float
     glBindTexture(GL_TEXTURE_2D, g->atlas);
     glUniform1f(g->mode, 0);
 }
-void cr_gl_begin(cr_gl *g) {
+void cr_gl_begin(cr_gl *g, uint32_t system_bar) {
     eglQuerySurface(g->display, g->surface, EGL_WIDTH, &g->full_width);
     eglQuerySurface(g->display, g->surface, EGL_HEIGHT, &g->full_height);
-    ARect r = g->platform->app->contentRect;
-    if (r.right <= r.left || r.bottom <= r.top || r.right > g->full_width ||
-        r.bottom > g->full_height)
-        r = (ARect){0, 0, g->full_width, g->full_height};
+    cr_android *p = g->platform;
+    ARect content = p->app->contentRect;
+    jint area[6];
+    jintArray snapshot = (*p->env)->CallObjectMethod(p->env, p->app->activity->clazz, p->safe_area);
+    bool valid = !clear_error(p) && snapshot && (*p->env)->GetArrayLength(p->env, snapshot) == 6;
+    if (valid) {
+        (*p->env)->GetIntArrayRegion(p->env, snapshot, 0, 6, area);
+        valid = !clear_error(p);
+    }
+    if (snapshot)
+        (*p->env)->DeleteLocalRef(p->env, snapshot);
+    cr_rect r = cr_viewport(g->full_width, g->full_height, valid ? area : NULL,
+                            (cr_rect){content.left, content.top, content.right, content.bottom});
+#ifndef NDEBUG
+    if (g->left != r.left || g->top != r.top || g->pixel_width != r.right - r.left ||
+        g->pixel_height != r.bottom - r.top)
+        __android_log_print(ANDROID_LOG_DEBUG, "CorvusRetro", "viewport surface=%dx%d safe=%d,%d,%d,%d",
+                            g->full_width, g->full_height, r.left, r.top, r.right, r.bottom);
+#endif
     g->left = r.left;
     g->top = r.top;
     g->pixel_width = r.right - r.left;
@@ -590,7 +607,8 @@ void cr_gl_begin(cr_gl *g) {
     g->width = g->pixel_width / g->density;
     g->height = g->pixel_height / g->density;
     glDisable(GL_SCISSOR_TEST);
-    glClearColor(0, 0, 0, 1);
+    glClearColor(((system_bar >> 16) & 255) / 255.f, ((system_bar >> 8) & 255) / 255.f,
+                 (system_bar & 255) / 255.f, 1);
     glClear(GL_COLOR_BUFFER_BIT);
     glViewport(g->left, g->full_height - r.bottom, g->pixel_width, g->pixel_height);
     glUseProgram(g->program);

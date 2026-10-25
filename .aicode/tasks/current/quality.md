@@ -1,7 +1,5 @@
-# Quality gate
-
-PASS pour les thèmes et leur compatibilité.
-Tests natifs et tests de sélection/valeurs inconnues/default/IDs historiques exécutés ; build et lint passent.
-Quatre palettes et persistance vérifiées sur émulateur, y compris thème clair du lecteur et menu rapide. Signature/alignement APK vérifiés. Revue sans finding bloquant.
-La couleur ASUS utilise la référence publique du logotype noir ; le guide complet ASUS reste inaccessible via le proxy et n'est pas certifié.
-Le workflow Android APK vérifie chaque push sur main et fournit l'artefact distant.
+Résultat : PASS local
+Trois CTest passent normalement et sous ASan/UBSan, APK ARM64/x86_64 et lint sans erreur, signature et alignement16Ko valides.
+ÉmulateursAndroid10/15 : marges et input portrait/paysage ; Android10 : ancien dark migré vers corvus,3choix persistants, aucun crashapp. Android15 : menu, sélection thèmes, chargement/déchargement et rotation exercés après démarrage à froid lent et ANR deSystemUI indépendant.
+Revue indépendante et complément couleur de barres : aucun finding bloquant. Politique sans tirets longs et git diff --check passent.
+Limites : pas de téléphone physique ni exécutionARM64 ; encoches et navigation gestuelle testées dans le calcul C, sans essai matériel. CI après publication à contrôler.

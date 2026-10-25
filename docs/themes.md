@@ -45,12 +45,11 @@ sur le fond noir du jeu.
 
 ## Compatibilité des choix
 
-Ordre du menu : CorvusRetro, NVIDIA Shield, MaterialUI sombre, ASUS.
-Les identifiants enregistrés restent stables : Shield `0`, sombre `1`, Corvus `2`,
-ASUS `3`. Les clés Android `shield` et `dark` gardent leur sens, complétées par
-`corvus` et `asus`.
+Ordre du menu : CorvusRetro, NVIDIA Shield, ASUS. Le thème sombre a été supprimé.
+Les identifiants publiés restent stables : Shield `0`, Corvus `2`, ASUS `3`.
+L’ancien identifiant `1` revient à CorvusRetro et la clé Android `dark` est migrée
+vers `corvus`. Les choix `shield` et `asus` restent conservés.
 
-CorvusRetro devient le défaut lorsqu'aucun choix n'est enregistré. Un choix
-explicite antérieur est conservé. Une valeur inconnue revient à CorvusRetro.
+CorvusRetro est le défaut en absence de choix ou avec une valeur inconnue.
 Les palettes couvrent menus, sélection, icônes, boutons, lecteur, menu rapide et
 barres système ; elles ne modifient pas les couleurs des frames émulées.

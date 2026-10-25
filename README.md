@@ -5,12 +5,14 @@ C/C++ et de la navigation MaterialUI de RetroArch. Les moteurs sont ceux de
 [CorvusCore](https://github.com/CorvusSoftware/CorvusCore).
 Code applicatif sous **AGPL-3.0-only**, Copyright (C) 2026 CorvusSoftware.
 
-## Version 0.6 : thèmes CorvusRetro et ASUS
+## Version 0.7 : marges Android et trois thèmes
 
+Le rendu natif réserve les marges des barres système et des encoches, en portrait
+comme en paysage. Le dessin et les zones tactiles utilisent la même surface utile.
 Le thème par défaut reprend le bleu nuit, l’indigo et le violet du logo CorvusRetro.
-Le thème ASUS clair reprend le noir et blanc du logotype corporate ; NVIDIA Shield
-et MaterialUI sombre restent disponibles. Les choix précédemment enregistrés sont
-conservés. Voir [les palettes et leurs références](docs/themes.md).
+ASUS noir/blanc et NVIDIA Shield noir/vert restent disponibles. L’ancien thème
+sombre a été supprimé ; son choix enregistré revient automatiquement à CorvusRetro.
+Voir [les palettes et leurs références](docs/themes.md).
 
 Les menus, leur état, la navigation, les commandes, le rendu et la boucle
 d'émulation sont maintenant en **C11**. Une `NativeActivity` héberge la boucle
@@ -37,7 +39,7 @@ Le cache de glyphes natif accepte aussi les noms de contenus Unicode.
 - Listes tactiles et onglets Menu principal, Listes de lecture et Réglages.
 - Chargement d'un cœur sans contenu et déchargement réel, avec état **Aucun cœur**.
 - **CorvusGB**, **CorvusGBC** et **CorvusGBA expérimental**, version 0.14.0.
-- Thème **CorvusRetro** bleu nuit/violet par défaut, **ASUS** noir/blanc, **NVIDIA Shield** noir/vert et **MaterialUI sombre** bleu.
+- Thème **CorvusRetro** bleu nuit/violet par défaut, **ASUS** noir/blanc et **NVIDIA Shield** noir/vert.
 - Icônes originales, module de cœur avec une tête de corbeau et identité CorvusRetro.
 - Import local par le sélecteur Android, listes par console et historique.
 - Commandes tactiles simultanées, clavier/manette, audio stéréo et proportions vidéo conservées.
@@ -52,7 +54,7 @@ Le cache de glyphes natif accepte aussi les noms de contenus Unicode.
 </p>
 
 Autres captures : [réglages](docs/screenshots/settings.png),
-[menu rapide](docs/screenshots/quick-menu.png), [thème bleu](docs/screenshots/theme-dark.png).
+[menu rapide](docs/screenshots/quick-menu.png), [catalogue des thèmes](docs/screenshots/themes.png).
 
 ## Utilisation et données
 

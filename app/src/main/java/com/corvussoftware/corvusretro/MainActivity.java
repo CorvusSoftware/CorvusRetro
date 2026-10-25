@@ -8,10 +8,15 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Insets;
 import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.os.Bundle;
+import android.view.DisplayCutout;
+import android.view.View;
+import android.view.WindowInsets;
 import android.view.WindowManager;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -38,6 +43,8 @@ public final class MainActivity extends NativeActivity {
     private boolean pickerOpen;
     private boolean copying;
     private int pickerSystem;
+    // Immutable snapshot published by the UI thread, read by the native render thread.
+    private volatile int[] windowArea;
 
     private static native void imported(String id, String title, int system, String path, String error);
 
@@ -49,7 +56,48 @@ public final class MainActivity extends NativeActivity {
             pickerSystem = state.getInt("picker_system", 0);
         }
         super.onCreate(state);
+        View decor = getWindow().getDecorView();
+        // Use the same full-window coordinate space on Android 8 through Android 15+.
+        // The C renderer reserves the system-provided safe area inside that surface.
+        decor.setSystemUiVisibility(decor.getSystemUiVisibility()
+                | View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
+        if (Build.VERSION.SDK_INT >= 28) {
+            WindowManager.LayoutParams attributes = getWindow().getAttributes();
+            attributes.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            getWindow().setAttributes(attributes);
+        }
+        decor.setOnApplyWindowInsetsListener((view, insets) -> {
+            publishWindowArea(view, insets);
+            return insets;
+        });
+        decor.requestApplyInsets();
     }
+    @Override public void onGlobalLayout() {
+        super.onGlobalLayout();
+        View decor = getWindow().getDecorView();
+        WindowInsets insets = decor.getRootWindowInsets();
+        if (insets != null) publishWindowArea(decor, insets);
+    }
+    private void publishWindowArea(View decor, WindowInsets insets) {
+        int left, top, right, bottom;
+        if (Build.VERSION.SDK_INT >= 30) {
+            Insets safe = insets.getInsetsIgnoringVisibility(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+            left = safe.left; top = safe.top; right = safe.right; bottom = safe.bottom;
+        } else {
+            left = insets.getStableInsetLeft(); top = insets.getStableInsetTop();
+            right = insets.getStableInsetRight(); bottom = insets.getStableInsetBottom();
+            DisplayCutout cutout = Build.VERSION.SDK_INT >= 28 ? insets.getDisplayCutout() : null;
+            if (Build.VERSION.SDK_INT >= 28 && cutout != null) {
+                left = Math.max(left, cutout.getSafeInsetLeft()); top = Math.max(top, cutout.getSafeInsetTop());
+                right = Math.max(right, cutout.getSafeInsetRight()); bottom = Math.max(bottom, cutout.getSafeInsetBottom());
+            }
+        }
+        int width = decor.getWidth(), height = decor.getHeight();
+        if (width > left + right && height > top + bottom)
+            windowArea = new int[] {width, height, left, top, right, bottom};
+    }
+    public int[] safeWindowArea() { return windowArea; }
     @Override protected void onSaveInstanceState(Bundle state) {
         state.putBoolean("picker", pickerOpen); state.putInt("picker_system", pickerSystem);
         super.onSaveInstanceState(state);
@@ -81,7 +129,10 @@ public final class MainActivity extends NativeActivity {
             if ("theme".equals(key)) {
                 String value = library.preferences.getString(key, "corvus");
                 if ("shield".equals(value)) return 0;
-                if ("dark".equals(value)) return 1;
+                if ("dark".equals(value)) {
+                    library.preferences.edit().putString(key, "corvus").apply();
+                    return 2;
+                }
                 if ("corvus".equals(value)) return 2;
                 if ("asus".equals(value)) return 3;
                 return fallback;
@@ -92,8 +143,8 @@ public final class MainActivity extends NativeActivity {
     }
     public void preferenceSet(String key, int value) {
         if ("theme".equals(key)) {
-            String[] values = {"shield", "dark", "corvus", "asus"};
-            library.preferences.edit().putString(key, value >= 0 && value < values.length ? values[value] : "corvus").apply();
+            String selected = value == 0 ? "shield" : value == 3 ? "asus" : "corvus";
+            library.preferences.edit().putString(key, selected).apply();
         }
         else if ("audio".equals(key) || "keep_awake".equals(key)) library.preferences.edit().putBoolean(key, value != 0).apply();
         else library.preferences.edit().putInt(key, value).apply();

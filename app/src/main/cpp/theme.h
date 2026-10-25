@@ -4,8 +4,8 @@
 #ifndef CORVUS_THEME_H
 #define CORVUS_THEME_H
 #include <stdint.h>
-/* Published IDs 0/1 must keep their stored meaning. */
-enum { CR_THEME_SHIELD, CR_THEME_DARK, CR_THEME_CORVUS, CR_THEME_ASUS, CR_THEME_COUNT };
+/* Published IDs stay stable; retired ID 1 falls back to CorvusRetro. */
+enum { CR_THEME_SHIELD = 0, CR_THEME_CORVUS = 2, CR_THEME_ASUS = 3, CR_THEME_COUNT = 3 };
 typedef struct {
     const char *name, *description;
     uint32_t background, header, surface, navigation;

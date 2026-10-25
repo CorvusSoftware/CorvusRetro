@@ -1,5 +1,39 @@
 # Validation Android
 
+## Version 0.7 : marges système et retrait du thème sombre
+
+Le service Android publie un snapshot immuable des dimensions de la fenêtre et
+des marges des barres système/encoches. La surface NativeActivity utilise les
+coordonnées de la fenêtre entière sur toutes les versions prises en charge.
+Le rendu C en déduit le viewport, le clipping et la même origine tactile.
+Un snapshot d'orientation périmée est rejeté. Aucune marge en dp n'est codée en dur.
+
+CTest `native_viewport` couvre barres haut/bas, navigation gestuelle, encoche,
+barre latérale en paysage, rotation, surface déjà réduite et valeurs transitoires
+invalides. Les trois suites CTest passent avec et sans ASan/UBSan.
+Le catalogue C ne contient plus que CorvusRetro, NVIDIA Shield et ASUS ; l'ancien
+ID `1` revient à Corvus sans réassigner les IDs publiés `0`, `2`, `3`.
+APK et lint sans erreur, signature et alignement 16 Ko vérifiés.
+Revue indépendante : aucun problème bloquant relevé.
+
+Sur Android 10 x86_64, 480 x 960, densité 200 :
+
+- Surface complète 480 x 960, viewport portrait `0,30,480,900` : horloge et navigation entièrement séparées du menu.
+- Paysage : surface 960 x 480, viewport `0,30,900,480`, barre de navigation à droite respectée ; retour en portrait correct.
+- Chargement/déchargement tactiles en portrait et paysage, dont cœur GBA après rotation.
+- Ancienne clé `dark` injectée dans les préférences de test : remplacée par `corvus`, démarrage avec le thème Corvus, données conservées.
+- Les trois choix du catalogue sont sélectionnables, persistants après relance ; captures actualisées.
+- Installation finale 0.7.0/code7 et démarrage réussis, aucun crash Android observé.
+
+
+Sur Android 15 x86_64 (API35, APK ciblant35), même résolution/densité :
+
+- Le menu natif réserve bien le viewport `0,30,480,900` dans la surface pleine fenêtre `480x960` ; titre et onglets hors des barres.
+- Chargement puis déchargement d'un cœur par toucher, catalogue réduit à trois choix, sélection ASUS et retour au menu vérifiés.
+- Paysage : surface `960x480`, viewport `0,30,900,480` ; chargement tactile GBC réussi avec la barre de navigation à droite.
+- La zone de barre Corvus garde `#090D14`, vérifiée sur la capture de l'APK final.
+- Le démarrage à froid sans KVM a provoqué un ANR de SystemUI de l'émulateur ; la boîte a été fermée avant les essais de CorvusRetro. Ce blocage de l'environnement n'est pas compté comme un essai applicatif réussi.
+
 ## Version 0.6 : thèmes
 
 Tests CTest passés pour les quatre choix, le nouveau défaut Corvus, les valeurs
@@ -68,7 +102,7 @@ Importer GBC et GBA, vérifier le cœur choisi et la persistance de la batterie 
 
 ## Limites
 
-Pas de téléphone physique, d'exécution ARM64 ou Android récent validés.
+Émulateurs Android 10 et 15 exercés ; pas de téléphone physique ni d'exécution ARM64 validés.
 La qualité audio à l'écoute, les performances mobiles et la compatibilité d'un
 catalogue restent à mesurer ; GBA reste expérimental. Les menus OpenGL n'exposent
 pas encore d'arbre d'accessibilité TalkBack. Les manettes physiques et les gestes

@@ -2,6 +2,7 @@
 // Copyright (C) 2026 CorvusSoftware
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "frontend.h"
+#include "viewport.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,7 +42,13 @@ int main(void) {
     check(u.theme == CR_THEME_CORVUS, "logo palette is the default without saved preference");
     check(cr_theme_valid(-1) == CR_THEME_CORVUS && cr_theme_valid(99) == CR_THEME_CORVUS,
           "unknown themes fall back safely");
-    check(CR_THEME_SHIELD == 0 && CR_THEME_DARK == 1, "published theme IDs retain compatibility");
+    check(CR_THEME_SHIELD == 0 && CR_THEME_CORVUS == 2 && CR_THEME_ASUS == 3,
+          "remaining published theme IDs retain compatibility");
+    check(cr_theme_valid(1) == CR_THEME_CORVUS, "retired theme falls back to Corvus");
+    check(CR_THEME_COUNT == 3 && cr_theme_at(0) == CR_THEME_CORVUS &&
+              cr_theme_at(1) == CR_THEME_SHIELD && cr_theme_at(2) == CR_THEME_ASUS &&
+              cr_theme_at(3) == CR_THEME_CORVUS,
+          "three active themes only");
     tap(&u, 100, 100);
     check(u.page == CR_CORES, "touch opens native core list");
     cr_ui_move(&u, 1);
@@ -63,11 +70,11 @@ int main(void) {
     check(u.page == CR_SETTINGS, "native bottom tab");
     tap(&u, 100, 100);
     check(u.page == CR_THEMES, "native theme list");
-    tap(&u, 100, 252);
-    check(theme == CR_THEME_DARK && u.theme == CR_THEME_DARK && u.page == CR_SETTINGS,
-          "legacy dark selection remains stable");
+    tap(&u, 100, 176);
+    check(theme == CR_THEME_SHIELD && u.theme == CR_THEME_SHIELD && u.page == CR_SETTINGS,
+          "Shield selection remains stable");
     tap(&u, 100, 100);
-    tap(&u, 100, 328);
+    tap(&u, 100, 252);
     check(theme == CR_THEME_ASUS && u.theme == CR_THEME_ASUS, "ASUS is selectable and saved");
     tap(&u, 100, 100);
     tap(&u, 100, 100);

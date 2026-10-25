@@ -13,7 +13,7 @@ typedef struct {
     JNIEnv *env;
     jclass cls;
     bool attached;
-    jmethodID density, atlas, advances, glyph, advance, games, root, credits, preference,
+    jmethodID density, safe_area, atlas, advances, glyph, advance, games, root, credits, preference,
         set_preference, pick, finish, touch, appearance, quit;
 } cr_android;
 typedef struct {
@@ -42,7 +42,7 @@ void cr_android_root(cr_android *, char *, size_t);
 bool cr_android_import(cr_import *);
 bool cr_gl_init(cr_gl *, cr_android *);
 void cr_gl_destroy(cr_gl *);
-void cr_gl_begin(cr_gl *);
+void cr_gl_begin(cr_gl *, uint32_t system_bar);
 bool cr_gl_end(cr_gl *);
 cr_painter cr_gl_painter(cr_gl *);
 #endif

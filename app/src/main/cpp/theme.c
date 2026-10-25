@@ -2,7 +2,7 @@
 // Copyright (C) 2026 CorvusSoftware
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "theme.h"
-static const cr_theme themes[CR_THEME_COUNT] = {
+static const cr_theme themes[CR_THEME_ASUS + 1] = {
     [CR_THEME_SHIELD] = {.name = "NVIDIA Shield",
                          .description = "Noir et vert",
                          .background = 0xff121212,
@@ -24,27 +24,6 @@ static const cr_theme themes[CR_THEME_COUNT] = {
                          .control_text = 0xffdedede,
                          .control_pressed_text = 0xff101a08,
                          .system_bar = 0xff000000},
-    [CR_THEME_DARK] = {.name = "MaterialUI sombre",
-                       .description = "Anthracite et bleu",
-                       .background = 0xff202124,
-                       .header = 0xff292b30,
-                       .surface = 0xff292b30,
-                       .navigation = 0xff292b30,
-                       .text = 0xfff1f3f4,
-                       .muted = 0xffa4abb5,
-                       .accent = 0xff81c7ff,
-                       .icon = 0xffa4abb5,
-                       .divider = 0xff36383e,
-                       .focus = 0xff243b50,
-                       .header_text = 0xfff1f3f4,
-                       .header_hint = 0xffa4abb5,
-                       .header_icon = 0xff81c7ff,
-                       .navigation_active = 0xff81c7ff,
-                       .navigation_passive = 0xffa4abb5,
-                       .control = 0xcc40444b,
-                       .control_text = 0xfff1f3f4,
-                       .control_pressed_text = 0xff101820,
-                       .system_bar = 0xff292b30},
     [CR_THEME_CORVUS] = {.name = "CorvusRetro",
                          .description = "Bleu nuit et violet du corbeau",
                          .background = 0xff090d14,
@@ -88,11 +67,11 @@ static const cr_theme themes[CR_THEME_COUNT] = {
                        .control_pressed_text = 0xffffffff,
                        .system_bar = 0xff000000}};
 int cr_theme_valid(int id) {
-    return id >= 0 && id < CR_THEME_COUNT ? id : CR_THEME_CORVUS;
+    return id == CR_THEME_SHIELD || id == CR_THEME_CORVUS || id == CR_THEME_ASUS ? id
+                                                                                 : CR_THEME_CORVUS;
 }
 int cr_theme_at(int index) {
-    static const int order[CR_THEME_COUNT] = {CR_THEME_CORVUS, CR_THEME_SHIELD, CR_THEME_DARK,
-                                              CR_THEME_ASUS};
+    static const int order[CR_THEME_COUNT] = {CR_THEME_CORVUS, CR_THEME_SHIELD, CR_THEME_ASUS};
     return index >= 0 && index < CR_THEME_COUNT ? order[index] : CR_THEME_CORVUS;
 }
 const cr_theme *cr_theme_get(int id) {

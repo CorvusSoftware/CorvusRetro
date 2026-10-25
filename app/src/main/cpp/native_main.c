@@ -289,7 +289,7 @@ void android_main(struct android_app *app) {
             }
         }
         if (a->window && a->resumed) {
-            cr_gl_begin(&a->gl);
+            cr_gl_begin(&a->gl, cr_theme_get(a->ui.theme)->system_bar);
             if (fabsf(a->ui.width - a->gl.width) > .1f || fabsf(a->ui.height - a->gl.height) > .1f)
                 cr_ui_size(&a->ui, a->gl.width, a->gl.height);
             cr_ui_update(&a->ui, time - a->last_draw);

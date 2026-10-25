@@ -1,9 +1,4 @@
-# Faits vérifiés
-
-Palette Corvus choisie visuellement dans le logo utilisateur : fond090D14, en-tête111827, navigation141E30, accentB69AFF eticônes9A9DFF. Contrasteadaptéàl'interface.
-Catalogue C theme.c/h avec0Shield/1Darkinchangés,2Corvusdefault,3ASUS ; ordreaffichéCorvus/Shield/Dark/ASUS. LeschoixStringAndroidshield/darkrestentstables,corvus/asusajoutés. Javaappliqueseulementl'ARGBdebarreC.
-SiteASUSrefuséparproxy403. RéférencepubliqueSimpleIcons14.0.0 : entréeASUShex000000sourceasus.com. ThèmeASUSnoir/blancdu logotype ; aucuneaffirmationdeconformitéàunechartecomplètenonconsultée.
-Rôlespalette distincts pouren-tête/nav/texte/contrôles/panneauclair ; framesémuléesinchangées. IcônedelancementrecoloréeCorvus.
-TestsCTestsélection/default/compatIDetmoteurspassent ; APK/lint/signature/ZIP16Kopassent. Revueindépendantesansfindingbloquant.
-Android : ancienschoixconservés,4palettessélectionnablesetpersistantes,lecteur/menu rapideASUSlisibles, défautCorvusconfirméaprèsretraitseulementdelaclétheme. Aucuncrash. Capturesdocsactualisées.
-Sous-moduleCorvusCoreintact, règles desourcesetponctuationconservées.
+NativeActivity onGlobalLayout utilise la position du NativeContentView ; sur Android15 ciblant35, contentRect peut couvrir les barres. Surface explicitement pleine fenêtre et WindowInsets système/cutout publiés par snapshot immuable volatile Java, lu par JNI et validé contre dimensions EGL.
+Viewport/scissor et coordonnées tactiles partagent left/top. Rotation rejette dimensions anciennes ; glClear utilise couleur system_bar du thème.
+Thème ID1 retiré ; IDs0Shield/2Corvus/3ASUS conservés. Clé dark réellement migrée vers corvus surAndroid10 ; autres données gardées.
+Android10 et15 : surface480x960 utile0,30,480,900 ; paysage960x480 utile0,30,900,480, toucher cœur correct. Android15 sansKVM a montré un ANR deSystemUI au démarrage à froid ; boîte fermée avant essais valides deCorvusRetro. Aucun téléphone physique ou ARM64 exercé.
