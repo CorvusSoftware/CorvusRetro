@@ -325,6 +325,7 @@ bool cr_engine_select(cr_engine *engine, int system) {
     cr_engine_init(&candidate, engine->root);
     if (!create_handle(&candidate, system)) {
         fail(engine, candidate.error);
+        release_handle(&candidate);
         return false;
     }
     if (!cr_engine_save_battery(engine)) {
@@ -346,6 +347,7 @@ bool cr_engine_open(cr_engine *engine, int system, const char *id, const char *p
     memcpy(candidate.id, id, strlen(id) + 1);
     if (!create_handle(&candidate, system)) {
         fail(engine, candidate.error);
+        release_handle(&candidate);
         return false;
     }
     /* Reopening the current game must load its latest in-memory battery. */
