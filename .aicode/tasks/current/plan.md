@@ -1,1 +1,3 @@
-Version 0.7 : respecter les barres système et encoches dans la surface NativeActivity et les zones tactiles. Fournir les WindowInsets Android au rendu C, sans marges fixes. Supprimer le thème sombre, conserver les IDs Shield0/Corvus2/ASUS3 et migrer ancien choix dark vers corvus. Valider tests natifs normaux et instrumentés, APK/lint, Android29 et Android35 portrait/paysage/navigation, revue, puis publication main et CI.
+Version 0.8 : adapter vidéo et commandes selon les principes des overlays RetroArch, placer le menu entre Select et Start, retirer le titre en jeu.
+Calcul C unique pour dessin et toucher, croix 8 directions, ratios GB/GBC/GBA, vidéo séparée en portrait et plein viewport en paysage. Préserver marges système, thèmes, moteurs et données.
+Validation : géométrie/rendu/input/multitouch/rotation, tests C normaux et instrumentés, APK/lint, émulateur Android15, revue, publication main et CI.

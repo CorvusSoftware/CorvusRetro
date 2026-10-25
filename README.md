@@ -5,14 +5,18 @@ C/C++ et de la navigation MaterialUI de RetroArch. Les moteurs sont ceux de
 [CorvusCore](https://github.com/CorvusSoftware/CorvusCore).
 Code applicatif sous **AGPL-3.0-only**, Copyright (C) 2026 CorvusSoftware.
 
-## Version 0.7 : marges Android et trois thèmes
+## Version 0.8 : écran de jeu et commandes recalibrés
 
-Le rendu natif réserve les marges des barres système et des encoches, en portrait
-comme en paysage. Le dessin et les zones tactiles utilisent la même surface utile.
-Le thème par défaut reprend le bleu nuit, l’indigo et le violet du logo CorvusRetro.
-ASUS noir/blanc et NVIDIA Shield noir/vert restent disponibles. L’ancien thème
-sombre a été supprimé ; son choix enregistré revient automatiquement à CorvusRetro.
-Voir [les palettes et leurs références](docs/themes.md).
+Le bouton du menu rapide est au centre des commandes, entre **Select** et **Start**.
+Le lecteur utilise toute la surface utile, sans barre de titre. En portrait, la
+vidéo et les commandes occupent des zones séparées ; en paysage, les commandes
+se superposent à la vidéo, comme les overlays de RetroArch. La croix accepte
+les huit directions et les boutons s'adaptent à la taille de la fenêtre.
+Les proportions GB/GBC/GBA et les marges des barres système restent respectées.
+Voir [les commandes et leurs références](docs/controls.md).
+
+Les thèmes **CorvusRetro** par défaut, **NVIDIA Shield** et **ASUS** restent
+disponibles : [palettes](docs/themes.md).
 
 Les menus, leur état, la navigation, les commandes, le rendu et la boucle
 d'émulation sont maintenant en **C11**. Une `NativeActivity` héberge la boucle
@@ -21,7 +25,7 @@ Les menus et le lecteur Java de la version 0.4 ont été remplacés.
 
 | Partie | Implémentation |
 | --- | --- |
-| Menus, thèmes, navigation et commandes | C11, `frontend.c` |
+| Menus, thèmes, navigation et commandes | C11, `frontend.c` et `play_layout.c` |
 | Boucle Android et cycle de vie | C11, `native_main.c` |
 | Rendu des menus et des frames | C11, EGL/OpenGL ES 2 |
 | Audio PCM stéréo | C11, AAudio et tampon circulaire |
@@ -42,8 +46,8 @@ Le cache de glyphes natif accepte aussi les noms de contenus Unicode.
 - Thème **CorvusRetro** bleu nuit/violet par défaut, **ASUS** noir/blanc et **NVIDIA Shield** noir/vert.
 - Icônes originales, module de cœur avec une tête de corbeau et identité CorvusRetro.
 - Import local par le sélecteur Android, listes par console et historique.
-- Commandes tactiles simultanées, clavier/manette, audio stéréo et proportions vidéo conservées.
-- Menu rapide natif : reprendre, redémarrer, sauvegarder, charger un état, menu principal et fermeture.
+- Commandes tactiles simultanées, croix à huit directions, clavier/manette, audio stéréo et proportions vidéo conservées.
+- Menu rapide natif via le bouton central : reprendre, redémarrer, sauvegarder, charger un état, menu principal et fermeture.
 - Suspension en arrière-plan et conservation de la session lors d'une rotation.
 - APK debug Android 8.0+, ARM64 et x86_64.
 
@@ -54,7 +58,8 @@ Le cache de glyphes natif accepte aussi les noms de contenus Unicode.
 </p>
 
 Autres captures : [réglages](docs/screenshots/settings.png),
-[menu rapide](docs/screenshots/quick-menu.png), [catalogue des thèmes](docs/screenshots/themes.png).
+[menu rapide](docs/screenshots/quick-menu.png), [lecteur en paysage](docs/screenshots/player-landscape.png),
+[catalogue des thèmes](docs/screenshots/themes.png).
 
 ## Utilisation et données
 

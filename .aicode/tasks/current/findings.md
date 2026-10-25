@@ -1,4 +1,5 @@
-NativeActivity onGlobalLayout utilise la position du NativeContentView ; sur Android15 ciblant35, contentRect peut couvrir les barres. Surface explicitement pleine fenêtre et WindowInsets système/cutout publiés par snapshot immuable volatile Java, lu par JNI et validé contre dimensions EGL.
-Viewport/scissor et coordonnées tactiles partagent left/top. Rotation rejette dimensions anciennes ; glClear utilise couleur system_bar du thème.
-Thème ID1 retiré ; IDs0Shield/2Corvus/3ASUS conservés. Clé dark réellement migrée vers corvus surAndroid10 ; autres données gardées.
-Android10 et15 : surface480x960 utile0,30,480,900 ; paysage960x480 utile0,30,900,480, toucher cœur correct. Android15 sansKVM a montré un ANR deSystemUI au démarrage à froid ; boîte fermée avant essais valides deCorvusRetro. Aucun téléphone physique ou ARM64 exercé.
+Ancien lecteur : titre 56dp, positions fixes, quatre disques directionnels, Select/Start adjacents.
+Références publiques consultées : common-overlays retropad, flat/gba, neo-retropad. Configurations normalisées portrait/paysage ; flat/gba portrait place son menu à x=.5/y=.94792. Corvus garde son code et ses ressources originaux.
+play_layout.c/h fournit vidéo, panneau portrait, croix et cibles ; frontend dessine et touche le même résultat. Croix diagonale sur les neuf secteurs avec centre neutre, A/B radiaux, menu isolé des entrées moteur. Échelle bornée pour éviter les collisions sur petites fenêtres.
+Un glissement démarré sur Menu ne devient pas un bouton moteur ; l’ouverture du menu efface toutes les entrées. Rotation conserve le moteur et annule les appuis.
+Android15 sans KVM : ANR SystemUI au démarrage avant essais valides ; aucun crash fatal de CorvusRetro pendant les essais GB/GBA.

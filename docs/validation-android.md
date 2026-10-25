@@ -1,5 +1,29 @@
 # Validation Android
 
+## Version 0.8 : écran et commandes
+
+Quatre suites CTest passent normalement et sous ASan/UBSan, dont `native_controls`.
+Cette dernière couvre trois systèmes et dix tailles de fenêtre : ratios natifs,
+cibles dans les limites et sans collisions, diagonales/centre neutre, menu central,
+rendu sans titre, correspondance entre l'icône dessinée et son toucher, pause avec
+un autre doigt sur A, reprise, déplacement et annulation sans entrée coincée.
+APK ARM64/x86_64, lint, signature et alignement 16 Ko passent. Revue indépendante :
+aucun problème bloquant relevé.
+
+Essais Android 15 x86_64, 480 x 960, densité 200, sans KVM :
+
+- Import GB réel par le sélecteur Android ; vidéo et commandes séparées en portrait, menu tactile central puis reprise par Retour Android.
+- Appui sur A recalibré : modification des pixels du programme GB original, prouvant l'entrée dans le moteur.
+- Portrait/paysage/portrait : contenu conservé, proportions natives respectées, menu central utilisable après rotation et fermeture du contenu par le menu rapide.
+- Import GBA réel : boutons L/R visibles et menu central utilisable en portrait et paysage ; aucun crash fatal de CorvusRetro observé. La fixture GBA teste la batterie et affiche un fond noir.
+- Surface utile portrait `0,30,480,900`, paysage `0,30,900,480` ; les barres Android restent séparées du lecteur.
+- Comme en 0.7, le démarrage à froid a montré une boîte ANR de SystemUI de l'émulateur, avant les essais valides de CorvusRetro.
+
+Captures : [portrait](screenshots/player.png), [paysage](screenshots/player-landscape.png),
+[menu rapide](screenshots/quick-menu.png), [GBA portrait](screenshots/player-gba.png),
+[GBA paysage](screenshots/player-gba-landscape.png). Références et géométrie dans
+[les commandes](controls.md). Pas de qualification sur téléphone physique.
+
 ## Version 0.7 : marges système et retrait du thème sombre
 
 Le service Android publie un snapshot immuable des dimensions de la fenêtre et

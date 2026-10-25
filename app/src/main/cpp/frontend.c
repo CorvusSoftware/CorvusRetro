@@ -2,6 +2,7 @@
 // Copyright (C) 2026 CorvusSoftware
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "frontend.h"
+#include "play_layout.h"
 #include <ctype.h>
 #include <math.h>
 #include <stdio.h>
@@ -35,11 +36,6 @@ typedef struct {
     int icon, action, value;
     bool toggle, checked;
 } row;
-typedef struct {
-    float x, y, w, h;
-    unsigned mask;
-    const char *label;
-} button;
 static float quick_height(const cr_ui *u);
 static void quick_clamp(cr_ui *u);
 static float body_bottom(const cr_ui *u) {
@@ -460,37 +456,12 @@ void cr_ui_key(cr_ui *u, unsigned mask, bool down) {
     } else
         u->keys &= ~mask;
 }
-static int controls(const cr_ui *u, button *b) {
-    float w = u->width, h = u->height;
-    bool portrait = h - 56 > w;
-    float bottom = portrait ? 56 : 20;
-    int n = 0;
-    const int x[] = {1, 1, 0, 2};
-    const int y[] = {0, 2, 1, 1};
-    const unsigned masks[] = {1, 2, 4, 8};
-    const char *labels[] = {"↑", "↓", "←", "→"};
-    for (int i = 0; i < 4; i++)
-        b[n++] =
-            (button){10 + x[i] * 52, h - bottom - 154 + y[i] * 52, 48, 48, masks[i], labels[i]};
-    float ab = portrait ? 84 : 32;
-    b[n++] = (button){w - 68, h - ab - 112, 52, 52, 16, "A"};
-    b[n++] = (button){w - 128, h - ab - 52, 52, 52, 32, "B"};
-    b[n++] = (button){w / 2 + 6, h - 52, 68, 48, 64, "START"};
-    b[n++] = (button){w / 2 - 74, h - 52, 68, 48, 128, "SELECT"};
-    if (u->engine.system == 2) {
-        float top = portrait ? h - 256 : 64;
-        b[n++] = (button){16, top, 68, 48, 256, "L"};
-        b[n++] = (button){w - 84, top, 68, 48, 512, "R"};
-    }
-    return n;
+static cr_play_layout play_layout(const cr_ui *u) {
+    return cr_play_layout_make(u->width, u->height, u->engine.system, u->engine.width, u->engine.height);
 }
 static unsigned button_at(const cr_ui *u, float x, float y) {
-    button b[10];
-    int n = controls(u, b);
-    for (int i = 0; i < n; i++)
-        if (x >= b[i].x && x < b[i].x + b[i].w && y >= b[i].y && y < b[i].y + b[i].h)
-            return b[i].mask;
-    return 0;
+    cr_play_layout layout = play_layout(u);
+    return cr_play_hit(&layout, x, y);
 }
 static float quick_height(const cr_ui *u) {
     return fminf(392, u->height - 16);
@@ -508,8 +479,10 @@ static int target(const cr_ui *u, float x, float y) {
             return -1;
         return 10000 + (int)((y - top - 56 + u->quick_scroll) / 56);
     }
-    if (u->page == CR_PLAY)
-        return y < 56 && x > u->width - 56 ? -3 : -1;
+    if (u->page == CR_PLAY) {
+        cr_play_layout layout = play_layout(u);
+        return cr_area_contains(layout.menu, x, y) ? -3 : -1;
+    }
     if (y < 56)
         return x < 56 && u->page != CR_MAIN ? -2 : -1;
     if (y >= u->height - 72)
@@ -538,14 +511,16 @@ void cr_ui_touch(cr_ui *u, int id, int phase, float x, float y) {
     if (!p->active)
         return;
     if (phase == CR_TOUCH_MOVE) {
+        if (fabsf(x - p->x) > 8 || fabsf(y - p->y) > 8)
+            p->dragged = true;
         if (cr_ui_running(u)) {
+            if (p->target == -3)
+                return;
             unsigned mask = button_at(u, x, y);
             u->pulses |= mask & ~p->mask;
             p->mask = mask;
             return;
         }
-        if (fabsf(x - p->x) > 8 || fabsf(y - p->y) > 8)
-            p->dragged = true;
         if (p->dragged && u->quick && p->target >= 10000) {
             u->quick_scroll += p->last_y - y;
             quick_clamp(u);
@@ -660,40 +635,46 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
     rect(p, 0, 0, w, h, bg);
     if (u->page == CR_PLAY) {
         rect(p, 0, 0, w, h, 0xff000000);
-        float area = h - 56;
-        bool portrait = area > w;
-        float reserved = portrait ? (u->engine.system == 2 ? 256 : 216) : 0;
-        if (u->engine.loaded) {
-            float scale = fminf(w / u->engine.width, fmaxf(1, area - reserved) / u->engine.height),
-                  gw = u->engine.width * scale, gh = u->engine.height * scale;
-            p->game(p->context, u->engine.pixels, u->engine.width, u->engine.height, (w - gw) / 2,
-                    56 + (area - reserved - gh) / 2, gw, gh);
-        }
-        rect(p, 0, 0, w, 56, header);
-        text(p, u->title, 16, 24, 15, theme->header_text, w - 80);
-        char core[100];
-        snprintf(core, sizeof(core), "%s · %s", cores[u->engine.system], CR_CORE_VERSION);
-        text(p, core, 16, 43, 11, theme->header_hint, w - 80);
-        p->icon(p->context, CR_ICON_MENU, w - 44, 16, 24, theme->header_text);
-        button b[10];
-        int n = controls(u, b);
+        cr_play_layout layout = play_layout(u);
+        if (u->engine.loaded)
+            p->game(p->context, u->engine.pixels, u->engine.width, u->engine.height,
+                    layout.video.x, layout.video.y, layout.video.w, layout.video.h);
+        if (layout.portrait)
+            rect(p, layout.panel.x, layout.panel.y, layout.panel.w, layout.panel.h, bg);
         unsigned input = u->keys;
+        bool menu_down = false;
         for (int i = 0; i < 32; i++)
-            if (u->pointers[i].active)
+            if (u->pointers[i].active) {
                 input |= u->pointers[i].mask;
-        for (int i = 0; i < n; i++) {
-            uint32_t c = input & b[i].mask ? accent : theme->control;
-            if (b[i].w == b[i].h)
-                p->circle(p->context, b[i].x + b[i].w / 2, b[i].y + b[i].h / 2, b[i].w / 2, c);
-            else {
-                rect(p, b[i].x + 24, b[i].y, b[i].w - 48, b[i].h, c);
-                p->circle(p->context, b[i].x + 24, b[i].y + 24, 24, c);
-                p->circle(p->context, b[i].x + b[i].w - 24, b[i].y + 24, 24, c);
+                menu_down |= u->pointers[i].target == -3 && !u->pointers[i].dragged;
             }
-            center(p, b[i].label, b[i].x + b[i].w / 2, b[i].y + b[i].h / 2 + 6,
-                   strlen(b[i].label) > 3 ? 10 : 21,
-                   input & b[i].mask ? theme->control_pressed_text : theme->control_text);
+        uint32_t idle = layout.portrait ? theme->control : (theme->control & 0xffffff) | 0xb0000000;
+        float cell = layout.dpad.w / 3;
+        rect(p, layout.dpad.x + cell, layout.dpad.y + cell, cell, cell, idle);
+        for (int i = 0; i < layout.count; i++) {
+            const cr_control *b = &layout.controls[i];
+            cr_area a = b->area;
+            uint32_t c = input & b->mask ? accent : idle;
+            if (i < 4)
+                rect(p, a.x, a.y, a.w, a.h, c);
+            else if (a.w == a.h)
+                p->circle(p->context, a.x + a.w / 2, a.y + a.h / 2, a.h / 2, c);
+            else {
+                rect(p, a.x + a.h / 2, a.y, a.w - a.h, a.h, c);
+                p->circle(p->context, a.x + a.h / 2, a.y + a.h / 2, a.h / 2, c);
+                p->circle(p->context, a.x + a.w - a.h / 2, a.y + a.h / 2, a.h / 2, c);
+            }
+            float font = (strlen(b->label) > 3 ? 9 : i < 4 ? 18 : 23) * layout.scale;
+            center(p, b->label, a.x + a.w / 2, a.y + a.h / 2 + font * .32f, font,
+                   input & b->mask ? theme->control_pressed_text : theme->control_text);
         }
+        cr_area menu = layout.menu;
+        p->circle(p->context, menu.x + menu.w / 2, menu.y + menu.h / 2, menu.w / 2,
+                  menu_down ? accent : idle);
+        float icon = 24 * layout.scale;
+        p->icon(p->context, CR_ICON_MENU, menu.x + (menu.w - icon) / 2,
+                menu.y + (menu.h - icon) / 2, icon,
+                menu_down ? theme->control_pressed_text : theme->control_text);
     } else {
         const char *title = "Menu principal";
         switch (u->page) {
@@ -759,7 +740,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         if (u->page == CR_ABOUT)
             u->text_height =
                 paragraphs(p,
-                           "CorvusRetro 0.7.0\n\nFrontend original en C, rendu OpenGL ES et audio "
+                           "CorvusRetro 0.8.0\n\nFrontend original en C, rendu OpenGL ES et audio "
                            "AAudio.\n\nCorvusSoftware\nCœurs CorvusCore 0.14.0 : Game Boy, Game "
                            "Boy Color, Game Boy Advance (expérimental).\n\nNavigation inspirée de "
                            "MaterialUI. Thèmes CorvusRetro, ASUS, NVIDIA Shield et "
