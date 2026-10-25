@@ -377,7 +377,7 @@ static void activate(cr_ui *u, row r) {
         cr_game *g = &u->games[r.value];
         char path[4200];
         snprintf(path, sizeof(path), "%s/roms/%s.rom", u->engine.root, g->id);
-        char title[512], id[68];
+        char title[512], id[80];
         snprintf(title, sizeof(title), "%s", g->title);
         snprintf(id, sizeof(id), "%s", g->id);
         open_game(u, g->system, id, title, path);
@@ -929,7 +929,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
                 "CorvusSoftware\nSPDX-License-Identifier: AGPL-3.0-only",
                 20, 92, w - 40, 24, fg, u->scroll);
         if (u->page == CR_CORE_INFO) {
-            char info[1024];
+            char info[2048];
             if (u->engine.handle) {
                 const cr_core_descriptor *desc = cr_registry_get(u->engine.system);
                 snprintf(info, sizeof(info),
@@ -960,7 +960,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         text(p, title, has_back(u) ? 56 : 20, 35, 19, theme->header_text, w - 100);
         p->icon(p->context, CR_ICON_CROW, w - 44, 16, 24, theme->header_icon);
         rect(p, 0, body_bottom(u), w, 100, bg);
-        char footer[160];
+        char footer[256];
         if (u->engine.handle)
             snprintf(footer, sizeof(footer), "Cœur chargé : %s · %s", core_name(u->engine.system),
                      cr_registry_get(u->engine.system)->version);
