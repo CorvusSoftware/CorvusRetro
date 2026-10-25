@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #define _POSIX_C_SOURCE 200809L
 #include "engine.h"
+#include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <math.h>
@@ -13,6 +14,40 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+/* Heap-owned context: remains valid when candidate engine structs are moved. */
+struct cr_engine_output {
+    uint32_t *pixels;
+    uint32_t width, height;
+    int16_t audio[4096];
+    size_t audio_count;
+    bool got_video, failed;
+};
+
+static void on_video(void *userdata, const uint32_t *pixels,
+                     uint32_t width, uint32_t height, size_t stride) {
+    struct cr_engine_output *output = userdata;
+    if (!output || !output->pixels || !pixels ||
+        width != output->width || height != output->height || stride < width) {
+        if (output) output->failed = true;
+        return;
+    }
+    for (size_t row = 0; row < height; ++row)
+        memcpy(output->pixels + row * width, pixels + row * stride,
+               (size_t)width * sizeof(uint32_t));
+    output->got_video = true;
+}
+
+static void on_audio(void *userdata, const int16_t *samples, size_t stereo_frames) {
+    struct cr_engine_output *output = userdata;
+    if (!output || !samples || stereo_frames > (4096 - output->audio_count) / 2) {
+        if (output) output->failed = true;
+        return;
+    }
+    size_t count = stereo_frames * 2;
+    memcpy(output->audio + output->audio_count, samples, count * sizeof(int16_t));
+    output->audio_count += count;
+}
+
 #define MAX_ROM (32u * 1024u * 1024u)
 #define MAX_BATTERY (1024u * 1024u)
 #define MAX_STATE (16u * 1024u * 1024u)
@@ -22,13 +57,14 @@ static bool fail(cr_engine *engine, const char *message) {
     return false;
 }
 static bool sdk_error(cr_engine *engine) {
-    return fail(engine, corvuscore_last_error());
+    return fail(engine, engine->api.last_error ? engine->api.last_error(engine->handle)
+                                               : "Erreur du cœur CorvusAPI");
 }
 static void success(cr_engine *engine) {
     engine->error[0] = '\0';
 }
 static bool valid_system(cr_engine *engine, int system) {
-    return (system >= CORVUSCORE_GB && system <= CORVUSCORE_GBA) || fail(engine, "Cœur inconnu");
+    return (system >= 0 && system <= 2) || fail(engine, "Cœur inconnu");
 }
 static bool ready(cr_engine *engine) {
     return (engine->handle && engine->loaded) || fail(engine, "Aucun contenu chargé");
@@ -178,11 +214,17 @@ static bool write_file(cr_engine *engine, const char *path, const uint8_t *bytes
     return synced || fail(engine, "Finalisation de sauvegarde impossible");
 }
 static void release_handle(cr_engine *engine) {
-    if (engine->handle)
-        corvuscore_destroy(engine->handle);
+    if (engine->handle && engine->api.destroy)
+        engine->api.destroy(engine->handle);
+    if (engine->module)
+        dlclose(engine->module);
+    free(engine->output);
     free(engine->pixels);
     engine->handle = NULL;
+    engine->module = NULL;
+    engine->output = NULL;
     engine->pixels = NULL;
+    memset(&engine->api, 0, sizeof(engine->api));
     engine->loaded = false;
     engine->system = -1;
     engine->width = engine->height = engine->rate = 0;
@@ -190,14 +232,48 @@ static void release_handle(cr_engine *engine) {
     engine->audio_count = 0;
     engine->id[0] = '\0';
 }
+
 static bool create_handle(cr_engine *engine, int system) {
-    if (!valid_system(engine, system))
-        return false;
-    if (corvuscore_api_version() != CORVUSCORE_API_VERSION)
-        return fail(engine, "Version de l'API CorvusCore incompatible");
-    engine->handle = corvuscore_create(system);
-    if (!engine->handle)
-        return sdk_error(engine);
+    static const char *module_names[] = {
+        "libcorvus_gb.so", "libcorvus_gbc.so", "libcorvus_gba.so"
+    };
+    static const char *core_ids[] = {"corvus.gb", "corvus.gbc", "corvus.gba"};
+    if (!valid_system(engine, system)) return false;
+    char module_path[128];
+#if defined(__ANDROID__)
+    snprintf(module_path, sizeof(module_path), "%s", module_names[system]);
+#else
+    snprintf(module_path, sizeof(module_path), "./%s", module_names[system]);
+#endif
+    engine->module = dlopen(module_path, RTLD_NOW | RTLD_LOCAL);
+    if (!engine->module)
+        return fail(engine, "Module CorvusAPI introuvable");
+    corvus_get_api_fn entry = NULL;
+    void *symbol = dlsym(engine->module, CORVUS_CORE_ENTRYPOINT);
+    if (!symbol) return fail(engine, "Entrée CorvusAPI absente");
+    memcpy(&entry, &symbol, sizeof(entry));
+    engine->api.struct_size = sizeof(engine->api);
+    if (!entry(CORVUS_API_VERSION, &engine->api) ||
+        engine->api.api_version != CORVUS_API_VERSION ||
+        engine->api.struct_size < sizeof(engine->api) ||
+        !engine->api.get_info || !engine->api.create || !engine->api.destroy ||
+        !engine->api.load_game || !engine->api.unload_game ||
+        !engine->api.get_av_info || !engine->api.set_button || !engine->api.run_frame ||
+        !engine->api.serialize_size || !engine->api.serialize ||
+        !engine->api.unserialize || !engine->api.battery_size ||
+        !engine->api.battery_dirty || !engine->api.battery_copy ||
+        !engine->api.battery_acknowledge)
+        return fail(engine, "Version ou fonctions CorvusAPI incompatibles");
+    corvus_core_info info = {.struct_size = sizeof(info)};
+    if (!engine->api.get_info(&info) || !info.id ||
+        strcmp(info.id, core_ids[system]) != 0)
+        return fail(engine, "Identifiant de cœur CorvusAPI invalide");
+    engine->output = calloc(1, sizeof(*engine->output));
+    if (!engine->output) return fail(engine, "Mémoire insuffisante");
+    corvus_host host = {.struct_size = sizeof(host), .userdata = engine->output,
+                        .video_frame = on_video, .audio_frames = on_audio};
+    engine->handle = engine->api.create(&host);
+    if (!engine->handle) return sdk_error(engine);
     engine->system = system;
     return true;
 }
@@ -219,7 +295,9 @@ static bool mapped_load(cr_engine *engine, const char *path, const uint8_t *batt
     close(fd);
     if (data == MAP_FAILED)
         return fail(engine, "Lecture du contenu impossible");
-    int loaded = corvuscore_load(engine->handle, data, size, battery, battery_size);
+    corvus_game game = {.struct_size = sizeof(game), .rom_data = data, .rom_size = size,
+                        .battery_data = battery, .battery_size = battery_size};
+    int loaded = engine->api.load_game(engine->handle, &game);
     if (!loaded)
         sdk_error(engine);
     munmap(data, size);
@@ -247,6 +325,7 @@ bool cr_engine_select(cr_engine *engine, int system) {
     cr_engine_init(&candidate, engine->root);
     if (!create_handle(&candidate, system)) {
         fail(engine, candidate.error);
+        release_handle(&candidate);
         return false;
     }
     if (!cr_engine_save_battery(engine)) {
@@ -268,6 +347,7 @@ bool cr_engine_open(cr_engine *engine, int system, const char *id, const char *p
     memcpy(candidate.id, id, strlen(id) + 1);
     if (!create_handle(&candidate, system)) {
         fail(engine, candidate.error);
+        release_handle(&candidate);
         return false;
     }
     /* Reopening the current game must load its latest in-memory battery. */
@@ -283,10 +363,15 @@ bool cr_engine_open(cr_engine *engine, int system, const char *id, const char *p
               mapped_load(&candidate, path, battery, battery_size);
     free(battery);
     if (ok) {
-        candidate.width = corvuscore_video_width(candidate.handle);
-        candidate.height = corvuscore_video_height(candidate.handle);
-        candidate.rate = corvuscore_audio_rate(candidate.handle);
-        candidate.fps = corvuscore_video_fps(candidate.handle);
+        corvus_av_info av = {.struct_size = sizeof(av)};
+        if (!candidate.api.get_av_info(candidate.handle, &av))
+            ok = sdk_error(&candidate);
+        else {
+            candidate.width = (int)av.width;
+            candidate.height = (int)av.height;
+            candidate.rate = (int)av.audio_sample_rate;
+            candidate.fps = av.fps;
+        }
         if (candidate.width <= 0 || candidate.height <= 0 || candidate.width > 1024 ||
             candidate.height > 1024 || candidate.rate <= 0 || !isfinite(candidate.fps) ||
             candidate.fps <= 0)
@@ -297,8 +382,12 @@ bool cr_engine_open(cr_engine *engine, int system, const char *id, const char *p
             calloc((size_t)candidate.width * (size_t)candidate.height, sizeof(*candidate.pixels));
         if (!candidate.pixels)
             ok = fail(&candidate, "Mémoire insuffisante");
-        else
+        else {
+            candidate.output->pixels = candidate.pixels;
+            candidate.output->width = (uint32_t)candidate.width;
+            candidate.output->height = (uint32_t)candidate.height;
             candidate.loaded = true;
+        }
     }
     if (!ok) {
         fail(engine, candidate.error);
@@ -311,30 +400,35 @@ bool cr_engine_open(cr_engine *engine, int system, const char *id, const char *p
     return true;
 }
 bool cr_engine_step(cr_engine *engine, unsigned mask) {
-    if (!ready(engine))
-        return false;
-    if (mask & ~1023u)
-        return fail(engine, "Boutons invalides");
+    if (!ready(engine)) return false;
+    if (mask & ~1023u) return fail(engine, "Boutons invalides");
+    static const uint32_t input_map[10] = {
+        CORVUS_BUTTON_UP, CORVUS_BUTTON_DOWN, CORVUS_BUTTON_LEFT,
+        CORVUS_BUTTON_RIGHT, CORVUS_BUTTON_A, CORVUS_BUTTON_B,
+        CORVUS_BUTTON_START, CORVUS_BUTTON_SELECT, CORVUS_BUTTON_L, CORVUS_BUTTON_R
+    };
+    struct cr_engine_output *output = engine->output;
+    output->got_video = false;
+    output->failed = false;
+    output->audio_count = 0;
     for (int button = 0; button < 10; ++button)
-        if (!corvuscore_set_button(engine->handle, button, (mask & (1u << button)) != 0))
-            return sdk_error(engine);
-    if (!corvuscore_run_frame(engine->handle, engine->pixels,
-                              (size_t)engine->width * (size_t)engine->height))
+        engine->api.set_button(engine->handle, 0, input_map[button],
+                               (mask & (1u << button)) != 0);
+    if (!engine->api.run_frame(engine->handle))
         return sdk_error(engine);
-    engine->audio_count = corvuscore_read_audio(engine->handle, engine->audio,
-                                                sizeof(engine->audio) / sizeof(engine->audio[0]));
-    if (engine->audio_count > sizeof(engine->audio) / sizeof(engine->audio[0]) ||
-        engine->audio_count % 2 != 0)
-        return fail(engine, "Format audio invalide");
+    if (output->failed || !output->got_video)
+        return fail(engine, "Sortie video ou audio CorvusAPI invalide");
+    engine->audio_count = output->audio_count;
+    memcpy(engine->audio, output->audio, engine->audio_count * sizeof(int16_t));
     success(engine);
     return true;
 }
 bool cr_engine_save_battery(cr_engine *engine) {
-    if (!engine->handle || !engine->loaded || !corvuscore_battery_dirty(engine->handle)) {
+    if (!engine->handle || !engine->loaded || !engine->api.battery_dirty(engine->handle)) {
         success(engine);
         return true;
     }
-    size_t size = corvuscore_battery_size(engine->handle);
+    size_t size = engine->api.battery_size(engine->handle);
     if (!size) {
         success(engine);
         return true;
@@ -345,7 +439,7 @@ bool cr_engine_save_battery(cr_engine *engine) {
     if (!bytes)
         return fail(engine, "Mémoire insuffisante");
     uint64_t generation = 0;
-    bool copied = corvuscore_copy_battery_generation(engine->handle, bytes, size, &generation) != 0;
+    bool copied = engine->api.battery_copy(engine->handle, bytes, size, &generation) != 0;
     if (!copied)
         sdk_error(engine);
     char path[4096];
@@ -354,7 +448,7 @@ bool cr_engine_save_battery(cr_engine *engine) {
     free(bytes);
     if (!written)
         return false;
-    if (!corvuscore_acknowledge_battery(engine->handle, generation))
+    if (!engine->api.battery_acknowledge(engine->handle, generation))
         return sdk_error(engine);
     success(engine);
     return true;
@@ -362,7 +456,7 @@ bool cr_engine_save_battery(cr_engine *engine) {
 bool cr_engine_reset(cr_engine *engine) {
     if (!ready(engine) || !cr_engine_save_battery(engine))
         return false;
-    if (!corvuscore_reset(engine->handle))
+    if (!engine->api.reset || !engine->api.reset(engine->handle))
         return sdk_error(engine);
     engine->audio_count = 0;
     success(engine);
@@ -371,13 +465,13 @@ bool cr_engine_reset(cr_engine *engine) {
 bool cr_engine_save_state(cr_engine *engine) {
     if (!ready(engine))
         return false;
-    size_t size = corvuscore_state_size(engine->handle);
+    size_t size = engine->api.serialize_size(engine->handle);
     if (!size || size > MAX_STATE)
         return fail(engine, "État de sauvegarde invalide");
     uint8_t *bytes = malloc(size);
     if (!bytes)
         return fail(engine, "Mémoire insuffisante");
-    bool copied = corvuscore_save_state(engine->handle, bytes, size) != 0;
+    bool copied = engine->api.serialize(engine->handle, bytes, size) != 0;
     if (!copied)
         sdk_error(engine);
     char path[4096];
@@ -398,7 +492,7 @@ bool cr_engine_load_state(cr_engine *engine) {
     if (!data_path(engine, path, "states", "-" CR_CORE_VERSION ".state") ||
         !read_file(engine, path, MAX_STATE, false, &bytes, &size))
         return false;
-    bool loaded = corvuscore_load_state(engine->handle, bytes, size) != 0;
+    bool loaded = engine->api.unserialize(engine->handle, bytes, size) != 0;
     free(bytes);
     if (!loaded)
         return sdk_error(engine);

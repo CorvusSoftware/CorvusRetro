@@ -2,7 +2,8 @@
 
 Application Android native originale de **CorvusSoftware**, inspirée de l'approche
 C/C++ et de la navigation MaterialUI de RetroArch. Les moteurs sont ceux de
-[CorvusCore](https://github.com/CorvusSoftware/CorvusCore).
+[CorvusCore](https://github.com/CorvusSoftware/CorvusCore), charges via l'ABI
+[CorvusAPI](https://github.com/CorvusSoftware/CorvusAPI).
 Code applicatif sous **AGPL-3.0-only**, Copyright (C) 2026 CorvusSoftware.
 
 ## Version 0.9 : appuis et catégories
@@ -34,7 +35,7 @@ Les menus et le lecteur Java de la version 0.4 ont été remplacés.
 | Boucle Android et cycle de vie | C11, `native_main.c` |
 | Rendu des menus et des frames | C11, EGL/OpenGL ES 2 |
 | Audio PCM stéréo | C11, AAudio et tampon circulaire |
-| Chargement, états et batterie | C11, SDK C CorvusCore |
+| Chargement, états et batterie | C11, ABI C CorvusAPI et modules integres |
 | Moteurs GB/GBC/GBA | C++20, CorvusCore |
 | Services du système Android | Java : SAF, stockage/préférences, polices et ressources |
 
@@ -108,8 +109,8 @@ make test SANITIZE=ON CMAKE="$ANDROID_HOME/cmake/3.22.1/bin/cmake"
 ```
 
 APK : `app/build/outputs/apk/debug/app-debug.apk`, signé avec la clé Android debug.
-Les tests hôtes n'ont plus besoin d'une JVM ou d'un pont JNI : ils exercent le C
-et le SDK directement. Le test mémoire instrumente notre code C portable ; le SDK
+Les tests hotes n'ont plus besoin d'une JVM ou d'un pont JNI : ils exercent le C,
+les modules CorvusAPI et les vrais moteurs directement. Le test mémoire instrumente notre code C portable ; le SDK
 CorvusCore n'est pas instrumenté par cette option.
 Voir [les preuves et limites Android](docs/validation-android.md).
 
@@ -127,9 +128,10 @@ CorvusRetro-debug-…**. Extraire l'APK du ZIP ; artefacts conservés 14 jours.
 
 `app/src/main/cpp/` contient le frontend C, ses pilotes Android/GL/audio et le
 contrat portable de plateforme. `app/src/main/java/` contient uniquement les
-services Android. `third_party/CorvusCore/` fournit les moteurs C++20 figés au
-commit `38829d4935bbdcf4b13261714352362065b78551` ; son API C préliminaire version 0
-est vérifiée avant utilisation. Le frontend utilise ce SDK, sans adaptateur libretro.
+services Android. `third_party/CorvusCore/` fournit les moteurs C++20 via un sous-module versionne. Chaque moteur est expose
+par un module CorvusAPI integre a l'APK, sans adaptateur libretro. Le frontend
+utilise le contrat CorvusAPI version 0, encore experimental, et non directement
+l'API C de CorvusCore. Voir [la migration](docs/corvusapi-migration.md).
 
 L'architecture, les pilotes et MaterialUI de RetroArch ont été étudiés. Les
 implémentations applicatives, shaders et icônes sont originaux. Voir

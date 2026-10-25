@@ -53,10 +53,10 @@ static void make_rom(const char *path, int system) {
     free(bytes);
 }
 static uint8_t *machine_state(cr_engine *engine, size_t *size) {
-    *size = corvuscore_state_size(engine->handle);
+    *size = engine->api.serialize_size(engine->handle);
     check(*size > 0, "state size", engine);
     uint8_t *bytes = malloc(*size);
-    check(bytes && corvuscore_save_state(engine->handle, bytes, *size), "capture state", engine);
+    check(bytes && engine->api.serialize(engine->handle, bytes, *size), "capture state", engine);
     return bytes;
 }
 static void assert_state(cr_engine *engine, const uint8_t *expected, size_t size,
@@ -72,8 +72,7 @@ static void path(char out[4096], const char *root, const char *folder, const cha
     check(count > 0 && count < 4096, "test path", NULL);
 }
 int main(void) {
-    check(strcmp(corvuscore_version(), CR_CORE_VERSION) == 0, "pinned core version", NULL);
-    check(corvuscore_api_version() == CORVUSCORE_API_VERSION, "pinned API", NULL);
+    /* Verify actual core metadata through CorvusAPI after loading the module. */
     char root[] = "/tmp/corvus-native-engine-XXXXXX";
     check(mkdtemp(root) != NULL, "temporary storage", NULL);
     char ids[3][68], roms[3][4096];
@@ -98,6 +97,10 @@ int main(void) {
         check(cr_engine_select(&engine, system), "load idle core", &engine);
         check(engine.handle && engine.system == system && !engine.loaded, "real idle handle",
               &engine);
+        corvus_core_info info = {.struct_size = sizeof(info)};
+        check(engine.api.get_info(&info) && info.version &&
+                  strcmp(info.version, CR_CORE_VERSION) == 0,
+              "pinned core version via CorvusAPI", &engine);
         check(!cr_engine_step(&engine, 0), "idle frame rejected", &engine);
         check(cr_engine_open(&engine, system, ids[system], roms[system]), "load content", &engine);
         check(engine.loaded && engine.width == (system == 2 ? 240 : 160) &&
@@ -110,7 +113,8 @@ int main(void) {
               "stereo PCM", &engine);
         check(!cr_engine_step(&engine, 1u << 10), "invalid input mask", &engine);
         if (system == 2) {
-            size_t size = corvuscore_battery_size(engine.handle);
+            uint64_t generation = 0;
+            size_t size = engine.api.battery_size(engine.handle);
             uint8_t *stale = malloc(size);
             check(stale && size > 0, "allocate stale battery", &engine);
             memset(stale, 0x33, size);
@@ -119,7 +123,7 @@ int main(void) {
             write_bytes(battery_path, stale, size);
             check(cr_engine_open(&engine, system, ids[system], roms[system]),
                   "reopen current game with dirty battery", &engine);
-            check(corvuscore_copy_battery(engine.handle, stale, size) && stale[0] == 0x5a,
+            check(engine.api.battery_copy(engine.handle, stale, size, &generation) && stale[0] == 0x5a,
                   "reopen must load latest in-memory battery", &engine);
             free(stale);
         }
@@ -138,7 +142,7 @@ int main(void) {
         check(cr_engine_step(&engine, 0) && cr_engine_load_state(&engine), "restore state",
               &engine);
         assert_state(&engine, state, state_size, "exact state roundtrip");
-        corvuscore_bridge *current = engine.handle;
+        void *current = engine.handle;
         check(!cr_engine_open(&engine, system, "../unsafe", roms[system]), "unsafe content ID",
               &engine);
         check(engine.handle == current, "invalid ID retains current engine", &engine);
@@ -168,7 +172,7 @@ int main(void) {
             char new_path[4096];
             path(new_path, root, "saves", ids[system], ".sav.new");
             check(mkdir(new_path, 0700) == 0, "inject atomic writer failure", &engine);
-            check(corvuscore_battery_dirty(engine.handle), "GBA battery dirty", &engine);
+            check(engine.api.battery_dirty(engine.handle), "GBA battery dirty", &engine);
             current = engine.handle;
             check(!cr_engine_select(&engine, 0), "failed save prevents replacement", &engine);
             check(!cr_engine_open(&engine, 0, ids[0], roms[0]),
@@ -176,10 +180,10 @@ int main(void) {
             check(!cr_engine_close(&engine), "failed save prevents unload", &engine);
             check(engine.handle == current && engine.loaded && engine.system == 2,
                   "failure retains current owner", &engine);
-            check(corvuscore_battery_dirty(engine.handle), "failed save not acknowledged", &engine);
+            check(engine.api.battery_dirty(engine.handle), "failed save not acknowledged", &engine);
             check(rmdir(new_path) == 0 && cr_engine_save_battery(&engine), "retry battery write",
                   &engine);
-            check(!corvuscore_battery_dirty(engine.handle), "committed battery acknowledged",
+            check(!engine.api.battery_dirty(engine.handle), "committed battery acknowledged",
                   &engine);
             char battery_path[4096];
             path(battery_path, root, "saves", ids[system], ".sav");
@@ -197,9 +201,10 @@ int main(void) {
                   cr_engine_step(&engine, 0),
               "reload content", &engine);
         if (system == 2) {
-            size_t size = corvuscore_battery_size(engine.handle);
+            uint64_t generation = 0;
+            size_t size = engine.api.battery_size(engine.handle);
             uint8_t *battery = malloc(size);
-            check(battery && corvuscore_copy_battery(engine.handle, battery, size) &&
+            check(battery && engine.api.battery_copy(engine.handle, battery, size, &generation) &&
                       battery[0] == 0x5a,
                   "GBA battery reloaded", &engine);
             free(battery);
