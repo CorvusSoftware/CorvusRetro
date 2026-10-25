@@ -27,6 +27,15 @@ static void tap(cr_ui *u, float x, float y) {
     cr_ui_touch(u, 0, CR_TOUCH_DOWN, x, y);
     cr_ui_touch(u, 0, CR_TOUCH_UP, x, y);
 }
+static int fixture_reset(void *handle) { (void)handle; return 1; }
+static size_t fixture_state_size(void *handle) { (void)handle; return 1; }
+static int fixture_serialize(void *handle, uint8_t *out, size_t size) {
+    (void)handle; (void)out; (void)size; return 1;
+}
+static int fixture_unserialize(void *handle, const uint8_t *data, size_t size) {
+    (void)handle; (void)data; (void)size; return 1;
+}
+
 int main(void) {
     check(cr_content_system("test.GBC", 0) == 1 && cr_content_system("test.gba", 1) == 2,
           "native system association");
@@ -89,6 +98,11 @@ int main(void) {
     u.page = CR_PLAY;
     u.engine.loaded = true;
     u.engine.system = 2;
+    /* This test drives the menu without loading a real game core. */
+    u.engine.api.reset = fixture_reset;
+    u.engine.api.serialize_size = fixture_state_size;
+    u.engine.api.serialize = fixture_serialize;
+    u.engine.api.unserialize = fixture_unserialize;
     cr_ui_size(&u, 384, 700);
     cr_ui_touch(&u, 0, CR_TOUCH_DOWN, 330, 520);
     cr_ui_touch(&u, 1, CR_TOUCH_DOWN, 40, 565);
