@@ -9,9 +9,9 @@
         <item name="android:windowActionModeOverlay">true</item>
     </style>
     <style name="CorvusTheme" parent="CorvusBase">
-        <item name="android:colorAccent">#7AB547</item>
-        <item name="android:windowBackground">#121212</item>
-        <item name="android:statusBarColor">#000000</item>
-        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:colorAccent">#B69AFF</item>
+        <item name="android:windowBackground">#090D14</item>
+        <item name="android:statusBarColor">#090D14</item>
+        <item name="android:navigationBarColor">#090D14</item>
     </style>
 </resources>

@@ -5,7 +5,12 @@ C/C++ et de la navigation MaterialUI de RetroArch. Les moteurs sont ceux de
 [CorvusCore](https://github.com/CorvusSoftware/CorvusCore).
 Code applicatif sous **AGPL-3.0-only**, Copyright (C) 2026 CorvusSoftware.
 
-## Version 0.5 : frontend natif en C
+## Version 0.6 : thèmes CorvusRetro et ASUS
+
+Le thème par défaut reprend le bleu nuit, l’indigo et le violet du logo CorvusRetro.
+Le thème ASUS clair reprend le noir et blanc du logotype corporate ; NVIDIA Shield
+et MaterialUI sombre restent disponibles. Les choix précédemment enregistrés sont
+conservés. Voir [les palettes et leurs références](docs/themes.md).
 
 Les menus, leur état, la navigation, les commandes, le rendu et la boucle
 d'émulation sont maintenant en **C11**. Une `NativeActivity` héberge la boucle
@@ -32,7 +37,7 @@ Le cache de glyphes natif accepte aussi les noms de contenus Unicode.
 - Listes tactiles et onglets Menu principal, Listes de lecture et Réglages.
 - Chargement d'un cœur sans contenu et déchargement réel, avec état **Aucun cœur**.
 - **CorvusGB**, **CorvusGBC** et **CorvusGBA expérimental**, version 0.14.0.
-- Thème **NVIDIA Shield** noir/vert et thème **MaterialUI sombre** bleu.
+- Thème **CorvusRetro** bleu nuit/violet par défaut, **ASUS** noir/blanc, **NVIDIA Shield** noir/vert et **MaterialUI sombre** bleu.
 - Icônes originales, module de cœur avec une tête de corbeau et identité CorvusRetro.
 - Import local par le sélecteur Android, listes par console et historique.
 - Commandes tactiles simultanées, clavier/manette, audio stéréo et proportions vidéo conservées.
@@ -42,7 +47,7 @@ Le cache de glyphes natif accepte aussi les noms de contenus Unicode.
 
 <p>
   <img src="docs/screenshots/menu.png" width="240" alt="Menu dessiné en C et OpenGL" />
-  <img src="docs/screenshots/cores.png" width="240" alt="Liste native des cœurs" />
+  <img src="docs/screenshots/asus.png" width="240" alt="Thème ASUS noir et blanc" />
   <img src="docs/screenshots/player.png" width="240" alt="Programme original exécuté dans le lecteur natif" />
 </p>
 

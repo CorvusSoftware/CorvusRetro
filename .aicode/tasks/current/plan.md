@@ -1,18 +1,8 @@
-# Frontend natif CorvusRetro 0.5
+# Thèmes CorvusRetro et ASUS
 
-Demande corrigée : utiliser la même approche C/C++ native que RetroArch, avec code original, et non des menus Java.
-Budget DEEP : migration de rendu, entrées, cycle Android et propriété des moteurs. Deux tâches parallèles distinctes : plateforme Android Java et moteur C ; frontend et rendu C intégrés par le parent, puis revue indépendante.
-
-Architecture cible : NativeActivity et native_app_glue, boucle événementielle C, menus et navigation C, EGL/OpenGL ES2 C, audio AAudio C, SDK C CorvusCore sur moteurs C++20. Java limité au sélecteur SAF, stockage Android et préférences compatibles, glyphes et ressources système rasterisés en atlas. Aucun menu ni widget applicatif Java.
-
-Étapes :
-1. Étudier les pilotes Android, GL et audio de RetroArch et définir les frontières. Terminé.
-2. Terminé : implémenter moteur C avec sauvegardes compatibles et tests hôtes ; services Android NativeActivity.
-3. Terminé : implémenter menus, texte, icônes, rendu du jeu et commandes tactiles/manette en C.
-4. Terminé : remplacer l'ancienne couche Java/JNI, intégrer CMake/CI et tester build/lint/natif.
-5. Terminé : tester sur émulateur les thèmes, chargements, import, états, batterie, rotation et reprise, puis revoir et corriger.
-6. Documentation et cloud actualisés. Publication autorisée sur main avec contrôle du workflow Android APK.
-
-P0 : compilation C11 réelle, tests moteurs et navigation, aucune logique de menus/émulation Java, fichiers/sauvegardes 0.4 conservés.
-P1 : essais Android avec contenu synthétique original, contrôles C, importSAF, pause/reprise/rotation et fermeture/libération.
-Contraintes : code original signé, zéro tiret Unicode long, CorvusCore figé intact, crédits conservés, aucune copie source RetroArch.
+Objectif : thème CorvusRetro par défaut inspiré du logo fourni (noir, bleu nuit, violet/lavande), ajout du thème ASUS corporate et conservation des thèmes existants.
+Périmètre : catalogue de palettes C, menus/rendu C, adaptation des préférences Android et couleurs des barres, icône de lancement, validation et captures.
+Compatibilité : conserver les IDs0Shield/1Sombre et les clés enregistrées shield/dark ; défautCorvus uniquement en absence de choix. Ne pas modifier les moteurs ou sauvegardes.
+Étapes réalisées : référence logotypeASUSpublique consultée, quatrepalettes cataloguées, rôlesappliqués, tests/persistance/rendu/build/lint/revue validés. Publication autorisée surmain avec vérificationCI.
+Preuves : tests du changement de thème et des anciens choix, buildAPK/lint, captures Android par thème et conservation après relance.
+Contrainte : rester en C natif pour les thèmes et le rendu, Java se limite à stocker les choix et appliquer les couleurs de fenêtre fournies par C ; signatures et règles de ponctuation inchangées.

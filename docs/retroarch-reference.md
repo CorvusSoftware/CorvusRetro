@@ -54,8 +54,9 @@ Valeurs examinées dans `materialui_theme_nvidia_shield`, dans
 | Indications | `#999999` |
 | Séparateurs | `#498515` |
 
-CorvusRetro utilise cette palette dans ses composants Android et conserve un
-second thème sombre bleu. Les choix de thème sont mémorisés.
+CorvusRetro conserve cette palette comme option NVIDIA Shield, avec MaterialUI
+sombre, CorvusRetro et ASUS. Le catalogue et le rendu sont natifs C ; les choix
+sont mémorisés. Voir [les palettes actuelles](themes.md).
 
 ## Icônes
 

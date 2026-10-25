@@ -53,7 +53,7 @@ static int rows(const cr_ui *u) {
     if (u->page == CR_SETTINGS)
         return 5;
     if (u->page == CR_THEMES)
-        return 2;
+        return CR_THEME_COUNT;
     if (u->page == CR_GAMES) {
         int n = 0;
         for (size_t i = 0; i < u->game_count; i++)
@@ -113,8 +113,8 @@ static row get_row(const cr_ui *u, int index) {
     } else if (u->page == CR_SETTINGS) {
         switch (index) {
         case 0:
-            fill(&r, "Thème de l’interface", u->theme ? "MaterialUI sombre" : "NVIDIA Shield",
-                 CR_ICON_THEME, ACT_THEME, 0);
+            fill(&r, "Thème de l’interface", cr_theme_get(u->theme)->name, CR_ICON_THEME, ACT_THEME,
+                 0);
             break;
         case 1:
             fill(&r, "Audio", "Activer le son pendant le jeu", CR_ICON_SETTINGS, ACT_AUDIO, 0);
@@ -137,9 +137,10 @@ static row get_row(const cr_ui *u, int index) {
             break;
         }
     } else if (u->page == CR_THEMES) {
-        fill(&r, index ? "MaterialUI sombre" : "NVIDIA Shield",
-             index ? "Anthracite et bleu" : "Noir et vert", CR_ICON_THEME, ACT_SET_THEME, index);
-        r.checked = u->theme == index;
+        int id = cr_theme_at(index);
+        const cr_theme *theme = cr_theme_get(id);
+        fill(&r, theme->name, theme->description, CR_ICON_THEME, ACT_SET_THEME, id);
+        r.checked = u->theme == id;
     } else if (u->page == CR_GAMES) {
         int n = 0;
         for (size_t i = 0; i < u->game_count; i++)
@@ -187,9 +188,10 @@ void cr_ui_init(cr_ui *u, cr_platform p, const char *root) {
     u->width = 384;
     u->height = 700;
     u->filter = -1;
+    u->theme = CR_THEME_CORVUS;
     cr_engine_init(&u->engine, root);
     if (p.preference) {
-        u->theme = p.preference(p.context, "theme", 0) == 1;
+        u->theme = cr_theme_valid(p.preference(p.context, "theme", CR_THEME_CORVUS));
         u->audio = p.preference(p.context, "audio", 1) != 0;
         u->awake = p.preference(p.context, "keep_awake", 1) != 0;
     } else {
@@ -296,7 +298,7 @@ static void activate(cr_ui *u, row r) {
         page(u, CR_THEMES);
         break;
     case ACT_SET_THEME:
-        u->theme = r.value;
+        u->theme = cr_theme_valid(r.value);
         if (u->platform.set_preference)
             u->platform.set_preference(u->platform.context, "theme", u->theme);
         page(u, CR_SETTINGS);
@@ -650,12 +652,10 @@ static float paragraphs(const cr_painter *p, const char *s, float x, float top, 
     return y + scroll - top + line;
 }
 void cr_ui_draw(cr_ui *u, const cr_painter *p) {
-    uint32_t bg = u->theme ? 0xff202124 : 0xff121212, header = u->theme ? 0xff292b30 : 0xff1f1f1f,
-             nav = u->theme ? header : 0xff242424;
-    uint32_t fg = u->theme ? 0xfff1f3f4 : 0xffdedede, muted = u->theme ? 0xffa4abb5 : 0xff999999,
-             accent = u->theme ? 0xff81c7ff : 0xff7ab547;
-    uint32_t passive = u->theme ? muted : 0xff558b2f, line = u->theme ? 0xff36383e : 0xff498515,
-             focus = u->theme ? 0xff243b50 : 0xff255d00;
+    const cr_theme *theme = cr_theme_get(u->theme);
+    uint32_t bg = theme->background, header = theme->header, nav = theme->navigation;
+    uint32_t fg = theme->text, muted = theme->muted, accent = theme->accent;
+    uint32_t line = theme->divider, focus = theme->focus;
     float w = u->width, h = u->height;
     rect(p, 0, 0, w, h, bg);
     if (u->page == CR_PLAY) {
@@ -670,11 +670,11 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
                     56 + (area - reserved - gh) / 2, gw, gh);
         }
         rect(p, 0, 0, w, 56, header);
-        text(p, u->title, 16, 24, 15, fg, w - 80);
+        text(p, u->title, 16, 24, 15, theme->header_text, w - 80);
         char core[100];
         snprintf(core, sizeof(core), "%s · %s", cores[u->engine.system], CR_CORE_VERSION);
-        text(p, core, 16, 43, 11, muted, w - 80);
-        p->icon(p->context, CR_ICON_MENU, w - 44, 16, 24, fg);
+        text(p, core, 16, 43, 11, theme->header_hint, w - 80);
+        p->icon(p->context, CR_ICON_MENU, w - 44, 16, 24, theme->header_text);
         button b[10];
         int n = controls(u, b);
         unsigned input = u->keys;
@@ -682,7 +682,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
             if (u->pointers[i].active)
                 input |= u->pointers[i].mask;
         for (int i = 0; i < n; i++) {
-            uint32_t c = input & b[i].mask ? accent : (u->theme ? 0xcc40444b : 0xcc263320);
+            uint32_t c = input & b[i].mask ? accent : theme->control;
             if (b[i].w == b[i].h)
                 p->circle(p->context, b[i].x + b[i].w / 2, b[i].y + b[i].h / 2, b[i].w / 2, c);
             else {
@@ -691,7 +691,8 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
                 p->circle(p->context, b[i].x + b[i].w - 24, b[i].y + 24, 24, c);
             }
             center(p, b[i].label, b[i].x + b[i].w / 2, b[i].y + b[i].h / 2 + 6,
-                   strlen(b[i].label) > 3 ? 10 : 21, fg);
+                   strlen(b[i].label) > 3 ? 10 : 21,
+                   input & b[i].mask ? theme->control_pressed_text : theme->control_text);
         }
     } else {
         const char *title = "Menu principal";
@@ -722,9 +723,9 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         }
         rect(p, 0, 0, w, 56, header);
         if (u->page != CR_MAIN)
-            p->icon(p->context, CR_ICON_BACK, 12, 16, 24, fg);
-        text(p, title, u->page == CR_MAIN ? 20 : 56, 35, 19, fg, w - 100);
-        p->icon(p->context, CR_ICON_CROW, w - 44, 16, 24, accent);
+            p->icon(p->context, CR_ICON_BACK, 12, 16, 24, theme->header_text);
+        text(p, title, u->page == CR_MAIN ? 20 : 56, 35, 19, theme->header_text, w - 100);
+        p->icon(p->context, CR_ICON_CROW, w - 44, 16, 24, theme->header_icon);
         if (p->clip)
             p->clip(p->context, 0, 56, w, fmaxf(1, body_bottom(u) - 56));
         int count = rows(u);
@@ -735,7 +736,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
             row r = get_row(u, i);
             if (i == u->focus)
                 rect(p, 0, y, w, 76, focus);
-            p->icon(p->context, r.icon, 20, y + 22, 32, u->theme ? muted : accent);
+            p->icon(p->context, r.icon, 20, y + 22, 32, theme->icon);
             text(p, r.label, 66, y + 29, 16, fg, w - 110);
             text(p, r.hint, 66, y + 53, 13, muted, w - 110);
             if (r.toggle) {
@@ -758,10 +759,11 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         if (u->page == CR_ABOUT)
             u->text_height =
                 paragraphs(p,
-                           "CorvusRetro 0.5.0\n\nFrontend original en C, rendu OpenGL ES et audio "
+                           "CorvusRetro 0.6.0\n\nFrontend original en C, rendu OpenGL ES et audio "
                            "AAudio.\n\nCorvusSoftware\nCœurs CorvusCore 0.14.0 : Game Boy, Game "
                            "Boy Color, Game Boy Advance (expérimental).\n\nNavigation inspirée de "
-                           "MaterialUI et thème NVIDIA Shield.\n\nCopyright (C) 2026 "
+                           "MaterialUI. Thèmes CorvusRetro, ASUS, NVIDIA Shield et "
+                           "sombre.\n\nCopyright (C) 2026 "
                            "CorvusSoftware\nSPDX-License-Identifier: AGPL-3.0-only",
                            20, 92, w - 40, 24, fg, u->scroll);
         if (u->page == CR_LICENSE)
@@ -772,9 +774,9 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         // Cover scrolled content before drawing the fixed header and navigation.
         rect(p, 0, 0, w, 56, header);
         if (u->page != CR_MAIN)
-            p->icon(p->context, CR_ICON_BACK, 12, 16, 24, fg);
-        text(p, title, u->page == CR_MAIN ? 20 : 56, 35, 19, fg, w - 100);
-        p->icon(p->context, CR_ICON_CROW, w - 44, 16, 24, accent);
+            p->icon(p->context, CR_ICON_BACK, 12, 16, 24, theme->header_text);
+        text(p, title, u->page == CR_MAIN ? 20 : 56, 35, 19, theme->header_text, w - 100);
+        p->icon(p->context, CR_ICON_CROW, w - 44, 16, 24, theme->header_icon);
         rect(p, 0, body_bottom(u), w, 100, bg);
         char footer[160];
         if (u->engine.handle)
@@ -792,7 +794,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
                                                                         : 0;
         for (int i = 0; i < 3; i++) {
             float x = w * (i + .5f) / 3;
-            uint32_t c = i == selected ? accent : passive;
+            uint32_t c = i == selected ? theme->navigation_active : theme->navigation_passive;
             p->icon(p->context, icons[i], x - 12, h - 61, 24, c);
             center(p, labels[i], x, h - 17, 10, c);
         }
@@ -800,7 +802,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
     if (u->quick) {
         rect(p, 0, 0, w, h, 0xb0000000);
         float qh = quick_height(u), qw = fminf(360, w - 24), x = (w - qw) / 2, y = (h - qh) / 2;
-        rect(p, x, y, qw, qh, header);
+        rect(p, x, y, qw, qh, theme->surface);
         if (p->clip)
             p->clip(p->context, x, y + 56, qw, qh - 56);
         for (int i = 0; i < 6; i++) {
@@ -814,7 +816,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         if (p->clip)
             p->clip(p->context, 0, 0, w, h);
         rect(p, x, y, qw, 56, header);
-        text(p, "Menu rapide", x + 20, y + 35, 20, fg, qw - 40);
+        text(p, "Menu rapide", x + 20, y + 35, 20, theme->header_text, qw - 40);
     }
     if (u->message_time > 0 && u->message[0]) {
         float y = u->page == CR_PLAY ? h - 108 : h - 142;

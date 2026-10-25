@@ -78,13 +78,23 @@ public final class MainActivity extends NativeActivity {
     }
     public int preference(String key, int fallback) {
         try {
-            if ("theme".equals(key)) return "dark".equals(library.preferences.getString(key, "shield")) ? 1 : 0;
+            if ("theme".equals(key)) {
+                String value = library.preferences.getString(key, "corvus");
+                if ("shield".equals(value)) return 0;
+                if ("dark".equals(value)) return 1;
+                if ("corvus".equals(value)) return 2;
+                if ("asus".equals(value)) return 3;
+                return fallback;
+            }
             if ("audio".equals(key) || "keep_awake".equals(key)) return library.preferences.getBoolean(key, fallback != 0) ? 1 : 0;
             return library.preferences.getInt(key, fallback);
         } catch (ClassCastException error) { return fallback; }
     }
     public void preferenceSet(String key, int value) {
-        if ("theme".equals(key)) library.preferences.edit().putString(key, value == 1 ? "dark" : "shield").apply();
+        if ("theme".equals(key)) {
+            String[] values = {"shield", "dark", "corvus", "asus"};
+            library.preferences.edit().putString(key, value >= 0 && value < values.length ? values[value] : "corvus").apply();
+        }
         else if ("audio".equals(key) || "keep_awake".equals(key)) library.preferences.edit().putBoolean(key, value != 0).apply();
         else library.preferences.edit().putInt(key, value).apply();
     }
@@ -157,10 +167,9 @@ public final class MainActivity extends NativeActivity {
         try { return asset("LICENSE.txt") + "\n\n" + asset("CORVUSCORE-NOTICE.txt") + "\n\n" + asset("CORVUSCORE-COPYRIGHT.txt") + "\n\n" + asset("ANDROID-NATIVE-GLUE-NOTICE.txt"); }
         catch (IOException error) { return "Licence indisponible. Consultez LICENSE dans le dépôt."; }
     }
-    public void appearance(int theme, boolean keepAwake) {
+    public void appearance(int color, boolean keepAwake) {
         runOnUiThread(() -> {
             if (destroyed) return;
-            int color = theme == 0 ? Color.BLACK : 0xff292b30;
             getWindow().setStatusBarColor(color); getWindow().setNavigationBarColor(color);
             if (keepAwake) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);

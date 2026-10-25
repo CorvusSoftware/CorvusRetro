@@ -4,6 +4,7 @@
 #ifndef CORVUS_FRONTEND_H
 #define CORVUS_FRONTEND_H
 #include "engine.h"
+#include "theme.h"
 #include "platform.h"
 #include "render.h"
 enum {

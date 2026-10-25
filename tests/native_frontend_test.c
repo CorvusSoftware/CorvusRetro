@@ -38,6 +38,10 @@ int main(void) {
     cr_ui_init(&u, p, root);
     cr_ui_size(&u, 384, 700);
     check(u.page == CR_MAIN && !u.engine.handle, "initial menu without core");
+    check(u.theme == CR_THEME_CORVUS, "logo palette is the default without saved preference");
+    check(cr_theme_valid(-1) == CR_THEME_CORVUS && cr_theme_valid(99) == CR_THEME_CORVUS,
+          "unknown themes fall back safely");
+    check(CR_THEME_SHIELD == 0 && CR_THEME_DARK == 1, "published theme IDs retain compatibility");
     tap(&u, 100, 100);
     check(u.page == CR_CORES, "touch opens native core list");
     cr_ui_move(&u, 1);
@@ -59,8 +63,15 @@ int main(void) {
     check(u.page == CR_SETTINGS, "native bottom tab");
     tap(&u, 100, 100);
     check(u.page == CR_THEMES, "native theme list");
-    tap(&u, 100, 170);
-    check(theme == 1 && u.theme == 1 && u.page == CR_SETTINGS, "theme preference callback");
+    tap(&u, 100, 252);
+    check(theme == CR_THEME_DARK && u.theme == CR_THEME_DARK && u.page == CR_SETTINGS,
+          "legacy dark selection remains stable");
+    tap(&u, 100, 100);
+    tap(&u, 100, 328);
+    check(theme == CR_THEME_ASUS && u.theme == CR_THEME_ASUS, "ASUS is selectable and saved");
+    tap(&u, 100, 100);
+    tap(&u, 100, 100);
+    check(theme == CR_THEME_CORVUS && u.theme == CR_THEME_CORVUS, "Corvus is selectable and saved");
     cr_ui_back(&u);
     check(u.page == CR_MAIN, "back navigation");
     // Multiple pointers and cancellation are independent of the rendering driver.

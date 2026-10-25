@@ -1,4 +1,19 @@
-# Validation du frontend natif 0.5
+# Validation Android
+
+## Version 0.6 : thèmes
+
+Tests CTest passés pour les quatre choix, le nouveau défaut Corvus, les valeurs
+inconnues et les identifiants historiques. Build APK et lint sans erreur.
+Revue indépendante : aucun finding bloquant sur les préférences et les rôles
+visuels du thème clair.
+
+Sur émulateur Android 10 x86_64 : préférence Shield 0.5 conservée après mise à
+jour, Corvus et ASUS conservés après relance, lecteur et menu rapide ASUS lisibles,
+retour aux anciens thèmes sombre et Shield avec persistance, puis absence de
+préférence simulée sans supprimer contenus/sauvegardes : démarrage Corvus confirmé.
+Captures des quatre choix et du nouveau catalogue réalisées ; aucun crash observé.
+
+## Frontend natif 0.5
 
 ## Tests hôtes et construction
 

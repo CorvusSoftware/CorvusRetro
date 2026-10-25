@@ -1,6 +1,6 @@
 État : DONE
-Migration0.5 : frontend/menus/rendu/input/cadence/moteurs etpersistance pilotésenC ; EGL/GLES2 etAAudio natifs. JavauniquementservicesAndroid.
-Tests natifs,ASan/UBSan,buildpropre/lint,revue etscénariosAndroid passent. DonnéesetancienétatGBA0.4 préservés. Captures/docs actualisées.
-Signature/alignements etstructureAPK vérifiés ; sous-moduleCorvusCore intact etnotices conservées.
-Publication autorisée surmain, workflowAndroidAPK fournit résultat etartefact de la révisionpubliée.
-Scriptcloud natifetdémarrage sauvegardésenbrouillon etinstallation rejouéeavec succès.
+Version0.6 : CorvusRetro nuit/indigo/violet par défaut sans choix sauvegardé, ASUS clair noir/blanc du logotype ajouté, Shield et sombre conservés.
+Catalogue et couleurs enC, seules préférences et couleurs de fenêtre appliquées enJava. Contrastes clair/sombre séparés.
+Tests natifs,build/lint,signature/alignement,revue etessaisAndroid passent. Captures etréférences documentées.
+SiteASUS bloquéparréseau ; référence logotype SimpleIcons explicitée, pasdecertificationduguidecomplet.
+Publication autorisée surmain ; résultatCI etAPK accessiblesviaworkflowAndroidAPK.

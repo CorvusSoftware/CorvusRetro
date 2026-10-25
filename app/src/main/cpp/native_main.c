@@ -232,7 +232,8 @@ void android_main(struct android_app *app) {
         if (a->applied_theme != a->ui.theme || a->applied_awake != awake) {
             cr_platform services = a->ui.platform;
             if (services.appearance)
-                services.appearance(services.context, a->ui.theme, awake);
+                services.appearance(services.context, (int)cr_theme_get(a->ui.theme)->system_bar,
+                                    awake);
             a->applied_theme = a->ui.theme;
             a->applied_awake = awake;
         }
