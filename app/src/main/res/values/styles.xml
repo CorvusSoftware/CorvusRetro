@@ -3,13 +3,21 @@
      Copyright (C) 2026 CorvusSoftware
      SPDX-License-Identifier: AGPL-3.0-only -->
 <resources>
-    <style name="CorvusTheme" parent="android:style/Theme.Material.NoActionBar">
+    <style name="CorvusBase" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+    <style name="CorvusTheme" parent="CorvusBase">
+        <item name="android:colorAccent">#7AB547</item>
+        <item name="android:windowBackground">#121212</item>
+        <item name="android:statusBarColor">#000000</item>
+        <item name="android:navigationBarColor">#000000</item>
+    </style>
+    <style name="CorvusThemeDark" parent="CorvusBase">
         <item name="android:colorAccent">#81C7FF</item>
         <item name="android:windowBackground">#202124</item>
         <item name="android:statusBarColor">#292B30</item>
         <item name="android:navigationBarColor">#292B30</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowActionModeOverlay">true</item>
     </style>
 </resources>

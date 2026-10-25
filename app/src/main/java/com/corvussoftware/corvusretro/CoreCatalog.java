@@ -12,6 +12,6 @@ final class CoreCatalog {
     private CoreCatalog() {}
     static int valid(int system) { return system >= 0 && system < 3 ? system : 0; }
     static String label(Context context, int system) {
-        return NAMES[system] + " — " + SYSTEMS[system] + (system == 2 ? " · " + context.getString(R.string.experimental) : "");
+        return NAMES[system] + " : " + SYSTEMS[system] + (system == 2 ? " · " + context.getString(R.string.experimental) : "");
     }
 }

@@ -7,7 +7,6 @@ import android.media.AudioAttributes;
 import android.media.AudioFormat;
 import android.media.AudioTrack;
 import android.os.Handler;
-import android.os.HandlerThread;
 import android.os.Looper;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -19,11 +18,6 @@ final class EmulationSession {
         void ready(int width, int height);
         void message(String message);
         void failed(String message);
-    }
-    private static final HandlerThread THREAD;
-    static {
-        THREAD = new HandlerThread("CorvusCore");
-        THREAD.start();
     }
     private final Handler worker;
     private final Handler ui = new Handler(Looper.getMainLooper());
@@ -49,14 +43,15 @@ final class EmulationSession {
     EmulationSession(GameLibrary library, GameLibrary.Game game, FrameSurface surface, Listener listener) {
         this.library = library; this.game = game; this.surface = surface; this.listener = listener;
         // One queue makes an old session's close/save precede the next load.
-        worker = new Handler(THREAD.getLooper()); worker.post(this::load);
+        worker = CoreManager.worker(); worker.post(this::load);
     }
     private void postMessage(String text) { ui.post(() -> { if (!closed) listener.message(text); }); }
     private void load() {
         if (closed) return;
         try {
             byte[] battery = GameLibrary.read(library.battery(game), 1024 * 1024);
-            core = new NativeCore(game.system, library.rom(game).getAbsolutePath(), battery);
+            core = CoreManager.acquire(game.system, this);
+            core.loadContent(library.rom(game).getAbsolutePath(), battery);
             pixels = new int[core.width * core.height]; delivery = new int[pixels.length]; samples = new short[4096];
             period = Math.round(1_000_000_000 / core.fps);
             sound = library.preferences.getBoolean("audio", true);
@@ -134,7 +129,7 @@ final class EmulationSession {
     void pulse(int mask) { if (!paused && !closed) pulse.getAndUpdate(value -> value | mask); }
     void clearInput() { input.set(0); pulse.set(0); }
     private void saveBattery() throws IOException {
-        if (core == null) return;
+        if (core == null || !core.hasContent()) return;
         byte[] bytes = core.battery();
         if (bytes != null) { GameLibrary.write(library.battery(game), bytes); core.acknowledgeBattery(); }
     }
@@ -170,7 +165,7 @@ final class EmulationSession {
                 ui.post(() -> android.widget.Toast.makeText(app, R.string.save_failed, android.widget.Toast.LENGTH_LONG).show());
             }
             if (audio != null) { audio.release(); audio = null; }
-            if (core != null) { core.close(); core = null; }
+            if (core != null) { CoreManager.release(this, core); core = null; }
         });
     }
 }

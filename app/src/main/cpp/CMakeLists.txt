@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 cmake_minimum_required(VERSION 3.22.1)
 project(CorvusRetro LANGUAGES C CXX)
-set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -21,11 +20,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
         endif()
     endforeach()
 endif()
-add_library(corvusretro SHARED
-    ../jni/bridge.c
-    core_bridge.cpp
-    "${CORVUS_ROOT}/core/src/corvus_core.c")
-target_include_directories(corvusretro PRIVATE "${CORVUS_ROOT}/core/include")
+add_library(corvusretro SHARED core_bridge.cpp)
 target_link_libraries(corvusretro PRIVATE corvuscore_c_api)
 target_compile_options(corvusretro PRIVATE -Wall -Wextra -Werror)
 if(ANDROID)

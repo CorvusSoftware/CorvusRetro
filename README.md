@@ -1,61 +1,69 @@
 # CorvusRetro
 
-Application Android de **CorvusSoftware**, avec interface originale inspirée de
-la navigation **MaterialUI de RetroArch** et les moteurs maison
+Application Android originale de **CorvusSoftware**, avec navigation inspirée de
+**MaterialUI de RetroArch** et les moteurs maison
 [CorvusCore](https://github.com/CorvusSoftware/CorvusCore).
 Code applicatif sous **AGPL-3.0-only**, Copyright (C) 2026 CorvusSoftware.
 
-## Version 0.3
+## Version 0.4
 
-- Menu principal en listes tactiles : charger un cœur, charger du contenu, historique et informations.
-- Onglets Menu principal, Listes de lecture et Réglages ; thème anthracite et bleu.
-- Cœurs intégrés **CorvusGB**, **CorvusGBC** et **CorvusGBA (expérimental)**, version 0.14.0.
-- Import de fichiers locaux par le sélecteur Android, listes par console et historique.
-- Rendu natif à proportions conservées, audio PCM stéréo et commandes tactiles.
-- Menu rapide : reprendre, redémarrer, sauvegarder/charger un état et fermer le contenu.
-- Sauvegardes batterie automatiques ; arrêt de l'émulation en arrière-plan.
-- APK debug pour Android 8.0+ : ARM64 et x86_64.
+- Listes tactiles et onglets Menu principal, Listes de lecture et Réglages.
+- **Charger un cœur** crée un moteur natif, même sans contenu ; **Décharger le cœur** le libère et revient à **Aucun cœur**.
+- Cœurs intégrés : **CorvusGB**, **CorvusGBC**, **CorvusGBA (expérimental)**, version 0.14.0.
+- Thème **NVIDIA Shield** par défaut : fond noir, en-tête anthracite, icônes et sélection vertes. Thème **MaterialUI sombre** bleu disponible dans les réglages.
+- Icônes vectorielles originales de style MaterialUI ; module de cœur avec une tête de corbeau découpée, également utilisée comme identité de l'application.
+- Import local, listes par console, historique, audio stéréo et commandes tactiles.
+- Menu rapide : reprendre, redémarrer, sauvegarder ou charger un état et fermer le contenu.
+- Sauvegardes batterie automatiques et suspension de l'émulation en arrière-plan.
+- APK debug Android 8.0+, ARM64 et x86_64.
 
-La compatibilité dépend de CorvusCore ; l'intégration ne garantit pas que tous les
-jeux fonctionnent. GBA reste expérimental. Aucun jeu commercial ou BIOS constructeur n'est fourni.
-
-Captures sur émulateur Android 10 :
+Captures réelles sur émulateur Android 10 :
 
 <p>
-  <img src="docs/screenshots/menu.png" width="240" alt="Menu principal en listes MaterialUI" />
+  <img src="docs/screenshots/menu.png" width="240" alt="Cœur chargé et thème NVIDIA Shield" />
   <img src="docs/screenshots/cores.png" width="240" alt="Sélection des cœurs CorvusCore" />
-  <img src="docs/screenshots/player.png" width="240" alt="Programme de test original exécuté par CorvusGB" />
+  <img src="docs/screenshots/settings.png" width="240" alt="Réglages du thème et du lecteur" />
 </p>
 
-Autres captures : [liste de contenus](docs/screenshots/playlist.png),
-[menu rapide](docs/screenshots/quick-menu.png), [réglages](docs/screenshots/settings.png).
+Autres captures : [lecteur](docs/screenshots/player.png),
+[liste de contenus](docs/screenshots/playlist.png), [menu rapide](docs/screenshots/quick-menu.png),
+[aucun cœur](docs/screenshots/menu-empty.png), [thème sombre bleu](docs/screenshots/theme-dark.png).
 
-## Utilisation
+## Charger et décharger
 
-1. Choisir éventuellement un cœur dans **Charger un cœur**.
-2. Utiliser **Charger du contenu** pour sélectionner un fichier `.gb`, `.gbc` ou `.gba`.
-3. Retrouver le contenu dans **Listes de lecture** ou **Historique**.
-4. Pendant le jeu, ouvrir le **Menu rapide** avec son icône ou le bouton Retour Android.
+L'application démarre avec **Aucun cœur**. Choisir **Charger un cœur** initialise
+le moteur sélectionné. Son nom apparaît dans la barre d'état. Il peut être
+remplacé par un autre cœur ou libéré avec **Décharger le cœur**.
+Ce choix est un état de la session : après arrêt du processus, aucun cœur n'est chargé.
 
-L'extension `.gbc` ou `.gba` sélectionne le système correspondant. Un fichier `.gb`
-utilise le cœur GB/GBC choisi ; avec GBA sélectionné, il revient au cœur GB.
-Les fichiers doivent être décompressés, avec une taille maximale de 32 Mio.
-L'import vérifie le contenu avec le cœur avant de l'ajouter à la bibliothèque.
+**Charger du contenu** ouvre le sélecteur Android. Les extensions `.gbc` et `.gba`
+sélectionnent le système correspondant ; `.gb` utilise le cœur GB/GBC choisi,
+ou GB si GBA était sélectionné. Sans cœur chargé, les contenus sont associés
+à leur console. Les fichiers doivent être décompressés et limités à 32 Mio.
 
-Les contenus sont copiés dans le stockage privé de l'application. Les sauvegardes
-batterie sont écrites périodiquement, à la pause et à la fermeture. Un emplacement
-d'état par contenu est associé à la version de CorvusCore. Les données sont conservées
-lors d'une mise à jour avec la même signature et supprimées à la désinstallation.
-L'export de sauvegardes n'est pas encore proposé.
+Les listes et l'historique peuvent lancer directement un contenu, avec chargement
+automatique de son moteur. Le menu rapide s'ouvre par son icône ou Retour Android.
+**Fermer le contenu** enregistre la batterie, libère le moteur et revient aux menus.
+Un changement de cœur demandé depuis une autre activité est refusé si un lecteur
+en est encore propriétaire : fermer d'abord le contenu.
 
-Les touches directionnelles, A/B, Start/Select et L/R sur GBA sont tactiles.
-Les événements clavier/manette Android correspondants sont aussi pris en charge
-(flèches, Z/X, Entrée/Espace, boutons A/B, Start/Select et L1/R1).
-Le son et la veille se règlent avant le lancement d'un contenu.
+Les fichiers importés, la batterie et les états résident dans le stockage privé.
+La batterie est enregistrée périodiquement, à la pause et à la fermeture.
+Un emplacement d'état par contenu est associé à la version de CorvusCore.
+Une mise à jour avec la même signature conserve les données ; la désinstallation
+les supprime. L'export de sauvegardes reste à ajouter.
 
-## Construire
+Commandes tactiles : directions, A/B, Start/Select et L/R sur GBA.
+Événements clavier/manette pris en charge : flèches, Z/X, Entrée/Espace,
+A/B, Start/Select et L1/R1. Le son et la veille se règlent avant le lancement.
+Le thème se choisit dans **Réglages → Thème de l'interface** et reste mémorisé.
 
-Prérequis : JDK 17 ou 21, Android SDK 35, Build Tools 35.0.0,
+La compatibilité dépend de CorvusCore. GBA reste expérimental.
+Aucun jeu commercial ou BIOS constructeur n'est fourni.
+
+## Construire et tester
+
+Prérequis : JDK 17 ou 21, SDK Android 35, Build Tools 35.0.0,
 NDK 27.2.12479018 et CMake 3.22.1. Gradle 8.13 et AGP 8.9.1 sont fixés.
 
 ```sh
@@ -65,61 +73,46 @@ cd CorvusRetro
 git submodule update --init --recursive
 export ANDROID_HOME=/chemin/vers/android-sdk
 ./gradlew :app:assembleDebug :app:lintDebug
+# Tests natifs sur Linux, avec JAVA_HOME vers un JDK complet :
+make test CMAKE="$ANDROID_HOME/cmake/3.22.1/bin/cmake"
 ```
 
-Résultat : `app/build/outputs/apk/debug/app-debug.apk`.
-Dans Android Studio, ouvrir la racine puis installer ces versions du SDK/NDK/CMake.
-L'APK utilise la signature Android de développement, pas une clé de publication.
+APK : `app/build/outputs/apk/debug/app-debug.apk`, signé avec la clé Android debug.
+Android Studio peut ouvrir la racine du projet avec ces versions du SDK/NDK/CMake.
+Les preuves d'exécution et leurs limites sont dans [la validation Android](docs/validation-android.md).
 
 ## APK automatique
 
 Le workflow [Android APK](https://github.com/CorvusSoftware/CorvusRetro/actions/workflows/android.yml)
-s'exécute à chaque push sur `main`, pour les pull requests et manuellement.
-Il initialise CorvusCore, exécute les tests C et JNI, les contrôles mémoire,
-la compilation et lint Android, puis vérifie la signature et l'alignement 16 Ko.
+s'exécute à chaque push sur `main`, sur les pull requests et manuellement.
+Il initialise CorvusCore, contrôle la ponctuation du dépôt, teste les vrais moteurs
+via JNI, construit l'application et exécute lint, puis vérifie signature et alignement 16 Ko.
 
 Téléchargement : **Actions → Android APK → exécution réussie → Artifacts →
-CorvusRetro-debug-…**, puis extraire l'APK du ZIP. Artefacts conservés 14 jours.
+CorvusRetro-debug-…**, puis extraire l'APK du ZIP. Conservation : 14 jours.
 
-## Architecture et tests
+## Architecture
 
 ```text
-app/                      Menus Android Java, lecteur, audio et pont JNI C++
+app/                      Menus Java, lecteur, audio et pont JNI C++
 third_party/CorvusCore/    Moteurs C++20 et SDK C, sous-module figé
-core/                     Ancienne démo portable C11 (réglages → Démo de rendu)
-tests/                    Tests C et tests Java/JNI exécutables sur Linux
+tests/                    Tests Java/JNI et génération de contenus synthétiques
 ```
 
-`MainActivity` gère menus/imports ; `PlayerActivity` héberge le lecteur.
-`EmulationSession` sérialise l'émulation, l'audio et les sauvegardes sur un thread
-dédié. `NativeCore` utilise le SDK C de CorvusCore via JNI : images ARGB8888,
-audio PCM16 stéréo, entrées, états et sauvegardes batterie avec acquittement
-après écriture. Le thread Android présente les images et reçoit les commandes.
+`CoreManager` possède le cœur sans contenu et transfère son handle à un seul
+`EmulationSession`. Création, émulation, sauvegardes et destruction passent par
+une même file FIFO. `MainActivity` observe l'état chargé ; `PlayerActivity`
+présente les images et commandes. Les fichiers et préférences restent dans `GameLibrary`.
 
-CorvusCore est fixé au commit `38829d4935bbdcf4b13261714352362065b78551`.
-Son API C version 0 est encore préliminaire ; toute mise à jour exige une nouvelle
-validation du pont. Les sources du sous-module restent intactes.
+CorvusCore 0.14.0 est figé au commit `38829d4935bbdcf4b13261714352362065b78551`.
+Le pont vérifie son API C préliminaire version 0. Toute mise à jour exige une nouvelle
+validation. Les sources du sous-module restent intactes.
 
-```sh
-make test
-# Sous Linux, JAVA_HOME doit désigner un JDK complet :
-make jni-test
-make core-jni-test CMAKE="$ANDROID_HOME/cmake/3.22.1/bin/cmake"
-```
+## Inspiration et conventions
 
-Les tests JNI des vrais moteurs utilisent des programmes synthétiques originaux
-pour GB, GBC et GBA : chargement, image, audio, entrées, états, reset, rejet des
-buffers invalides et sauvegarde batterie GBA. Ils n'établissent pas la compatibilité
-avec un catalogue de jeux. Voir [la validation Android](docs/validation-android.md)
-pour les interactions réellement vérifiées et les limites restantes.
-
-## Inspiration et licences
-
-La navigation reprend les principes étudiés dans le pilote MaterialUI de RetroArch :
-listes d'actions, trois onglets et menu rapide. Le code applicatif, les icônes et
-les commandes sont écrits pour CorvusRetro. Aucun code ou graphisme RetroArch
-n'est copié. Le lecteur utilise directement le SDK CorvusCore, sans frontend libretro.
-Voir [les références et choix d'intégration](docs/retroarch-reference.md).
+Le pilote MaterialUI, son thème Shield et les ressources GLUI ont été étudiés
+pour la navigation, les couleurs et les métaphores d'icônes. Les icônes et le
+code applicatif sont originaux. Voir [les références précises](docs/retroarch-reference.md).
 
 Tout fichier source original porte :
 
@@ -129,7 +122,8 @@ Tout fichier source original porte :
 // SPDX-License-Identifier: AGPL-3.0-only
 ```
 
-Les fichiers XML et scripts adaptent les commentaires à leur langage. Les licences
-et crédits tiers sont conservés : wrapper Gradle, CorvusCore et ses attributions
-internes. Les notices CorvusCore sont également consultables hors ligne dans
-**Réglages → Licence et crédits**.
+Les tirets Unicode longs sont interdits dans les fichiers du dépôt parent.
+Les licences et crédits tiers restent conservés, notamment ceux de CorvusCore
+et du wrapper Gradle. Les notices embarquées utilisent le tiret ASCII pour les
+plages d'années, sans modification des crédits. Elles sont consultables hors ligne
+via **Réglages → Licence et crédits**.

@@ -7,22 +7,29 @@ package com.corvussoftware.corvusretro;
 final class NativeCore implements AutoCloseable {
     static { System.loadLibrary("corvusretro"); }
     private long handle;
-    final int width;
-    final int height;
-    final int sampleRate;
-    final double fps;
+    int width;
+    int height;
+    int sampleRate;
+    double fps;
+    private boolean contentLoaded;
 
+    NativeCore(int system) { handle = create(system); }
     NativeCore(int system, String romPath, byte[] battery) {
-        handle = create(system);
+        this(system);
         try {
-            load(handle, romPath, battery);
-            int[] info = info(handle);
-            width = info[0]; height = info[1]; sampleRate = info[2]; fps = info[3] / 1000.0;
+            loadContent(romPath, battery);
         } catch (RuntimeException | Error error) {
             close();
             throw error;
         }
     }
+    void loadContent(String romPath, byte[] battery) {
+        load(handle, romPath, battery);
+        int[] info = info(handle);
+        width = info[0]; height = info[1]; sampleRate = info[2]; fps = info[3] / 1000.0;
+        contentLoaded = true;
+    }
+    boolean hasContent() { return contentLoaded; }
     static native String version();
     int frame(int[] pixels, int input, short[] audio) { return frame(handle, pixels, input, audio); }
     void reset() { reset(handle); }
@@ -32,6 +39,7 @@ final class NativeCore implements AutoCloseable {
     void acknowledgeBattery() { acknowledgeBattery(handle); }
     @Override public void close() {
         if (handle != 0) { destroy(handle); handle = 0; }
+        contentLoaded = false;
     }
     private static native long create(int system);
     private static native void load(long handle, String romPath, byte[] battery);

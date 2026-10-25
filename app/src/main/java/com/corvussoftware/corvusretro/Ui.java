@@ -14,21 +14,34 @@ import android.os.Build;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowInsets;
-import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
 final class Ui {
-    static final int BG = 0xff202124, SURFACE = 0xff292b30, BORDER = 0xff36383e;
-    static final int TEXT = 0xfff1f3f4, MUTED = 0xffa4abb5, ACCENT = 0xff81c7ff;
+    static int BG, SURFACE, HEADER, NAV, BORDER, TEXT, MUTED, ACCENT, ICON, PASSIVE, HIGHLIGHT, CONTROL;
     private Ui() {}
     static int dp(Context c, int value) {
         return Math.round(value * c.getResources().getDisplayMetrics().density);
     }
-    static boolean compactViewport(Context c) {
-        android.content.res.Configuration config = c.getResources().getConfiguration();
-        return config.screenWidthDp <= 340 || config.screenHeightDp < 640;
+    static boolean isShield(Context c) {
+        return !"dark".equals(c.getSharedPreferences("corvus", Context.MODE_PRIVATE).getString("theme", "shield"));
+    }
+    static void applyTheme(Activity activity) {
+        boolean shield = isShield(activity);
+        activity.setTheme(shield ? R.style.CorvusTheme : R.style.CorvusThemeDark);
+        BG = shield ? 0xff121212 : 0xff202124;
+        HEADER = shield ? 0xff1f1f1f : 0xff292b30;
+        NAV = shield ? 0xff242424 : 0xff292b30;
+        SURFACE = shield ? 0xff1d1d1d : 0xff292b30;
+        BORDER = shield ? 0xff498515 : 0xff36383e;
+        TEXT = shield ? 0xffdedede : 0xfff1f3f4;
+        MUTED = shield ? 0xff999999 : 0xffa4abb5;
+        ACCENT = shield ? 0xff7ab547 : 0xff81c7ff;
+        ICON = shield ? ACCENT : MUTED;
+        PASSIVE = shield ? 0xff558b2f : MUTED;
+        HIGHLIGHT = shield ? 0xff255d00 : 0xff243b50;
+        CONTROL = shield ? 0xc0263320 : 0x9940444b;
     }
     static GradientDrawable shape(Context c, int color, int radius, boolean border) {
         GradientDrawable result = new GradientDrawable();
@@ -38,7 +51,7 @@ final class Ui {
         return result;
     }
     static RippleDrawable ripple(Context c, int color, int radius) {
-        return new RippleDrawable(ColorStateList.valueOf(0x336c9ac7),
+        return new RippleDrawable(ColorStateList.valueOf((ACCENT & 0x00ffffff) | 0x44000000),
                 shape(c, color, radius, false), shape(c, 0xffffffff, radius, false));
     }
     static LinearLayout column(Context c) {
@@ -61,19 +74,11 @@ final class Ui {
         result.setLineSpacing(dp(c, 3), 1);
         return result;
     }
-    static Button button(Context c, int resource, boolean primary) {
-        Button result = new Button(c);
-        result.setText(resource);
-        result.setAllCaps(false);
-        result.setTextSize(14);
-        result.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        result.setTextColor(primary ? 0xff14200d : TEXT);
-        result.setBackground(ripple(c, primary ? ACCENT : BORDER, 16));
-        result.setMinimumWidth(0);
-        result.setMinWidth(0);
-        result.setMinHeight(dp(c, 52));
-        result.setPadding(dp(c, 12), dp(c, 8), dp(c, 12), dp(c, 8));
-        return result;
+    static android.graphics.drawable.Drawable listBackground(Context c) {
+        android.graphics.drawable.StateListDrawable states = new android.graphics.drawable.StateListDrawable();
+        states.addState(new int[]{android.R.attr.state_focused}, shape(c, HIGHLIGHT, 0, false));
+        states.addState(new int[]{}, ripple(c, BG, 0));
+        return states;
     }
     static ImageView icon(Context c, int resource, int color) {
         ImageView result = new ImageView(c);
@@ -82,21 +87,8 @@ final class Ui {
         result.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         return result;
     }
-    static TextView badge(Context c, int resource) {
-        TextView result = text(c, resource, 10, ACCENT, true);
-        result.setLetterSpacing(.12f);
-        result.setPadding(dp(c, 10), dp(c, 7), dp(c, 10), dp(c, 7));
-        result.setBackground(shape(c, 0xff273124, 8, false));
-        return result;
-    }
     static void space(LinearLayout parent, int height) {
         parent.addView(new View(parent.getContext()), new LinearLayout.LayoutParams(1, dp(parent.getContext(), height)));
-    }
-    static LinearLayout card(Context c) {
-        LinearLayout result = column(c);
-        result.setPadding(dp(c, 20), dp(c, 20), dp(c, 20), dp(c, 20));
-        result.setBackground(shape(c, SURFACE, 24, true));
-        return result;
     }
     @SuppressWarnings("deprecation")
     static void insets(Activity activity, View root) {

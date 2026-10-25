@@ -1,7 +1,6 @@
-État : LIVRABLE VALIDÉ
-Implémentation MaterialUI et intégration CorvusCore 0.14.0 terminées.
-Tests C, ASan/UBSan, Java/JNI des trois moteurs, APK, lint, signature et alignements validés.
-Android 10 x86_64 : imports GB/GBC/GBA, commandes GB, états, batterie GBA, reset, reprise, rotation, listes, historique, crédits et import invalide validés. Aucun crash observé.
-Documentation et captures réelles actualisées ; détails et limites dans docs/validation-android.md.
-Publication autorisée sur main ; consulter le workflow Android APK pour le résultat distant et l'artefact de cette révision.
-Configuration cloud actualisée et enregistrée en brouillon ; publication des réglages disponible dans l'interface utilisateur.
+État : DONE
+Code et validation locale de CorvusRetro 0.4 terminés.
+Suppression des composants obsolètes, vrais chargement/déchargement, icônes originales, thèmes Shield et sombre, ponctuation contrôlée par CI.
+Tests JNI, construction propre, lint, APK signé/aligné, revue et scénarios Android passent. Captures et documentation actualisées.
+Publication autorisée sur main ; le workflow Android APK fournit le résultat distant et l'artefact de la révision publiée.
+Configuration cloud actualisée, rejouée et sauvegardée en brouillon ; publication des réglages disponible dans l'interface utilisateur.

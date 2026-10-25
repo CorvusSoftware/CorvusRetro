@@ -1,8 +1,9 @@
 # Conventions CorvusRetro
 
-- Android d'abord ; moteurs C++20 dans le sous-module `third_party/CorvusCore/`, interface Android Java/JNI dans `app/`. `core/` reste une démo C11.
-- Écrire le code applicatif pour CorvusRetro. RetroArch sert de référence conceptuelle ; ne pas en copier le code ou les ressources.
-- Tout fichier source original commence par les trois mentions suivantes, adaptées à la syntaxe des commentaires du langage :
+- Android d'abord, moteurs C++20 dans `third_party/CorvusCore/`, interface Java et pont JNI dans `app/`.
+- Écrire le code applicatif pour CorvusRetro. Étudier RetroArch comme référence et dessiner les ressources originales.
+- Charger et décharger les handles uniquement sur la file FIFO CoreManager ; un seul lecteur propriétaire à la fois. Persister la batterie avant libération.
+- Tous les fichiers source originaux commencent par les mentions suivantes, adaptées aux commentaires du langage :
 
 ```c
 // CorvusRetro - CorvusSoftware
@@ -10,6 +11,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 ```
 
-- Conserver les licences et attributions des outils tiers, dont le wrapper Gradle et CorvusCore. Ne pas modifier les sources du sous-module.
-- Vérifier le noyau avec `make test`, la frontière JNI Linux avec `JAVA_HOME=... make jni-test`, les vrais moteurs avec `make core-jni-test` (CMake 3.22.1+), Android avec `./gradlew :app:assembleDebug :app:lintDebug`.
-- Version 0.3 : navigation MaterialUI originale et SDK CorvusCore 0.14.0 (GB/GBC/GBA expérimental). Sérialiser les appels par moteur ; sauvegarder la batterie avant de la déclarer acquittée. Distinguer tests hôtes, compilation APK, essais émulateur et appareil physique.
+- Les tirets Unicode longs sont interdits dans les fichiers du dépôt parent. Utiliser la ponctuation française ou le tiret ASCII. La CI contrôle cette règle.
+- Préserver les licences et attributions de CorvusCore et du wrapper Gradle. Ne pas modifier les sources du sous-module.
+- Validation : `JAVA_HOME=... make test CMAKE=...` pour les vrais moteurs, puis `./gradlew :app:assembleDebug :app:lintDebug`.
+- Version 0.4 : menus MaterialUI originaux, thèmes NVIDIA Shield et sombre, CorvusCore 0.14.0 GB/GBC/GBA expérimental. Distinguer tests hôtes, compilation, émulateur et téléphone physique.

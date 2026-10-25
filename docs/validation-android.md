@@ -1,46 +1,47 @@
-# Validation de la version 0.3
+# Validation Android
 
-## Vérifications exécutées
+## Version 0.4
 
-- Tests C de la démo portable, y compris AddressSanitizer et UndefinedBehaviorSanitizer.
-- Test Java/JNI de la démo avec `-Xcheck:jni`.
-- Tests Java/JNI des trois vrais moteurs CorvusCore 0.14.0 : chargement, dimensions, ARGB, PCM stéréo, entrées, restauration d'état, reset, buffers invalides et batterie GBA.
-- Construction APK debug ARM64 et x86_64 ; lint Android : zéro erreur.
-- Vérification `apksigner`, `zipalign -c -P 16 4` et segments ELF alignés sur 16 Ko pour les deux architectures.
-- Notices et copyright CorvusCore présents dans l'APK ; sous-module inchangé.
-- Revue indépendante du pont JNI, de l'import et du cycle de vie ; aucun finding bloquant restant.
+Vérifications exécutées sur le code de la version 0.4 :
 
-## Exécution Android
+- Tests Java/JNI des trois vrais moteurs CorvusCore 0.14.0 avec `-Xcheck:jni`.
+- Création sans contenu, refus d'opérations sur un cœur vide, chargement du contenu, vidéo ARGB, audio PCM, entrées, états et reset.
+- Libération du handle, refus d'exécuter une frame après fermeture et rechargement du même moteur.
+- Batterie GBA, buffers invalides et rejet du contenu vide.
+- Construction APK ARM64/x86_64 et lint Android sans erreur.
+- Revue indépendante de la propriété du moteur et des callbacks ; correction du snapshot d'état chargé pendant le rendu du menu.
+- Signature APK, alignements ZIP et ELF 16 Ko vérifiés sur les deux architectures.
+- Anciennes classes et symboles JNI absents de l'APK issu d'une construction propre ; fichiers source, entrée de menu et activité correspondants retirés.
+- Politique de ponctuation exécutée sur les fichiers du dépôt parent ; sous-module CorvusCore inchangé.
 
-Émulateur AOSP Android 10 x86_64, 480 × 960 pixels, densité 200, exécution
-logicielle sans KVM. APK installé et réellement lancé ; captures produites avec
-`screencap`, navigation par événements Android et inspection `uiautomator`.
+Les essais Android utilisent un émulateur AOSP Android 10 x86_64 sans KVM,
+480 × 960 pixels. Les contenus synthétiques proviennent de
+`python tests/generate_roms.py` : GB modifie une palette à chaque pression A,
+GBC exécute la variante couleur et GBA écrit `0x5a` en SRAM.
+Aucun contenu commercial ou BIOS constructeur n'est nécessaire.
 
-Contenus utilisés : programmes synthétiques originaux produits par
-`python tests/generate_roms.py`. Aucun jeu commercial ou BIOS n'est nécessaire.
-GB affiche des bandes et inverse sa palette à chaque pression sur A ; GBC reprend
-ce programme en mode couleur ; GBA écrit `0x5a` dans la SRAM puis boucle.
+Scénarios exécutés sur Android pour la version 0.4 :
 
-Contrôles réalisés :
+- Démarrage avec Aucun cœur ; chargement GB, remplacement par GBC, déchargement, chargement et déchargement GBA.
+- Choix du thème sombre bleu puis Shield avec un cœur GBC chargé : état chargé conservé pendant les recréations d'activité.
+- Lancement de GB depuis l'historique sans cœur chargé ; effet de A sur les pixels et restauration d'état avec comparaison d'image.
+- Un second menu refuse de décharger le cœur encore possédé par le lecteur ; retour au lecteur avec image inchangée.
+- Fermeture du contenu : retour à Aucun cœur ; rechargement du moteur et de l'état disque avec pixels identiques.
+- GBA : suppression ciblée de la batterie de notre fixture avant lancement, puis vérification d'une nouvelle écriture disque `0x5a` avant libération du cœur.
+- Listes et historique conservés après mise à jour depuis 0.3 ; aucun crash dans le buffer Android dédié.
 
-- Menu principal en listes, choix des trois cœurs et sélecteur de fichiers système.
-- Import `.gb`, démarrage réel CorvusGB et affichage de sa frame.
-- Pression tactile maintenue sur A : changement effectif de la palette du programme.
-- État écrit sur disque, nouvelle pression sur A, chargement de l'état : comparaison des pixels de l'image restaurée, identiques à l'image sauvegardée.
-- Passage en arrière-plan puis reprise via le lanceur : session et pixels conservés.
-- Rotation portrait/paysage/portrait : commandes visibles et pixels de la session conservés.
-- Fermeture du contenu, liste Game Boy persistante, réglages et dialogue de licence.
-- Import `.gbc`, affichage CorvusGBC, redémarrage du contenu et fermeture.
-- Import `.gba`, affichage CorvusGBA, présence L/R, sauvegarde/chargement d'état et fermeture. Batterie persistée dans le stockage privé, premier octet `0x5a` attendu vérifié sur disque.
-- Fichier GB invalide refusé ; liste des fichiers ROM avant/après identique, aucun fichier temporaire restant.
-- Historique persistant regroupant les trois contenus ouverts ; aucun crash présent dans le buffer Android dédié.
+Les captures du README sont issues de cette exécution de la version 0.4.
 
-Les captures du README montrent cette exécution Android. Les bandes affichées
-sont le résultat du programme synthétique, pas une illustration de jeu.
+## Contrôles antérieurs du lecteur
 
-## Reproduire sur un appareil de test
+La version 0.3 avait validé sur le même émulateur : import SAF GB/GBC/GBA,
+commandes A avec effet réel sur les pixels, sauvegarde sur disque et restauration
+d'état avec comparaison des images, reset GBC, batterie GBA lue sur disque,
+arrière-plan/reprise, rotation, listes, historique, crédits, import invalide sans
+fichier résiduel et commandes visibles sur une largeur de 320 dp.
+Ces preuves restent identifiées comme antérieures à la modification du cycle de vie.
 
-Construire et installer l'APK puis générer les programmes :
+## Reproduire
 
 ```sh
 python tests/generate_roms.py
@@ -49,19 +50,16 @@ adb push build/test-roms/. /sdcard/Download/
 adb shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n com.corvussoftware.corvusretro/.MainActivity
 ```
 
-Utiliser **Charger du contenu → Downloads** pour ouvrir les fichiers. Sur GB,
-appuyer sur A, sauvegarder l'état, appuyer à nouveau sur A, puis charger l'état :
-la palette précédente doit revenir. Vérifier ensuite menu rapide, reset,
-arrière-plan/reprise, rotation, listes et historique. Ouvrir GBC puis GBA ;
-vérifier les commandes L/R et la sauvegarde batterie de ce dernier. Ouvrir
-`Corvus-invalid.gb` : une erreur doit apparaître sans ajouter de contenu.
+Vérifier Aucun cœur au démarrage, charger chaque moteur, le remplacer puis le
+décharger. Changer le thème dans les réglages avec un cœur chargé : il doit rester
+chargé. Ouvrir GB, appuyer sur A, sauvegarder, appuyer de nouveau puis charger
+l'état : la palette précédente doit revenir. Fermer le contenu : Aucun cœur doit
+réapparaître. Ouvrir GBA et vérifier sa batterie, puis tenter le fichier invalide.
+Vérifier aussi l'import, la rotation et l'arrière-plan.
 
 ## Limites
 
-Aucun téléphone physique, appareil ARM64, Android récent ou écran 16 Ko n'a été
-exécuté pendant ces contrôles ; l'APK ARM64 et les alignements ont été vérifiés
-par construction et inspection. La génération de PCM a été testée ; la qualité
-audio à l'écoute et la latence réelle restent à mesurer sur téléphone.
-TalkBack, manettes physiques et multitouch simultané n'ont pas été testés.
-Les programmes synthétiques ne valident ni un catalogue de jeux, ni les performances
-sur matériel mobile. GBA reste expérimental conformément à CorvusCore.
+Les tests synthétiques ne prouvent pas la compatibilité commerciale ni les
+performances sur matériel mobile. GBA reste expérimental. Aucun téléphone physique,
+appareil ARM64 ou Android récent n'a été exécuté. La qualité audio à l'écoute,
+TalkBack, les manettes physiques et le multitouch simultané restent à vérifier.

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- CorvusRetro - CorvusSoftware
+     Copyright (C) 2026 CorvusSoftware
+     SPDX-License-Identifier: AGPL-3.0-only -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="32dp" android:height="32dp" android:viewportWidth="32" android:viewportHeight="32">
+    <path android:fillColor="#FFFFFF" android:fillType="evenOdd" android:pathData="M7,3 H25 Q28,3 28,6 V26 Q28,29 25,29 H7 Q4,29 4,26 V6 Q4,3 7,3 Z M9,8 V11 H23 V8 Z M9,15 V18 H23 V15 Z M9,22 V25 H19 V22 Z" />
+</vector>

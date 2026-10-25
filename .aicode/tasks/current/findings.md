@@ -1,13 +1,10 @@
-# Faits de la tâche
+# Faits vérifiés
 
-- Demande : étudier réellement RetroArch, adopter sa navigation MaterialUI et utiliser les cœurs maison CorvusSoftware/CorvusCore. Choix MaterialUI confirmé par l'utilisateur.
-- Références consultées : `menu/drivers/materialui.c` et `config.def.h`. Principes retenus : onglets principal/listes/réglages, entrées tactiles et menu rapide. Aucun code/graphisme repris.
-- CorvusCore 0.14.0 est figé au commit `38829d4935bbdcf4b13261714352362065b78551` par sous-module. C++20/CMake 3.22.1, SDK C API 0 préliminaire, GB/GBC et GBA expérimental.
-- SDK : handles opaques, appels sérialisés, ARGB8888, PCM16 stéréo, états et batterie avec génération acquittée après persistance. Notices/attributions embarquées sans modification du sous-module.
-- Revue indépendante : correction d'AtomicFile (API publique), verrou partagé de l'index, file FIFO fermeture/sauvegarde avant prochain chargement, validation d'import avant renommage, conservation de l'import lors de la rotation. Revue finale sans finding bloquant.
-- Tests JNI des vrais moteurs et de la démo passent ; C avec ASan/UBSan passe ; APK/lint passent (zéro erreur), signature et alignements ZIP/ELF 16 Ko validés pour les deux ABIs.
-- Android 10 x86_64 sans KVM : import SAF et frame GB réels, A modifie la palette, état restauré avec pixels identiques, arrière-plan et rotation conservent la session.
-- Le CLI adb échoue à écrire dans HOME readonly. `adb_shell` Python via TCP 5555 fonctionne ; scripts et preuves brutes sous `/workspace/setup`, toolchains sous `/workspace/toolchains`.
-- Pas de téléphone physique testé. Ne pas présenter les tests synthétiques comme preuve de compatibilité générale ou de performances mobiles.
-
-- Android GBC : import, frame, reset, fermeture validés. GBA : import, frame, L/R, états et batterie disque `0x5a` validés. Contenu invalide refusé sans ROM/fichier temporaire orphelin.
+Références : RetroArch ca3f823 et assets d9f9690. MaterialUI associe le chargement à cores.png ; thème NVIDIA Shield exact décrit dans docs/retroarch-reference.md.
+CoreManager possède un véritable handle idle et le transfère à un seul lecteur, sur le HandlerThread FIFO partagé. Fermeture et déchargement libèrent le handle et publient Aucun cœur. Les appels d'un autre menu pendant la lecture sont refusés.
+Revue : lecture de loaded capturée une seule fois par render, évitant un index négatif lors d'une libération concurrente. Aucun autre finding bloquant.
+Suppression complète des anciens fichiers applicatifs, JNI et C du laboratoire, de ses tests et archives, des ressources et des commandes de build correspondantes. L'APK propre ne contient plus les anciennes classes ni leurs symboles JNI.
+Politique CI : interdiction des tirets Unicode longs dans tous les fichiers du dépôt parent. Ponctuation du millésime des notices adaptée en ASCII ; tous les crédits conservés. Sous-module CorvusCore inchangé.
+Tests : moteurs JNI GB/GBC/GBA, handle idle, contenu, états, batterie, déchargement/rechargement PASS. Build propre et lint PASS, signature et alignements ZIP/ELF 16 Ko PASS.
+Android 10 x86_64 : chargement/remplacement/déchargement des trois moteurs, conservation du cœur pendant changement de thème, lecture depuis historique, A et état avec comparaison des pixels, refus d'un second menu, fermeture/rechargement, nouvelle batterie GBA disque et listes PASS. Aucun crash observé.
+Installation cloud actualisée et rejouée avec succès. Script et instructions de démarrage enregistrés en brouillon pour revue dans les réglages.

@@ -34,7 +34,13 @@ public final class CorvusCoreTest {
             for (int system = 0; system < 3; system++) {
                 Path file = folder.resolve("synthetic-" + system + ".rom");
                 Files.write(file, rom(system));
-                try (NativeCore core = new NativeCore(system, file.toString(), null)) {
+                try (NativeCore core = new NativeCore(system)) {
+                    check(!core.hasContent(), "Idle core unexpectedly has content");
+                    boolean emptyRejected = false;
+                    try { core.state(); } catch (IllegalArgumentException expected) { emptyRejected = true; }
+                    check(emptyRejected, "Idle core should reject content operations");
+                    core.loadContent(file.toString(), null);
+                    check(core.hasContent(), "Loaded core still reported idle");
                     check(core.width == (system == 2 ? 240 : 160), "Wrong video width");
                     check(core.height == (system == 2 ? 160 : 144), "Wrong video height");
                     check(core.sampleRate > 0 && core.fps > 50 && core.fps < 65, "Invalid timing");
@@ -67,7 +73,16 @@ public final class CorvusCoreTest {
                     }
                     core.reset();
                     core.frame(pixels, 0, audio);
-                    System.out.println("PASS CorvusCore system " + system + ": load, video, audio, inputs, state, reset, invalid buffers");
+                    core.close();
+                    check(!core.hasContent(), "Unloaded core retained content flag");
+                    boolean closedRejected = false;
+                    try { core.frame(pixels, 0, audio); } catch (IllegalArgumentException expected) { closedRejected = true; }
+                    check(closedRejected, "Unloaded handle still runs frames");
+                    core.close();
+                    try (NativeCore reloaded = new NativeCore(system, file.toString(), null)) {
+                        reloaded.frame(new int[reloaded.width * reloaded.height], 0, audio);
+                    }
+                    System.out.println("PASS CorvusCore system " + system + ": idle load, content, video, audio, inputs, state, reset, unload/reload, invalid buffers");
                 }
                 Files.delete(file);
             }

@@ -2,6 +2,6 @@
 <!-- CorvusRetro - CorvusSoftware
      Copyright (C) 2026 CorvusSoftware
      SPDX-License-Identifier: AGPL-3.0-only -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
-    <path android:fillColor="@android:color/transparent" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.8" android:strokeLineCap="round" android:pathData="M4,6 L7,6 M12,6 L20,6 M4,12 L13,12 M18,12 L20,12 M4,18 L7,18 M12,18 L20,18 M7,3 L7,9 L12,9 L12,3 Z M13,9 L13,15 L18,15 L18,9 Z M7,15 L7,21 L12,21 L12,15 Z"/>
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="32dp" android:height="32dp" android:viewportWidth="32" android:viewportHeight="32">
+    <path android:fillColor="#FFFFFF" android:fillType="evenOdd" android:pathData="M4,7 H28 V10 H4 Z M4,15 H28 V18 H4 Z M4,23 H28 V26 H4 Z" />
 </vector>

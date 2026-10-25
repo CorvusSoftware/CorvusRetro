@@ -4,34 +4,22 @@
      SPDX-License-Identifier: AGPL-3.0-only -->
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fr">
     <string name="app_name">CorvusRetro</string>
-    <string name="lab">Corvus Lab</string>
     <string name="settings">Réglages</string>
     <string name="about">À propos de CorvusRetro</string>
     <string name="about_caption">Une création indépendante de CorvusSoftware.</string>
-    <string name="about_body">CorvusRetro 0.3.0\n\nUne application rétro indépendante, développée par CorvusSoftware.\n\nFrontend indépendant utilisant les cœurs maison CorvusCore 0.14.0 pour Game Boy, Game Boy Color et Game Boy Advance (expérimental). Navigation inspirée de MaterialUI ; aucun code ou graphisme de RetroArch repris.</string>
+    <string name="about_body">CorvusRetro 0.4.0\n\nUne application rétro indépendante, développée par CorvusSoftware.\n\nFrontend indépendant utilisant les cœurs maison CorvusCore 0.14.0 pour Game Boy, Game Boy Color et Game Boy Advance (expérimental). Navigation inspirée de MaterialUI ; aucun code ou graphisme de RetroArch repris.</string>
     <string name="license">Licence et crédits</string>
     <string name="license_caption">AGPL-3.0-only · Code original</string>
     <string name="license_notice">© 2026 CorvusSoftware\nAGPL-3.0-only · Aucune garantie.\n\n%1$s</string>
     <string name="license_unavailable">Licence indisponible. Consultez le fichier LICENSE du dépôt.</string>
     <string name="close">Fermer</string>
     <string name="selected_tab">%1$s, sélectionné</string>
-    <string name="demo_subtitle">Démo interactive</string>
     <string name="back">Retour à la bibliothèque</string>
-    <string name="playing">EN JEU</string>
-    <string name="paused">EN PAUSE</string>
-    <string name="screen_label">CORVUS / POCKET</string>
-    <string name="game_hint">Un carré. Quatre directions. À vous de jouer.</string>
-    <string name="controls">Commandes</string>
-    <string name="controls_hint">Maintenez une direction pour vous déplacer.</string>
-    <string name="pause">Pause</string>
     <string name="resume">Reprendre</string>
-    <string name="reset">Recentrer</string>
-    <string name="demo_note">Une démo maison, sans ROM ni BIOS.</string>
     <string name="up">Haut</string>
     <string name="down">Bas</string>
     <string name="left">Gauche</string>
     <string name="right">Droite</string>
-    <string name="demo_description">Démo interactive : carré mobile sur une grille</string>
 
     <string name="main_menu">Menu principal</string>
     <string name="playlists">Listes de lecture</string>
@@ -43,7 +31,6 @@
     <string name="information">Informations</string>
     <string name="information_hint">CorvusRetro et les cœurs CorvusCore</string>
     <string name="experimental">Expérimental</string>
-    <string name="core_selected">Cœur : %1$s</string>
     <string name="importing">Import du contenu…</string>
     <string name="import_error">Impossible de charger le contenu</string>
     <string name="content_count">%1$d contenu(s)</string>
@@ -75,6 +62,13 @@
     <string name="button_start">Start</string>
     <string name="button_select">Select</string>
     <string name="back_to_menu">Retour au menu principal</string>
-    <string name="render_demo">Démo de rendu</string>
-    <string name="render_demo_hint">Laboratoire graphique et commandes tactiles</string>
+    <string name="no_core">Aucun cœur</string>
+    <string name="core_loaded">Cœur chargé : %1$s · %2$s</string>
+    <string name="core_version">%1$s · %2$s</string>
+    <string name="core_working">Changement de cœur…</string>
+    <string name="unload_core">Décharger le cœur</string>
+    <string name="unload_core_hint">Libérer le moteur et revenir à Aucun cœur</string>
+    <string name="theme">Thème de l’interface</string>
+    <string name="theme_shield">NVIDIA Shield</string>
+    <string name="theme_dark">MaterialUI sombre</string>
 </resources>

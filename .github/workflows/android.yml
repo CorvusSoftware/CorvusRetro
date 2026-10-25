@@ -55,16 +55,27 @@ jobs:
       - name: Set up Gradle and validate wrapper
         uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4
 
-      - name: Test portable C core
-        run: make test
-
-      - name: Test C core with memory sanitizers
+      - name: Check repository text policy
         run: |
-          make clean
-          make test CFLAGS='-std=c11 -Wall -Wextra -Werror -pedantic -g -fsanitize=address,undefined'
-
-      - name: Test Java and JNI boundary
-        run: make jni-test
+          python3 - <<'PYCODE'
+          from pathlib import Path
+          import subprocess
+          forbidden = {chr(value) for value in (0x2012, 0x2013, 0x2014, 0x2015, 0x2e3a, 0x2e3b)}
+          failures = []
+          for name in subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0'):
+              path = Path(name)
+              if not path.is_file():
+                  continue
+              try:
+                  text = path.read_text(encoding='utf-8')
+              except UnicodeDecodeError:
+                  continue
+              if any(character in text for character in forbidden):
+                  failures.append(name)
+          if failures:
+              raise SystemExit('Long Unicode dashes are forbidden: ' + ', '.join(failures))
+          print('PASS repository text policy')
+          PYCODE
 
       - name: Test real CorvusCore engines through JNI
         run: make core-jni-test CMAKE="$ANDROID_HOME/cmake/3.22.1/bin/cmake"

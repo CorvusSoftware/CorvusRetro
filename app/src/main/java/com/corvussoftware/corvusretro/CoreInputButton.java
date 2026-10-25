@@ -18,7 +18,7 @@ final class CoreInputButton extends Button {
         setText(label); setTextSize(label.length() > 2 ? 11 : 22); setAllCaps(false);
         setTextColor(0xffeeeeee); setPadding(0, 0, 0, 0);
         setContentDescription(context.getString(description));
-        setBackground(Ui.ripple(context, 0x9940444b, 28));
+        setBackground(Ui.ripple(context, Ui.CONTROL, 28));
         setMinimumWidth(0); setMinWidth(0); setClickable(true); setFocusable(true);
     }
     @Override public boolean onTouchEvent(MotionEvent event) {

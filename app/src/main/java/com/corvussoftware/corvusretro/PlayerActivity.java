@@ -27,20 +27,21 @@ public final class PlayerActivity extends Activity {
     private AlertDialog menu;
     private int dp(int value) { return Ui.dp(this, value); }
     @Override public void onCreate(Bundle state) {
+        Ui.applyTheme(this);
         super.onCreate(state);
         GameLibrary library = new GameLibrary(this);
         game = library.find(getIntent().getStringExtra("game"));
         if (game == null) { Toast.makeText(this, R.string.import_error, Toast.LENGTH_LONG).show(); finish(); return; }
         if (library.preferences.getBoolean("keep_awake", true)) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         LinearLayout root = Ui.column(this); root.setBackgroundColor(0xff000000);
-        LinearLayout toolbar = Ui.row(this); toolbar.setBackgroundColor(Ui.SURFACE);
+        LinearLayout toolbar = Ui.row(this); toolbar.setBackgroundColor(Ui.HEADER);
         toolbar.setPadding(dp(16), dp(4), dp(8), dp(4));
         LinearLayout title = Ui.column(this);
         TextView filename = Ui.text(this, R.string.app_name, 15, Ui.TEXT, true);
         filename.setText(game.title); filename.setSingleLine(true); filename.setEllipsize(TextUtils.TruncateAt.END);
         title.addView(filename); Ui.space(title, 3);
         TextView core = Ui.text(this, R.string.app_name, 11, Ui.MUTED, false);
-        core.setText(CoreCatalog.NAMES[game.system] + " · " + CoreCatalog.VERSION); title.addView(core);
+        core.setText(getString(R.string.core_version, CoreCatalog.NAMES[game.system], CoreCatalog.VERSION)); title.addView(core);
         toolbar.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
         ImageButton quick = new ImageButton(this); quick.setImageResource(R.drawable.ic_menu);
         quick.setImageTintList(android.content.res.ColorStateList.valueOf(Ui.TEXT));
