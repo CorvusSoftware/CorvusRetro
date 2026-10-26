@@ -9,7 +9,6 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CORVUS_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../../..")
 set(BUILD_TESTING OFF CACHE BOOL "Tests are built separately" FORCE)
 set(CORVUSCORE_BUILD_CORVUSAPI ON CACHE BOOL "Build bundled CorvusAPI modules" FORCE)
-set(CORVUSCORE_BUILD_LIBRETRO OFF CACHE BOOL "Use the native C API" FORCE)
 set(CORVUSCORE_INSTALL OFF CACHE BOOL "Embedded dependency" FORCE)
 add_subdirectory("${CORVUS_ROOT}/third_party/CorvusCore" corvuscore)
 # Debug APKs still need optimized emulation; keep debug symbols and assertions.

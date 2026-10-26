@@ -1034,7 +1034,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
             u->text_height = paragraphs(
                 p,
                 "CorvusRetro 0.12.0\n\nFrontend original en C, rendu OpenGL ES et audio "
-                "AAudio.\n\nCorvusSoftware\nCœurs officiels CorvusCore 0.14.0 : Game Boy, Game "
+                "AAudio.\n\nCorvusSoftware\nCœurs officiels CorvusCore 0.14.1 : Game Boy, Game "
                 "Boy Color, Game Boy Advance (expérimental).\n\nNavigation inspirée de "
                 "MaterialUI. Thèmes CorvusRetro, ASUS et NVIDIA Shield.\n\nCopyright (C) 2026 "
                 "CorvusSoftware\nSPDX-License-Identifier: AGPL-3.0-only",

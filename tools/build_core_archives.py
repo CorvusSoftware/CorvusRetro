@@ -67,7 +67,7 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--catalog", type=Path, required=True)
     parser.add_argument("--tag", required=True)
-    parser.add_argument("--version", default="0.14.0")
+    parser.add_argument("--version", default="0.14.1")
     args = parser.parse_args()
     if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", args.tag):
         parser.error("invalid release tag")

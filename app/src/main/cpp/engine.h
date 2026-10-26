@@ -4,12 +4,12 @@
 #ifndef CORVUSRETRO_ENGINE_H
 #define CORVUSRETRO_ENGINE_H
 
-#include <corvus/api.h>
+#include <corvusapi.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#define CR_CORE_VERSION "0.14.0"
+#define CR_CORE_VERSION "0.14.1"
 
 typedef struct cr_engine {
     void *handle;

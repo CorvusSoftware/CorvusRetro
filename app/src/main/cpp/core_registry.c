@@ -2,7 +2,7 @@
 // Copyright (C) 2026 CorvusSoftware
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "core_registry.h"
-#include <corvus/api.h>
+#include <corvusapi.h>
 #include "cr_bundled_cores.h"
 #include <ctype.h>
 #include <dlfcn.h>
