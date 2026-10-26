@@ -81,6 +81,9 @@ jobs:
         run: |
           python3 tools/validate_core_catalog.py
           python3 tools/test_core_catalog.py
+          python3 tools/validate_core_splits.py
+          python3 tools/test_core_splits.py
+          python3 tools/test_split_release_workflows.py
 
       - name: Test native C frontend and CorvusCore engines
         run: make test CMAKE="$ANDROID_HOME/cmake/3.22.1/bin/cmake"
@@ -96,44 +99,53 @@ jobs:
           "$ANDROID_HOME/cmake/3.22.1/bin/cmake" -E chdir build/corefree ./native_nocore_test
 
       - name: Build APK and run Android lint
-        run: ./gradlew --no-daemon :app:assembleDebug :app:lintDebug
+        run: |
+          ./gradlew --no-daemon :app:assembleDebug :app:lintDebug \
+            :features:coregb:assembleDebug :features:coregbc:assembleDebug \
+            :features:coregba:assembleDebug :app:assembleDebugAndroidTest
 
-      - name: Verify base 0.10 APK contains no emulator cores
+      - name: Verify base APK contains no emulator cores
         run: |
           apk=app/build/outputs/apk/debug/app-debug.apk
           for abi in arm64-v8a x86_64; do
             unzip -Z -1 "$apk" | grep -Fx "lib/$abi/libcorvusretro.so"
           done
           if unzip -Z -1 "$apk" | grep -E '^lib/(arm64-v8a|x86_64)/libcorvus_(gb|gbc|gba)\.so$'; then
-            echo "FAIL: CorvusRetro 0.10 base APK unexpectedly bundles official emulator engines"
+            echo "FAIL: base APK unexpectedly bundles official emulator engines"
             exit 1
           fi
           mkdir -p build/apk-variants
-          cp "$apk" build/apk-variants/CorvusRetro-0.10-base-debug.apk
+          cp "$apk" build/apk-variants/CorvusRetro-0.11-base-debug.apk
 
-      - name: Build optional official CorvusAPI pack
+      - name: Verify three independent core APKs
         run: |
-          ./gradlew --no-daemon -PcorvusCores=gb,gbc,gba :app:assembleDebug
-
-      - name: Verify downloadable official core pack
-        run: |
-          apk=app/build/outputs/apk/debug/app-debug.apk
-          for abi in arm64-v8a x86_64; do
-            for core in gb gbc gba; do
+          python3 tools/check_core_apks.py \
+            --apksigner "$ANDROID_HOME/build-tools/35.0.0/apksigner" \
+            --aapt "$ANDROID_HOME/build-tools/35.0.0/aapt" \
+            --zipalign "$ANDROID_HOME/build-tools/35.0.0/zipalign"
+          for core in gb gbc gba; do
+            apk="features/core$core/build/outputs/apk/debug/core$core-debug.apk"
+            for abi in arm64-v8a x86_64; do
               unzip -Z -1 "$apk" | grep -Fx "lib/$abi/libcorvus_$core.so"
             done
+            if unzip -Z -1 "$apk" | grep -E '^lib/[^/]+/libcorvusretro\.so$'; then
+              echo "FAIL: individual core unexpectedly contains the frontend"
+              exit 1
+            fi
+            cp "$apk" "build/apk-variants/CorvusRetro-0.11-core$core-debug.apk"
           done
-          cp "$apk" build/apk-variants/CorvusRetro-0.10-official-cores-debug.apk
 
-      - name: Verify APK signature and 16 KB alignment
+      - name: Verify APK signatures and 16 KB alignment
         run: |
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify app/build/outputs/apk/debug/app-debug.apk
-          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 16 4 app/build/outputs/apk/debug/app-debug.apk
+          for apk in build/apk-variants/*.apk; do
+            "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify "$apk"
+            "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 16 4 "$apk"
+          done
 
-      - name: Upload base and optional core-pack debug APKs
+      - name: Upload base and three individual debug cores
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: CorvusRetro-0.10-variants-${{ github.sha }}
+          name: CorvusRetro-0.11-individual-cores-${{ github.sha }}
           path: build/apk-variants/*.apk
           if-no-files-found: error
           retention-days: 14

@@ -1,16 +1,15 @@
-État : IN_PROGRESS pour la livraison de la ligne unique, BLOCKED pour le câble link.
+État : IN_PROGRESS, implémentation0.11 vérifiée localement, publication et catalogue en cours.
 
-Reprise sur main54cb1b7, prototype direct sauvegardé et sous-modules récursifs à jour.
-Ligne unique Charger/Décharger implémentée sur CorvusAPI sans changer le téléchargeur.
-Tests5/5 normaux et ASan/UBSan, test zéro cœur et catalogue5/5 réussis.
-APK de base + lint construits, signature et alignement16Ko vérifiés ; seuls les deux
-libcorvusretro.so sont présents. Pack explicite construit et vérifié : les trois
-modules officiels présents pour les deux ABIs ; signature et alignement valides.
-Revue indépendante : aucun finding concret. Android15 : base zéro cœur et téléchargeur,
-pack trois cœurs, informations, portrait/paysage, jeu GB existant ouvert puis déchargé.
-Les ANR de Quickstep/SystemUI ont été fermées avant les essais valides. Publication et CI à suivre.
+L’utilisateur a explicitement confirmé Cœur par cœur comme RetroArch. Sourceeb34629.
+Base0.11.0/code12 sans moteur, trois featureAPKs coregb/coregbc/coregba même certificat/version.
+Installation cumulative Android15 prouvée : GBA seul puisGB, ancienne batterieSHA-2inchangée et jeux GB existants conservés.
+SixCTestsnormaux+ASan et zéro cœur passent ;15testsPython passent ; build base/features/androidTest et lint passent.
+Instrumentation37contrôles, recréationActivity en attente et mortprocess avecsession persistante validées.
+Revue indépendante : P1barrière recréation corrigée parCoreInstallState+getterJNI+syncresume ; aucunfindingrestant.
+ConfirmationOSdifféréeaprèsbackgroundcorrigée; testUIDapp appliqué avecsuccès et état réconciliéauprochainlaunch (callbackpeutêtreperdulorsselfupdate).
 
-Contrat du câble proposé dans docs/subsystems-corvusapi-proposal.md.
-Pas d’entrée factice ni de contournement CorvusAPI. L’ABI publique manque réellement.
-Avant implémentation du link : proposer l’extension dans CorvusAPI puis adapter CorvusCore
-dans son dépôt ; les instructions interdisent de modifier ces dépendances ici.
+Nouveaufeedformat2 cores-v2.json vide jusqu’aux vraisAPK signés et publiés. Legacyindex.json0.10conservé.
+Preview signé automatique aprèsCIAndroid mainpush, publisher par tag v0.11.* réutilise mêmes APK et crée branchecatalogue candidate, pas d’autopromotionmain.
+Prochainesétapes : commit/push source, CIexacte+previewsigné, tagprereleasev0.11.0, télécharger4assets réels, migrationrelease0.10→base0.11+cores sursecondeAVD29, revuecatalogue puispublicationmain.
+AVD35TCP5557 agentAndroid ; secondeAVD29TCP5559 contientancienneAPKrelease11 déjàsignée, jeuGBAoriginal/historique/thèmeASUS préparés. CertificatpublicancrédepuisAPKinstallée:/workspace/setup/trusted-installed-release-cert.sha256 ; aucunecléprivéelue.
+Câblelinktoujoursindépendant : propositionCorvusAPIavantadaptateur, pasimplémentédanscetâche.

@@ -6,7 +6,7 @@ The current source tree is authoritative; previous chats, commits and RetroArch 
 
 ## Project
 
-CorvusRetro 0.10 is an original C11 Android NativeActivity frontend in the CorvusSoftware ecosystem.
+CorvusRetro 0.11 is an original C11 Android NativeActivity frontend in the CorvusSoftware ecosystem.
 It draws its own interface using EGL/OpenGL ES2 and processes audio with AAudio.
 It uses CorvusAPI (MIT, experimental ABI 0) to communicate with emulation cores.
 CorvusCore (AGPL-3.0-only) provides the official GB, GBC and GBA engines.
@@ -18,7 +18,8 @@ CorvusRetro itself is AGPL-3.0-only.
 - Java is for Android OS services: SAF, storage, preferences, fonts, networking, APK installer.
   Do not implement a parallel Java emulator, renderer or application menu.
 - The base Android APK ships with ZERO emulation cores. This is intentional.
-- Tested official engines are selected only in pack builds or native regression tests.
+- Tested official engines are selected in individual feature builds, explicit legacy
+  pack builds or native regression tests.
 - RetroArch/libretro are architectural and UX references. Do not copy their source,
   artwork, wording or branding. Keep the CorvusSoftware identity.
 
@@ -36,7 +37,8 @@ Read docs/core-downloader.md and docs/stable-content-identities.md when touching
 - app/src/main/cpp/android_backend.c: JNI services, native drawing and Android bridge.
 - app/src/main/cpp/audio_android.c: real-time audio output and pacing.
 - app/src/main/java/com/corvussoftware/corvusretro/: Android-only services.
-- core-repository/index.json: published core-pack metadata, empty until a valid pack is signed.
+- core-repository/cores-v2.json: individual signed core splits, matched to base version and ABI.
+- core-repository/index.json: legacy 0.10 full-APK pack metadata; keep backward compatibility.
 - tools/: offline validators and release tooling.
 - third_party/CorvusCore/: pinned third-party git submodule. Never edit it in this repo.
 - tests/: real-engine native tests and frontend interaction regressions.
@@ -56,21 +58,28 @@ Keep a change spanning UI, Java, C ABI or persistence consistent across all affe
 
 ## Core downloader and distribution
 
-- APKs are distributed outside Google Play, but Android code execution restrictions remain.
-- The baseline 0.10 APK includes only libcorvusretro.so, not official emulator modules.
-- Build a pack with the explicit Gradle option -PcorvusCores=gb,gbc,gba; the
-  corresponding CMake option is CORVUS_OFFICIAL_CORES (comma separated).
-- A catalog item represents an Android APK update containing requested cores,
-  NOT an arbitrary .so copied into app-writable storage. State that distinction to users.
-- Never auto-install a package. Android PackageInstaller confirms the package and checks
-  the app identity/signature. Use official HTTPS URLs, checked hash/size, ABI and source.
-- A pack can only be published after a release-signed APK exists, using the SAME durable
-  signer as the installed CorvusRetro. Never generate placeholder SHA-256 hashes or APK URLs.
-- One full APK update replaces the previous APK's entire native core collection.
-  Do not claim that separate packs compose independently until this is actually supported.
-- Never check in release signing keystores, passwords, secrets, downloaded APKs or .so files.
+- Base 0.11 ships with zero emulator modules. The three dynamic feature projects
+  features/coregb, coregbc and coregba each ship one CorvusAPI module for both ABIs.
+- Each core APK has the same package, versionCode and certificate as its base APK.
+  Android installs it with MODE_INHERIT_EXISTING, preserving other installed cores.
+- Discover only modules from this app's installed splits and read-only
+  ApplicationInfo.nativeLibraryDir. Never dlopen a downloaded .so from writable storage.
+- An individual catalog entry describes one core APK split, never a full frontend APK.
+  Legacy index.json and register_core_pack.py still describe 0.10 full application packs.
+- Core IDs are permanent; installing only GBA must keep historic SHA256-2 storage paths
+  even though GBA can be registry index 0. Never use a registry index as storage identity.
+- Never auto-install a module. Verify official HTTPS origin, size, hash, ABI and base
+  version. Android PackageInstaller verifies package, split, version and certificate
+  and requests user confirmation before native code is available.
+- Flush battery and suspend emulation before installation; pending Android sessions
+  outlive Activity recreation, so restore the installation barrier before opening games.
+- A full base update can remove splits or change the required versionCode. Do not
+  claim core APKs for different base versions are interchangeable.
+- Publish actual release-signed base/core APKs before promoting their metadata to main.
+  All four APKs must use the same durable signer as the installed official app.
+  Do not invent URLs, hashes or certificates; never commit signing credentials or binaries.
 - A release certificate cannot be rotated casually; test updates on a physical Android device.
-- Do not silently delete games whose cores are not currently installed.
+- Preserve all contents and saves when a core is absent. No destructive migration.
 
 ## Persistence and backward compatibility
 
@@ -113,19 +122,22 @@ Native development (all engines enabled solely for regression tests):
 - make test CMAKE=<cmake-3.22-path>
 - make test SANITIZE=ON CMAKE=<cmake-3.22-path>
 
-Android base APK (no bundled cores):
-- ./gradlew --no-daemon :app:assembleDebug :app:lintDebug
+Android base and individual cores:
+- ./gradlew --no-daemon :app:assembleDebug :app:lintDebug :features:coregb:assembleDebug :features:coregbc:assembleDebug :features:coregba:assembleDebug
 - Unzip the APK and verify NO libcorvus_gb.so, libcorvus_gbc.so or libcorvus_gba.so.
 - Confirm menu and library function with registry_count == 0.
 
-Official downloadable pack (explicit all-official composition):
-- ./gradlew -PcorvusCores=gb,gbc,gba :app:assembleDebug
-- Verify all three .so modules and APK ABIs in the output.
-- Verify versionCode and package ID, then test user-approved on-device upgrade.
+Individual core installation:
+- Verify each core APK contains only its own module, with both supported ABIs.
+- Check signatures, package, version and alignment with tools/check_core_apks.py.
+- Test zero cores, GBA alone, then adding GB without losing GBA or saved contents.
+- Exercise cancellation and Activity recreation while Android confirmation is pending.
 
 Catalog validation:
 - python3 tools/validate_core_catalog.py
 - python3 tools/test_core_catalog.py
+- python3 tools/validate_core_splits.py
+- python3 tools/test_core_splits.py
 
 Always inspect GitHub Actions results for the exact commit before merging.
 Differentiate host tests, compiled APK checks, emulator tests and physical-device tests.

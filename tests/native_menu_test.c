@@ -102,6 +102,9 @@ static void row(cr_ui *u, int i) {
 static void tab(cr_ui *u, int i) {
     tap(u, 64 + i * 128, 660);
 }
+static bool install_pending(void *ctx) {
+    return *(bool *)ctx;
+}
 static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     /* Original ARM program writes SRAM once, then loops. No external ROM. */
     uint8_t rom[512] = {0};
@@ -130,6 +133,14 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     file = fopen(saves, "wb");
     check(file && fclose(file) == 0, "block battery directory to reproduce disk failure");
     void *handle = u->engine.handle;
+    int installs = core_installs;
+    u->core_catalog.count = 1;
+    snprintf(u->core_catalog.packs[0].id, sizeof(u->core_catalog.packs[0].id), "corvus.gb");
+    u->page = CR_CORE_DOWNLOADS;
+    row(u, 1);
+    check(core_installs == installs && !u->installing && u->engine.handle == handle,
+          "failed battery persistence refuses installation before downloading");
+    u->page = CR_MAIN;
     row(u, 1);
     c = draw(u);
     check(u->page == CR_MAIN && u->engine.handle == handle && u->engine.loaded &&
@@ -137,6 +148,25 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
               strstr(c.text, "Décharger le cœur") && !strstr(c.text, "Charger un cœur"),
           "failed battery persistence keeps the game and unload action available for retry");
     check(unlink(saves) == 0, "remove battery directory obstruction");
+    u->page = CR_CORE_DOWNLOADS;
+    row(u, 1);
+    check(core_installs == installs + 1 && u->installing &&
+              !u->engine.api.battery_dirty(u->engine.handle),
+          "installation starts only after the running game's battery is persisted");
+    u->page = CR_PLAY;
+    check(!cr_ui_running(u), "installation pauses the current game before Android can kill it");
+    cr_ui_install_status(u, "Téléchargement en cours", false);
+    check(u->installing && !cr_ui_running(u), "progress cannot release the installation barrier");
+    u->quick = true;
+    u->focus = 5;
+    cr_ui_confirm(u);
+    check(u->engine.handle == handle && u->installing,
+          "quick-menu close cannot mutate a game during installation");
+    u->quick = false;
+    cr_ui_install_status(u, "Installation annulée", true);
+    check(!u->installing && cr_ui_running(u) && u->engine.handle == handle,
+          "terminal cancellation resumes the preserved game");
+    u->page = CR_MAIN;
     row(u, 1);
     c = draw(u);
     check(!u->engine.handle && !u->engine.loaded && !u->title[0] &&
@@ -152,6 +182,19 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
 int main(void) {
     char root[] = "/tmp/corvus-menu-XXXXXX";
     check(mkdtemp(root) != NULL, "temporary storage");
+    bool pending = true;
+    cr_ui restored;
+    cr_ui_init(&restored, (cr_platform){.context = &pending,
+                                       .core_install_pending = install_pending}, root);
+    restored.page = CR_PLAY;
+    restored.engine.loaded = true;
+    check(restored.installing && !cr_ui_running(&restored),
+          "recreated frontend restores the pending Android installation barrier");
+    cr_ui_install_status(&restored, "Installation annulée", true);
+    check(!restored.installing && cr_ui_running(&restored),
+          "terminal status releases the restored installation barrier");
+    restored.engine.loaded = false;
+    cr_ui_destroy(&restored);
     cr_ui u;
     cr_ui_init(&u, (cr_platform){.set_preference = set,
                                 .refresh_core_catalog = refresh_core_catalog,
@@ -170,18 +213,32 @@ int main(void) {
           u.catalog_loading, "downloader starts catalog request on entry");
     cr_core_catalog catalog = {0};
     catalog.count = 1;
-    snprintf(catalog.packs[0].id, sizeof(catalog.packs[0].id), "pack-gb");
-    snprintf(catalog.packs[0].name, sizeof(catalog.packs[0].name), "Corvus Pack GB");
+    snprintf(catalog.packs[0].id, sizeof(catalog.packs[0].id), "corvus.gb");
+    snprintf(catalog.packs[0].name, sizeof(catalog.packs[0].name), "CorvusGB");
     snprintf(catalog.packs[0].version, sizeof(catalog.packs[0].version), "1.0");
     snprintf(catalog.packs[0].abi, sizeof(catalog.packs[0].abi), "arm64-v8a");
     snprintf(catalog.packs[0].core_id, sizeof(catalog.packs[0].core_id), "corvus.gb");
     cr_ui_catalog(&u, &catalog);
     c = draw(&u);
-    check(!u.catalog_loading && strstr(c.text, "Corvus Pack GB"),
-          "remote packs are rendered in native UI");
+    check(!u.catalog_loading && strstr(c.text, "CorvusGB") && strstr(c.text, "mise à jour"),
+          "individual core with a different version is presented as an update");
+    snprintf(catalog.packs[0].version, sizeof(catalog.packs[0].version), "0.14.0");
+    cr_ui_catalog(&u, &catalog);
+    c = draw(&u);
+    check(strstr(c.text, "Installé") && !strstr(c.text, "mise à jour"),
+          "an identical installed core is marked installed instead of updated");
+    u.importing = true;
     row(&u, 1);
-    check(core_installs == 1 && strcmp(selected_pack, "pack-gb") == 0,
+    check(core_installs == 0 && !u.installing,
+          "a pending content import cannot race a module installation");
+    u.importing = false;
+    row(&u, 1);
+    check(core_installs == 1 && strcmp(selected_pack, "corvus.gb") == 0,
           "frontend requests verified pack installation by catalog ID only");
+    check(u.installing, "installer owns a barrier until a terminal Android status");
+    row(&u, 1);
+    check(core_installs == 1, "a second install cannot start while one is pending");
+    cr_ui_install_status(&u, "Installation annulée", true);
     row(&u, 0);
     check(core_refreshes == 2 && u.catalog_loading,
           "catalog can be refreshed without leaving menu");

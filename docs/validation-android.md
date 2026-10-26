@@ -1,5 +1,44 @@
 # Validation Android
 
+## Version 0.11 : cœurs Android individuels
+
+La base et trois APK de fonctionnalité distincts sont construits ensemble :
+package commun, versionCode12/versionName0.11.0, signatures identiques, ARM64 et
+x86_64, contrôle d'alignement16Ko. La base contient seulement libcorvusretro.so ;
+chaque module contient uniquement son propre module CorvusAPI.
+
+Preuves locales avant publication :
+
+- Six suites CTest normales et ASan/UBSan ; le nouveau test démarre sans registre,
+  ajoute GBA seul à l'indice0 puis GB/GBC, conserve les identifiants historiques
+  et vérifie import, commandes GBA et batteries suffixées `-2`.
+- Test natif zéro cœur ; quinze tests Python pour catalogue0.10, catalogue0.11 et
+  portes réelles des workflows de signature/publication (source, fork, SHA, tag,
+  hash et provenance).
+- Compilation de la base, des trois modules et des tests Android ; lintDebug passe.
+- Android15 x86_64 : GBA seul installé par Android, puis ajout GB avec
+  MODE_INHERIT_EXISTING ; GBA reste présent et chargé. Les bibliothèques sont
+  extraites dans le répertoire système du package, non modifiable par l'application.
+- Vrai programme GBA original exécuté avec ses commandes L/R. Son fichier batterie
+  historique `SHA-2.sav` conserve les mêmes octets après ajout de GB et changement
+  d'indice dans le registre. Un GB existant reste jouable.
+- Instrumentation Android :37 contrôles de catalogue, types JSON, identités et
+  cycle d'installation ; vraie session en attente, recréation Activity puis
+  annulation. Une session scellée est retrouvée après mort du processus, et les
+  callbacks d'une ancienne opération ne libèrent pas une nouvelle opération.
+- Confirmation différée en arrière-plan, affichée au retour au premier plan ;
+  annulation sans boucle. Une vraie session créée par l'UID de l'application est
+  appliquée après UPDATE, et le lancement suivant réconcilie son état terminé.
+  Un callback final peut être perdu lors de la mise à jour du package lui-même.
+- Revue indépendante des outils, workflows et de la correction du cycle de vie :
+  aucun finding concret restant. Le défaut initial de perte de barrière lors
+  d'une recréation Activity a été corrigé avant publication.
+
+Les captures et journaux restent hors git. La seconde AVD Android10 reçoit la
+release officielle0.10 signée pour vérifier ensuite une vraie mise à niveau vers
+les APK0.11 publiés. Cette preuve de migration sera ajoutée après exécution.
+Aucune qualification sur téléphone physique ou d'exécution ARM64 n'est revendiquée.
+
 ## Reprise 0.10 : ligne unique et migration CorvusAPI
 
 Reprise sur main `54cb1b7`, sans modifier les nouveaux modules, le téléchargeur,

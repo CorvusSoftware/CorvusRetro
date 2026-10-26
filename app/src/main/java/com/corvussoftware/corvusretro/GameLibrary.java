@@ -61,9 +61,10 @@ final class GameLibrary {
     private static boolean validSymbol(String symbol) {
         return symbol != null && symbol.matches("[a-zA-Z0-9][a-zA-Z0-9._-]{0,95}");
     }
-    private static String storageId(String contentHash, int index, String coreId) {
-        if (index >= 0 && index < 3 && coreId.equals(legacyCoreId(index)))
-            return contentHash + "-" + index;
+    private static String storageId(String contentHash, String coreId) {
+        for (int legacy = 0; legacy < 3; legacy++)
+            if (coreId.equals(legacyCoreId(legacy)))
+                return contentHash + "-" + legacy;
         long hash = 0xcbf29ce484222325L;
         for (byte b : coreId.getBytes(StandardCharsets.UTF_8)) {
             hash ^= (b & 255);
@@ -192,7 +193,7 @@ final class GameLibrary {
     void commit(Pending pending, int system, String coreId, String systemId) throws IOException {
         if (system < 0 || system >= MAX_BUNDLED_CORES || !validSymbol(coreId) ||
             !validSymbol(systemId)) throw new IOException("Identité de cœur invalide");
-        String id = storageId(pending.game.id.substring(0, 64), system, coreId);
+        String id = storageId(pending.game.id.substring(0, 64), coreId);
         Game accepted = new Game(id, pending.game.title, system, 0, coreId, systemId);
         synchronized (INDEX_LOCK) {
             File destination = new File(directory("roms"), accepted.id + ".rom");

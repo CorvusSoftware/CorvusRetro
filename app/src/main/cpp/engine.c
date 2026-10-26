@@ -252,11 +252,12 @@ static void release_handle(cr_engine *engine) {
 static bool create_handle(cr_engine *engine, int system) {
     const cr_core_descriptor *descriptor = cr_registry_get(system);
     if (!descriptor) return fail(engine, "Cœur inconnu ou incompatible");
-    char module_path[256];
+    char module_path[4096];
 #if defined(__ANDROID__)
     int n = snprintf(module_path, sizeof(module_path), "%s", descriptor->module);
 #else
-    int n = snprintf(module_path, sizeof(module_path), "./%s", descriptor->module);
+    int n = snprintf(module_path, sizeof(module_path), "%s%s",
+                     descriptor->module[0] == '/' ? "" : "./", descriptor->module);
 #endif
     if (n <= 0 || (size_t)n >= sizeof(module_path))
         return fail(engine, "Nom de module invalide");
@@ -353,7 +354,7 @@ bool cr_engine_open(cr_engine *engine, int system, const char *id, const char *p
         return false;
     if (!cr_game_id_valid(id))
         return fail(engine, "Identifiant de contenu invalide");
-    if (id[65] == 'c') {
+    {
         const cr_core_descriptor *core = cr_registry_get(system);
         char expected[96];
         char hash[65];

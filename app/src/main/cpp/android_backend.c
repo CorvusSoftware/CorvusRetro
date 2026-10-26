@@ -23,6 +23,7 @@ static cr_core_catalog pending_catalog;
 static bool catalog_ready;
 static char core_status[256];
 static bool core_status_ready;
+static bool core_status_finished;
 
 static void wake_frontend(void) {
     pthread_mutex_lock(&import_mutex);
@@ -114,13 +115,14 @@ JNIEXPORT void JNICALL Java_com_corvussoftware_corvusretro_MainActivity_coreCata
     wake_frontend();
 }
 JNIEXPORT void JNICALL Java_com_corvussoftware_corvusretro_MainActivity_coreInstallStatus(
-    JNIEnv *env, jclass cls, jstring value) {
+    JNIEnv *env, jclass cls, jstring value, jboolean finished) {
     (void)cls;
     char message[256];
     string_copy(env, value, message, sizeof(message));
     pthread_mutex_lock(&core_mutex);
     snprintf(core_status, sizeof(core_status), "%s", message);
     core_status_ready = true;
+    core_status_finished = finished;
     pthread_mutex_unlock(&core_mutex);
     wake_frontend();
 }
@@ -134,11 +136,12 @@ bool cr_android_core_catalog(cr_core_catalog *out) {
     pthread_mutex_unlock(&core_mutex);
     return ready;
 }
-bool cr_android_core_status(char *out, size_t cap) {
+bool cr_android_core_status(char *out, size_t cap, bool *finished) {
     pthread_mutex_lock(&core_mutex);
     bool ready = core_status_ready;
     if (ready) {
         snprintf(out, cap, "%s", core_status);
+        *finished = core_status_finished;
         core_status_ready = false;
     }
     pthread_mutex_unlock(&core_mutex);
@@ -205,7 +208,29 @@ bool cr_android_init(cr_android *p, struct android_app *app) {
     METHOD(quit, "quit", "()V");
     METHOD(refresh_catalog, "refreshCoreCatalog", "()V");
     METHOD(install_pack, "installCorePack", "(Ljava/lang/String;)V");
+    METHOD(installed_modules, "installedCoreModules", "()[Ljava/lang/String;");
+    METHOD(install_pending, "coreInstallPending", "()Z");
 #undef METHOD
+    jobjectArray modules = (*p->env)->CallObjectMethod(p->env, app->activity->clazz,
+                                                      p->installed_modules);
+    if (clear_error(p)) return false;
+    if (modules) {
+        jsize count = (*p->env)->GetArrayLength(p->env, modules);
+        if (count >= 0 && count <= CR_MAX_CORES) {
+            for (jsize i = 0; i < count; ++i) {
+                jstring module = (*p->env)->GetObjectArrayElement(p->env, modules, i);
+                char path[4096];
+                if (module && (*p->env)->GetStringUTFLength(p->env, module) < (jsize)sizeof(path)) {
+                    string_copy(p->env, module, path, sizeof(path));
+                    const char *entry = path;
+                    cr_registry_add_installed_modules(&entry, 1);
+                }
+                if (module) (*p->env)->DeleteLocalRef(p->env, module);
+            }
+        }
+        (*p->env)->DeleteLocalRef(p->env, modules);
+        if (clear_error(p)) return false;
+    }
     pthread_mutex_lock(&import_mutex);
     import_looper = app->looper;
     if (import_ready)
@@ -371,9 +396,15 @@ static void install_pack(void *ctx, const char *pack_id) {
     (*p->env)->DeleteLocalRef(p->env, id);
     clear_error(p);
 }
+static bool install_pending(void *ctx) {
+    cr_android *p = ctx;
+    jboolean pending = (*p->env)->CallBooleanMethod(p->env, p->app->activity->clazz,
+                                                   p->install_pending);
+    return clear_error(p) || pending;
+}
 cr_platform cr_android_services(cr_android *p) {
     return (cr_platform){p, pref, set_pref, pick, finish, games, touch, credits,
-                         appearance, quit, refresh_catalog, install_pack};
+                         appearance, quit, refresh_catalog, install_pack, install_pending};
 }
 
 static GLuint shader(GLenum type, const char *source) {

@@ -10,3 +10,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = 'CorvusRetro'
 include ':app'
+include ':features:coregb', ':features:coregbc', ':features:coregba'

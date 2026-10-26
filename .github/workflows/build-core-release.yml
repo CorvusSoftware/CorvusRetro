@@ -1,0 +1,182 @@
+# CorvusRetro - CorvusSoftware
+# Copyright (C) 2026 CorvusSoftware
+# SPDX-License-Identifier: AGPL-3.0-only
+name: Build signed individual Corvus cores
+
+on:
+  workflow_run:
+    workflows: [Android APK]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    name: Signed base and individual cores
+    if: >-
+      github.repository == 'CorvusSoftware/CorvusRetro' &&
+      ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+       (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - name: Verify the exact source passed the Android workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid source revision"; exit 1; }
+          gh api "repos/$GITHUB_REPOSITORY/actions/workflows/android.yml/runs?head_sha=$SOURCE_SHA&event=push&status=completed&per_page=100" \
+            > "$RUNNER_TEMP/android-runs.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          data = json.loads((Path(os.environ['RUNNER_TEMP']) / 'android-runs.json').read_text())
+          eligible = any(run.get('head_sha') == os.environ['SOURCE_SHA'] and
+                         run.get('head_branch') == 'main' and
+                         run.get('event') == 'push' and run.get('conclusion') == 'success' and
+                         run.get('head_repository', {}).get('full_name') == os.environ['GITHUB_REPOSITORY']
+                         for run in data.get('workflow_runs', []))
+          if not eligible:
+              raise SystemExit('The source revision has no successful main Android APK run')
+          PY
+
+      - name: Checkout tested sources and pinned modules
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Confirm the checked out source revision
+        run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+
+      - name: Verify signing prerequisites without logging values
+        env:
+          RELEASE_KEYSTORE: ${{ secrets.CORVUS_RELEASE_KEYSTORE_B64 }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.CORVUS_RELEASE_STORE_PASSWORD }}
+          RELEASE_ALIAS: ${{ secrets.CORVUS_RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.CORVUS_RELEASE_KEY_PASSWORD }}
+          RELEASE_CERT: ${{ secrets.CORVUS_RELEASE_CERT_SHA256 }}
+        run: |
+          test -n "$RELEASE_KEYSTORE" || { echo "Missing release keystore"; exit 1; }
+          test -n "$RELEASE_STORE_PASSWORD" || { echo "Missing release store password"; exit 1; }
+          test -n "$RELEASE_ALIAS" || { echo "Missing release key alias"; exit 1; }
+          test -n "$RELEASE_KEY_PASSWORD" || { echo "Missing release key password"; exit 1; }
+          [[ "$RELEASE_CERT" =~ ^[0-9a-fA-F]{64}$ ]] || { echo "Missing pinned release certificate"; exit 1; }
+
+      - name: Set up Java 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up the verified Android CLI
+        run: |
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/android-cli.zip" \
+            https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip
+          echo "5fdcc763663eefb86a5b8879697aa6088b041e70  $RUNNER_TEMP/android-cli.zip" | sha1sum --check
+          unzip -q "$RUNNER_TEMP/android-cli.zip" -d "$RUNNER_TEMP/android-cli"
+          echo "$RUNNER_TEMP/android-cli/cmdline-tools/bin" >> "$GITHUB_PATH"
+
+      - name: Install pinned Android build packages
+        run: |
+          python3 - <<'PY'
+          import os, subprocess
+          sdk = ['sdkmanager', '--sdk_root=' + os.environ['ANDROID_HOME']]
+          subprocess.run(sdk + ['--licenses'], input='y\n' * 100, text=True, check=True)
+          subprocess.run(sdk + ['platforms;android-35', 'build-tools;35.0.0',
+                               'ndk;27.2.12479018', 'cmake;3.22.1'], check=True)
+          PY
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4
+
+      - name: Import the existing release signing identity
+        env:
+          RELEASE_KEYSTORE: ${{ secrets.CORVUS_RELEASE_KEYSTORE_B64 }}
+        run: |
+          umask 077
+          printf '%s' "$RELEASE_KEYSTORE" | base64 --decode > "$RUNNER_TEMP/corvus-release.jks"
+          echo "CORVUS_RELEASE_KEYSTORE=$RUNNER_TEMP/corvus-release.jks" >> "$GITHUB_ENV"
+
+      - name: Verify the keystore against the independently pinned certificate
+        env:
+          CORVUS_RELEASE_STORE_PASSWORD: ${{ secrets.CORVUS_RELEASE_STORE_PASSWORD }}
+          CORVUS_RELEASE_KEY_ALIAS: ${{ secrets.CORVUS_RELEASE_KEY_ALIAS }}
+          RELEASE_CERT: ${{ secrets.CORVUS_RELEASE_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          if ! keytool -exportcert -keystore "$CORVUS_RELEASE_KEYSTORE" \
+              -storepass:env CORVUS_RELEASE_STORE_PASSWORD -alias "$CORVUS_RELEASE_KEY_ALIAS" \
+              -file "$RUNNER_TEMP/corvus-release-cert.der" >/dev/null 2>&1; then
+            echo "The release keystore password, format, or alias is invalid"
+            exit 1
+          fi
+          actual=$(sha256sum "$RUNNER_TEMP/corvus-release-cert.der" | cut -d' ' -f1)
+          test "${actual,,}" = "${RELEASE_CERT,,}" || { echo "Pinned release certificate mismatch"; exit 1; }
+
+      - name: Build the signed base and three feature APKs
+        env:
+          CORVUS_RELEASE_STORE_PASSWORD: ${{ secrets.CORVUS_RELEASE_STORE_PASSWORD }}
+          CORVUS_RELEASE_KEY_ALIAS: ${{ secrets.CORVUS_RELEASE_KEY_ALIAS }}
+          CORVUS_RELEASE_KEY_PASSWORD: ${{ secrets.CORVUS_RELEASE_KEY_PASSWORD }}
+        run: |
+          ./gradlew --no-daemon :app:assembleRelease \
+            :features:coregb:assembleRelease :features:coregbc:assembleRelease \
+            :features:coregba:assembleRelease
+
+      - name: Validate all four signed APKs
+        env:
+          RELEASE_CERT: ${{ secrets.CORVUS_RELEASE_CERT_SHA256 }}
+        run: |
+          python3 tools/check_core_apks.py --variant release \
+            --expected-cert-sha256 "$RELEASE_CERT" \
+            --apksigner "$ANDROID_HOME/build-tools/35.0.0/apksigner" \
+            --aapt "$ANDROID_HOME/build-tools/35.0.0/aapt" \
+            --zipalign "$ANDROID_HOME/build-tools/35.0.0/zipalign"
+
+      - name: Stage signed artifacts and provenance
+        run: |
+          mkdir -p build/signed-preview
+          cp app/build/outputs/apk/release/app-release.apk build/signed-preview/CorvusRetro-0.11-base-release.apk
+          cp features/coregb/build/outputs/apk/release/coregb-release.apk build/signed-preview/CorvusGB.apk
+          cp features/coregbc/build/outputs/apk/release/coregbc-release.apk build/signed-preview/CorvusGBC.apk
+          cp features/coregba/build/outputs/apk/release/coregba-release.apk build/signed-preview/CorvusGBA.apk
+          python3 - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          def revision(path):
+              return subprocess.check_output(['git', '-C', path, 'rev-parse', 'HEAD'], text=True).strip()
+          data = {'source_sha': os.environ['SOURCE_SHA'],
+                  'corvuscore_sha': revision('third_party/CorvusCore'),
+                  'corvusapi_sha': revision('third_party/CorvusCore/third_party/CorvusAPI')}
+          Path('build/signed-preview/source.json').write_text(json.dumps(data, indent=2) + '\n')
+          PY
+          (cd build/signed-preview && sha256sum *.apk source.json > SHA256SUMS)
+          echo "Signed qualification APKs only. No Release or catalog was published." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the signed qualification build
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: CorvusRetro-0.11-signed-${{ env.SOURCE_SHA }}
+          path: |
+            build/signed-preview/*.apk
+            build/signed-preview/source.json
+            build/signed-preview/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Erase temporary signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/corvus-release.jks" "$RUNNER_TEMP/corvus-release-cert.der"

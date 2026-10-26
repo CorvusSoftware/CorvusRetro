@@ -7,6 +7,10 @@ android {
     namespace 'com.corvussoftware.corvusretro'
     compileSdk 35
     ndkVersion '27.2.12479018'
+    dynamicFeatures = [':features:coregb', ':features:coregbc', ':features:coregba']
+    packaging {
+        jniLibs { useLegacyPackaging = true }
+    }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
@@ -14,12 +18,13 @@ android {
 
     defaultConfig {
         applicationId 'com.corvussoftware.corvusretro'
+        testInstrumentationRunner 'com.corvussoftware.corvusretro.CoreRepositoryInstrumentation'
         minSdk 26
         targetSdk 35
         versionCode project.hasProperty('corvusVersionCode')
                 ? project.property('corvusVersionCode').toInteger()
-                : (project.hasProperty('corvusCores') && project.property('corvusCores').toString().trim() ? 11 : 10)
-        versionName project.findProperty('corvusVersionName') ?: '0.10.0'
+                : 12
+        versionName project.findProperty('corvusVersionName') ?: '0.11.0'
         ndk { abiFilters 'arm64-v8a', 'x86_64' }
         externalNativeBuild {
             cmake {

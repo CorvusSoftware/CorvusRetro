@@ -54,6 +54,14 @@ static void command(struct android_app *app, int32_t cmd) {
         save(a);
         break;
     case APP_CMD_RESUME:
+        if (a->ui.platform.core_install_pending) {
+            bool pending = a->ui.platform.core_install_pending(a->ui.platform.context);
+            if (pending && !a->ui.installing) {
+                save(a);
+                cr_ui_clear_input(&a->ui);
+            }
+            a->ui.installing = pending;
+        }
         a->last_draw = now();
         a->resumed = true;
         a->deadline = now();
@@ -205,7 +213,7 @@ void android_main(struct android_app *app) {
     a->applied_theme = -1;
 #ifndef NDEBUG
     int last_page = -1, last_core = -2, last_content = -1, last_quick = -1, last_theme = -1,
-        last_active = -1, last_show_input = -1;
+        last_active = -1, last_show_input = -1, last_installing = -1;
 #endif
     while (!app->destroyRequested) {
         bool active = a->window && a->resumed && a->focused;
@@ -230,8 +238,9 @@ void android_main(struct android_app *app) {
         if (cr_android_core_catalog(&core_catalog))
             cr_ui_catalog(&a->ui, &core_catalog);
         char install_status[256];
-        if (cr_android_core_status(install_status, sizeof(install_status)))
-            cr_ui_message(&a->ui, install_status);
+        bool install_finished;
+        if (cr_android_core_status(install_status, sizeof(install_status), &install_finished))
+            cr_ui_install_status(&a->ui, install_status, install_finished);
         active = a->window && a->resumed && a->focused;
         running = active && cr_ui_running(&a->ui);
         time = now();
@@ -247,11 +256,12 @@ void android_main(struct android_app *app) {
 #ifndef NDEBUG
         if (last_page != a->ui.page || last_core != a->ui.engine.system ||
             last_content != a->ui.engine.loaded || last_quick != a->ui.quick ||
-            last_theme != a->ui.theme || last_active != active || last_show_input != a->ui.show_input) {
+            last_theme != a->ui.theme || last_active != active || last_show_input != a->ui.show_input ||
+            last_installing != a->ui.installing) {
             __android_log_print(ANDROID_LOG_DEBUG, "CorvusRetro",
-                                "frontend page=%d core=%d content=%d quick=%d theme=%d active=%d show_input=%d",
+                                "frontend page=%d core=%d content=%d quick=%d theme=%d active=%d show_input=%d installing=%d",
                                 a->ui.page, a->ui.engine.system, a->ui.engine.loaded, a->ui.quick,
-                                a->ui.theme, active, a->ui.show_input);
+                                a->ui.theme, active, a->ui.show_input, a->ui.installing);
             last_page = a->ui.page;
             last_core = a->ui.engine.system;
             last_content = a->ui.engine.loaded;
@@ -259,6 +269,7 @@ void android_main(struct android_app *app) {
             last_theme = a->ui.theme;
             last_active = active;
             last_show_input = a->ui.show_input;
+            last_installing = a->ui.installing;
         }
 #endif
         if (running != a->was_running) {

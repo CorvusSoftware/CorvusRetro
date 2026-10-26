@@ -1,14 +1,10 @@
-Reprise sur main54cb1b7 après migration CorvusAPI et packs APK0.10.
+Objectif confirmé : téléchargement et installation individuelle CorvusGB/CorvusGBC/CorvusGBA comme RetroArch, base sans moteurs, ajouts cumulables.
+Budget DEEP : build dynamic-feature, installation Android et registre/identités sont des frontières distinctes.
 
-Objectif utilisateur : ligne Charger/Décharger unique et sous-système Deux joueurs (câble link) conditionnel.
-Budget STANDARD pour la ligne et ses régressions ; le câble nécessite un contrat public distinct.
+1. Prototyper trois APK split Android installables avec MODE_INHERIT_EXISTING, même package/signature/version que base0.11/code12. Pas de chargement de .so depuis le stockage modifiable.
+2. Découvrir les bibliothèques installées par Android dans nativeLibraryDir, CorvusAPI0 inchangée. Préserver GB/GBC/GBA suffixes0/1/2 même quand GBA est le seul cœur installé.
+3. Nouveau flux cores-v2.json (format2, entriescores) compatible avec ancien index.json0.10 ; valider chaque APKsplit et le certificat avant installation.
+4. Tests natifs/sanitizers, outils/catalogue, build/lint APK, zéro/GBAseul/ajoutGB/retour sans perte, portrait/paysage et version/signature invalides.
+5. Revue indépendante, CI et livrables signables/publish workflow. Ne pas annoncer de modules téléchargeables tant que leurs vrais APK signés ne sont pas publiés et catalogués.
 
-1. Sauvegarder le prototype local et avancer sur main sans écraser les nouveaux commits. Fait.
-2. Adapter la ligne unique aux modules CorvusAPI et au mode sans cœur. Fait.
-3. Vérifier noyau/menu, ASan/UBSan, zéro cœur, APK/lint, packaging base/pack et émulateur.
-4. Documenter le contrat manquant avant toute modification d’ABI ou fournisseur.
-5. Publier la partie compatible sur main et contrôler sa CI exacte.
-
-Ne pas activer un faux sous-système : l’ABI0 actuelle ne permet ni déclaration ni câble.
-Prochaine étape pour le link : proposer puis faire valider l’extension dans CorvusAPI,
-implémenter l’adaptateur CorvusCore dans son propre dépôt, enfin intégrer le frontend.
+Le sous-système câble link reste à traiter via sa proposition CorvusAPI, indépendamment de cette distribution.

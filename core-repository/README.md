@@ -2,6 +2,13 @@
 
 Copyright (C) 2026 CorvusSoftware. SPDX-License-Identifier: AGPL-3.0-only.
 
+CorvusRetro 0.11 uses `cores-v2.json` for three independent Android core splits.
+Each entry identifies its stable core, ABI and required base versionCode. Android
+installs the signed module with MODE_INHERIT_EXISTING and keeps the other cores.
+Use tools/register_core_split.py with the signed base APK and independently pinned
+release certificate. See [individual cores](../docs/individual-cores.md).
+
+The remaining sections describe the legacy `index.json` format used by CorvusRetro 0.10.
 This is the official metadata feed used by the CorvusRetro **APK core-pack updater**.
 It is not a list of executable .so files to load from app-private writable storage.
 

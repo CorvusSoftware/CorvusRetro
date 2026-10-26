@@ -6,44 +6,42 @@ C/C++ et de la navigation MaterialUI de RetroArch. Les moteurs sont ceux de
 [CorvusAPI](https://github.com/CorvusSoftware/CorvusAPI).
 Code applicatif sous **AGPL-3.0-only**, Copyright (C) 2026 CorvusSoftware.
 
-## Version 0.10 : application sans cœurs préinstallés
+## Version 0.11 : cœurs téléchargés séparément
 
-CorvusRetro 0.10 adopte le comportement d'un frontend libretro : l'application
-de base n'embarque aucun émulateur. Les moteurs officiels CorvusGB,
-CorvusGBC et CorvusGBA sont sélectionnés pour une **compilation APK de pack**
-distincte, destinée au [Téléchargeur de cœurs](docs/core-downloader.md).
+L'application de base n'embarque aucun moteur. Dans **Charger un cœur >
+Téléchargeur de cœurs**, choisissez **CorvusGB**, **CorvusGBC** ou **CorvusGBA**.
+Chaque téléchargement installe uniquement le cœur choisi. Ajouter CorvusGB
+conserve CorvusGBA et CorvusGBC s'ils sont déjà présents.
 
-L'APK principal peut ouvrir le menu **Charger un cœur > Téléchargeur de cœurs**
-sans émulateur présent. Les trois moteurs sont donc optionnels dans l'APK
-distribuée ; CorvusCore reste le fournisseur officiel sans être une
-dépendance runtime obligatoire pour les utilisateurs.
+Android confirme l'ajout d'un module signé, puis CorvusRetro retrouve les cœurs
+installés au démarrage. Les trois modules utilisent CorvusAPI et les moteurs
+CorvusCore 0.14.0. Aucun jeu commercial ni BIOS constructeur n'est distribué.
 
-**Important :** le canal Android actuel fournit des **APK CorvusRetro
-complets** mis à jour via PackageInstaller. Un pack remplace l'ensemble
-de l'application et les moteurs inclus, sans installer des fichiers
-`.so` indépendants et cumulables comme RetroArch. Le catalogue est vide
-jusqu'à ce que des APK de release réellement signés soient publiés.
-Aucune ROM ou BIOS commercial n'est fourni.
+La distribution utilise trois **APK de module Android**, distincts de l'APK de
+base. L'installation hérite des modules existants et vérifie le package, la
+signature et la version de base. Aucun fichier natif téléchargé dans le cache
+n'est exécuté. Les cœurs proposés doivent correspondre au `versionCode` de la
+base ; une mise à jour complète de la base demande des modules compatibles.
+Voir [les téléchargements individuels](docs/individual-cores.md).
 
-### Construire la base et les moteurs en option
+### Construire la base et les trois modules
 
 ```sh
-# APK 0.10 légère, sans CorvusGB, CorvusGBC ni CorvusGBA :
-./gradlew :app:assembleDebug
-
-# APK contenant explicitement les trois moteurs officiels :
-./gradlew -PcorvusCores=gb,gbc,gba :app:assembleDebug
-
-# Tests natifs : ils utilisent toujours les trois moteurs :
+./gradlew :app:assembleDebug :app:lintDebug \
+  :features:coregb:assembleDebug :features:coregbc:assembleDebug \
+  :features:coregba:assembleDebug
 make test
 make test SANITIZE=ON
+python3 tools/validate_core_splits.py
+python3 tools/test_core_splits.py
 ```
 
-Pour une publication officielle, la même clé de signature durable doit
-être utilisée pour l'APK de base et les packs. Les consignes sont dans
-[core-downloader.md](docs/core-downloader.md). Sans cette étape de
-signature et de publication, le catalogue n'est pas encore utilisable
-pour télécharger les moteurs.
+Base : `app/build/outputs/apk/debug/app-debug.apk`. Cœurs :
+`features/coregb*/build/outputs/apk/debug/coregb*-debug.apk`.
+Les quatre APK doivent partager le même package, la même version et le même
+certificat. Le catalogue `core-repository/cores-v2.json` est alimenté uniquement
+avec des APK signés réellement publiés. L'ancien catalogue de packs 0.10 reste
+séparé dans `core-repository/index.json` pour les anciennes versions.
 
 Le fichier [AGENTS.md](AGENTS.md) et les instructions de répertoire
 préparent Codex à travailler sur cette architecture, selon une
@@ -78,7 +76,7 @@ Les menus et le lecteur Java de la version 0.4 ont été remplacés.
 | Boucle Android et cycle de vie | C11, `native_main.c` |
 | Rendu des menus et des frames | C11, EGL/OpenGL ES 2 |
 | Audio PCM stéréo | C11, AAudio et tampon circulaire |
-| Chargement, états et batterie | C11, ABI C CorvusAPI et modules integres |
+| Chargement, états et batterie | C11, ABI C CorvusAPI et modules Android installés |
 | Moteurs GB/GBC/GBA | C++20, CorvusCore |
 | Services du système Android | Java : SAF, stockage/préférences, polices et ressources |
 
@@ -91,7 +89,7 @@ Le cache de glyphes natif accepte aussi les noms de contenus Unicode.
 
 - Listes tactiles et onglets Menu principal, Listes de lecture et Réglages.
 - Chargement d'un cœur sans contenu et déchargement réel, avec état **Aucun cœur**.
-- **CorvusGB**, **CorvusGBC** et **CorvusGBA expérimental**, disponibles dans le pack officiel optionnel, version des moteurs 0.14.0.
+- **CorvusGB**, **CorvusGBC** et **CorvusGBA expérimental**, installables séparément, version des moteurs 0.14.0.
 - Thème **CorvusRetro** bleu nuit/violet par défaut, **ASUS** noir/blanc et **NVIDIA Shield** noir/vert.
 - Icônes originales, module de cœur avec une tête de corbeau et identité CorvusRetro.
 - Import local par le sélecteur Android, listes par console et historique.
@@ -170,14 +168,15 @@ sous-modules, contrôle la ponctuation, teste le C et les moteurs avec et sans
 sanitizers, construit l'APK, exécute lint et vérifie signature et alignement 16 Ko.
 
 Téléchargement : **Actions → Android APK → exécution réussie → Artifacts →
-CorvusRetro-debug-…**. Extraire l'APK du ZIP ; artefacts conservés 14 jours.
+CorvusRetro-0.11-individual-cores-…**. Le ZIP contient la base et les trois modules ; artefacts conservés 14 jours.
+Les modules sont installés par le téléchargeur, pas comme une nouvelle base.
 
 ## Architecture et origine
 
 `app/src/main/cpp/` contient le frontend C, ses pilotes Android/GL/audio et le
 contrat portable de plateforme. `app/src/main/java/` contient uniquement les
 services Android. `third_party/CorvusCore/` fournit les moteurs C++20 via un sous-module versionne. Chaque moteur est expose
-par un module CorvusAPI integre a l'APK, sans adaptateur libretro. Le frontend
+par un module CorvusAPI dans son APK Android dédié, sans adaptateur libretro. Le frontend
 utilise le contrat CorvusAPI version 0, encore experimental, et non directement
 l'API C de CorvusCore. Voir [la migration](docs/corvusapi-migration.md).
 
@@ -196,4 +195,4 @@ Tout fichier source original porte :
 
 Les tirets Unicode longs sont interdits dans les fichiers du dépôt parent et
 contrôlés par CI. Les licences et attributions de CorvusCore, du NDK et du wrapper
-Gradle restent conservées. Elles sont consultables dans **Réglages → Licence et crédits**.
+Gradle restent conservées. Elles sont consultables dans **Menu principal → Informations → Licence et crédits**.

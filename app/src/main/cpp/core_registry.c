@@ -41,11 +41,11 @@ static void set_system_id(cr_core_descriptor *core) {
 
 static void register_module(const char *name) {
     if (!name || registry_size == CR_MAX_CORES) return;
-    char path[256];
+    char path[4096];
 #if defined(__ANDROID__)
     int n = snprintf(path, sizeof(path), "%s", name);
 #else
-    int n = snprintf(path, sizeof(path), "./%s", name);
+    int n = snprintf(path, sizeof(path), "%s%s", name[0] == '/' ? "" : "./", name);
 #endif
     if (n <= 0 || (size_t)n >= sizeof(path)) return;
     void *module = dlopen(path, RTLD_NOW | RTLD_LOCAL);
@@ -110,6 +110,13 @@ size_t cr_registry_count(void) {
     return registry_size;
 }
 
+void cr_registry_add_installed_modules(const char *const *paths, size_t count) {
+    discover();
+    if (!paths || count > CR_MAX_CORES) return;
+    for (size_t i = 0; i < count; ++i)
+        if (paths[i] && paths[i][0] == '/') register_module(paths[i]);
+}
+
 const cr_core_descriptor *cr_registry_get(int index) {
     discover();
     return index >= 0 && (size_t)index < registry_size ? &registry[index] : NULL;
@@ -123,13 +130,32 @@ int cr_registry_find(const char *core_id) {
     return -1;
 }
 
+static int legacy_id(const char *core_id) {
+    if (!core_id) return -1;
+    const char *const official[] = {"corvus.gb", "corvus.gbc", "corvus.gba"};
+    for (int i = 0; i < 3; ++i)
+        if (strcmp(core_id, official[i]) == 0) return i;
+    return -1;
+}
+
+int cr_registry_legacy_system(int index) {
+    const cr_core_descriptor *core = cr_registry_get(index);
+    return core ? legacy_id(core->id) : -1;
+}
+
 bool cr_registry_content_id(char *out, size_t cap, const char *sha256,
                             const char *core_id) {
-    if (!out || cap < 83 || !sha256 || !core_id || !*core_id) return false;
+    if (!out || !cap || !sha256 || !core_id || !*core_id) return false;
     if (strlen(sha256) != 64) return false;
     for (size_t i = 0; i < 64; ++i)
         if (!((sha256[i] >= '0' && sha256[i] <= '9') ||
               (sha256[i] >= 'a' && sha256[i] <= 'f'))) return false;
+    int legacy = legacy_id(core_id);
+    if (legacy >= 0) {
+        int n = snprintf(out, cap, "%s-%d", sha256, legacy);
+        return n == 66 && (size_t)n < cap;
+    }
+    if (cap < 83) return false;
     /* FNV-1a here is a deterministic filename namespace, NOT a security hash.
      * The ROM identity remains the full SHA-256 digest above. */
     uint64_t suffix = UINT64_C(14695981039346656037);

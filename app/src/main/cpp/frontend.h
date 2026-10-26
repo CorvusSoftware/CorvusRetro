@@ -46,7 +46,7 @@ typedef struct {
     cr_core_catalog core_catalog;
     bool catalog_loading;
     int page, return_page, filter, theme, focus, tab, menu_pointer, feedback_target;
-    bool quick, audio, awake, importing, show_input;
+    bool quick, audio, awake, importing, show_input, installing;
     float width, height, scroll, quick_scroll, text_height;
     float feedback_alpha, control_feedback[10];
     cr_navigation history[8];
@@ -76,5 +76,7 @@ void cr_ui_import(cr_ui *, const cr_import *);
 void cr_ui_message(cr_ui *, const char *);
 void cr_ui_reload(cr_ui *);
 void cr_ui_catalog(cr_ui *, const cr_core_catalog *);
+/* Installer events cross the Android mailbox; only terminal events release the barrier. */
+void cr_ui_install_status(cr_ui *, const char *, bool finished);
 void cr_ui_update(cr_ui *, double);
 #endif

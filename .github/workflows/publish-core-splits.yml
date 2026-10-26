@@ -1,0 +1,245 @@
+# CorvusRetro - CorvusSoftware
+# Copyright (C) 2026 CorvusSoftware
+# SPDX-License-Identifier: AGPL-3.0-only
+name: Publish individual Corvus cores
+
+on:
+  push:
+    tags: ['v0.11.*']
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: "Optional successful signed build run; otherwise select one for this exact commit"
+        type: string
+        required: false
+      tag:
+        description: "Existing tag at the current tested main commit, e.g. v0.11.0"
+        type: string
+        required: true
+        default: v0.11.0
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    name: Publish tested APKs and stage the individual core catalog
+    if: >-
+      github.repository == 'CorvusSoftware/CorvusRetro' &&
+      ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v0.11.')) ||
+       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      REQUESTED_SOURCE_RUN: ${{ inputs.source_run_id }}
+      CORVUS_TAG: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
+    steps:
+      - name: Select a successful signed build for the exact release commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$CORVUS_TAG" =~ ^v0\.11\.[0-9]+$ ]] || { echo "Invalid individual-core release tag"; exit 1; }
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid release revision"; exit 1; }
+          if test -n "$REQUESTED_SOURCE_RUN"; then
+            [[ "$REQUESTED_SOURCE_RUN" =~ ^[1-9][0-9]*$ ]] || { echo "Invalid signed build run ID"; exit 1; }
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$REQUESTED_SOURCE_RUN" > "$RUNNER_TEMP/signed-run.json"
+          else
+            gh api "repos/$GITHUB_REPOSITORY/actions/workflows/build-core-release.yml/runs?head_sha=$GITHUB_SHA&status=completed&per_page=100" \
+              > "$RUNNER_TEMP/signed-runs.json"
+          fi
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP'])
+          def eligible(data):
+              return (type(data.get('id')) is int and data['id'] > 0 and
+                      data.get('path', '').split('@', 1)[0] == '.github/workflows/build-core-release.yml' and
+                      data.get('status') == 'completed' and data.get('conclusion') == 'success' and
+                      data.get('event') in ('workflow_run', 'workflow_dispatch') and
+                      data.get('head_branch') == 'main' and
+                      data.get('head_repository', {}).get('full_name') == os.environ['GITHUB_REPOSITORY'] and
+                      data.get('head_sha') == os.environ['GITHUB_SHA'])
+          if os.environ.get('REQUESTED_SOURCE_RUN'):
+              data = json.loads((root / 'signed-run.json').read_text())
+              candidates = [data] if (eligible(data) and
+                                     str(data['id']) == os.environ['REQUESTED_SOURCE_RUN']) else []
+          else:
+              runs = json.loads((root / 'signed-runs.json').read_text()).get('workflow_runs', [])
+              candidates = [run for run in runs if eligible(run)]
+          if not candidates:
+              raise SystemExit('No successful signed build exists for this exact tested main commit')
+          data = max(candidates, key=lambda run: run['id'])
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write('SOURCE_RUN_ID=' + str(data['id']) + '\n')
+          print('Selected signed build run', data['id'])
+          PY
+          if gh release view "$CORVUS_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release already exists; immutable APKs will not be overwritten"
+            exit 1
+          fi
+
+      - name: Checkout the tested source and registry tools
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          submodules: recursive
+
+      - name: Verify the existing tag points to the qualified source revision
+        run: |
+          git ls-remote origin "refs/tags/$CORVUS_TAG" "refs/tags/$CORVUS_TAG^{}" > "$RUNNER_TEMP/release-tag.txt"
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          lines = (Path(os.environ['RUNNER_TEMP']) / 'release-tag.txt').read_text().splitlines()
+          refs = dict(line.split()[::-1] for line in lines)
+          tag = 'refs/tags/' + os.environ['CORVUS_TAG']
+          actual = refs.get(tag + '^{}', refs.get(tag))
+          if actual != os.environ['GITHUB_SHA']:
+              raise SystemExit('The release tag does not point to the qualified source commit')
+          PY
+
+      - name: Download only the matching signed artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name "CorvusRetro-0.11-signed-$GITHUB_SHA" --dir "$RUNNER_TEMP/signed-core-apks"
+          python3 - <<'PY'
+          import hashlib, json, os, subprocess
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP']) / 'signed-core-apks'
+          expected = {'CorvusRetro-0.11-base-release.apk', 'CorvusGB.apk',
+                      'CorvusGBC.apk', 'CorvusGBA.apk', 'source.json'}
+          lines = (root / 'SHA256SUMS').read_text().splitlines()
+          checks = {}
+          for line in lines:
+              digest, name = line.split('  ', 1)
+              if name not in expected or name in checks:
+                  raise SystemExit('Unexpected or duplicate qualification artifact checksum')
+              checks[name] = digest
+          if set(checks) != expected:
+              raise SystemExit('Incomplete qualification artifact checksums')
+          for name, digest in checks.items():
+              if hashlib.sha256((root / name).read_bytes()).hexdigest() != digest:
+                  raise SystemExit('Qualification artifact checksum mismatch')
+          provenance = json.loads((root / 'source.json').read_text())
+          def revision(path):
+              return subprocess.check_output(['git', '-C', path, 'rev-parse', 'HEAD'], text=True).strip()
+          if (provenance.get('source_sha') != os.environ['GITHUB_SHA'] or
+                  provenance.get('corvuscore_sha') != revision('third_party/CorvusCore') or
+                  provenance.get('corvusapi_sha') != revision('third_party/CorvusCore/third_party/CorvusAPI')):
+              raise SystemExit('Qualification artifact source provenance mismatch')
+          PY
+          mkdir -p app/build/outputs/apk/release
+          cp "$RUNNER_TEMP/signed-core-apks/CorvusRetro-0.11-base-release.apk" app/build/outputs/apk/release/app-release.apk
+          for pair in 'coregb CorvusGB' 'coregbc CorvusGBC' 'coregba CorvusGBA'; do
+            read -r split asset <<< "$pair"
+            mkdir -p "features/$split/build/outputs/apk/release"
+            cp "$RUNNER_TEMP/signed-core-apks/$asset.apk" "features/$split/build/outputs/apk/release/$split-release.apk"
+          done
+
+      - name: Set up Java 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up the verified Android CLI
+        run: |
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/android-cli.zip" \
+            https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip
+          echo "5fdcc763663eefb86a5b8879697aa6088b041e70  $RUNNER_TEMP/android-cli.zip" | sha1sum --check
+          unzip -q "$RUNNER_TEMP/android-cli.zip" -d "$RUNNER_TEMP/android-cli"
+          echo "$RUNNER_TEMP/android-cli/cmdline-tools/bin" >> "$GITHUB_PATH"
+
+      - name: Install signature and package inspection tools
+        run: |
+          python3 - <<'PY'
+          import os, subprocess
+          sdk = ['sdkmanager', '--sdk_root=' + os.environ['ANDROID_HOME']]
+          subprocess.run(sdk + ['--licenses'], input='y\n' * 100, text=True, check=True)
+          subprocess.run(sdk + ['build-tools;35.0.0'], check=True)
+          PY
+
+      - name: Verify pinned signatures, split identity and release version
+        env:
+          RELEASE_CERT: ${{ secrets.CORVUS_RELEASE_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_CERT" =~ ^[0-9a-fA-F]{64}$ ]] || { echo "Missing pinned release certificate"; exit 1; }
+          python3 tools/check_core_apks.py --variant release \
+            --expected-cert-sha256 "$RELEASE_CERT" \
+            --apksigner "$ANDROID_HOME/build-tools/35.0.0/apksigner" \
+            --aapt "$ANDROID_HOME/build-tools/35.0.0/aapt" \
+            --zipalign "$ANDROID_HOME/build-tools/35.0.0/zipalign"
+          python3 - <<'PY'
+          import os, sys
+          from pathlib import Path
+          sys.path.insert(0, 'tools')
+          from register_core_split import package_info
+          info = package_info(Path('app/build/outputs/apk/release/app-release.apk'),
+                              os.environ['ANDROID_HOME'] + '/build-tools/35.0.0/aapt')
+          if os.environ['CORVUS_TAG'] != 'v' + info.get('versionName', ''):
+              raise SystemExit('Release tag does not match the qualified app version')
+          if int(info['versionCode']) < 12:
+              raise SystemExit('Individual core releases require base versionCode 12 or newer')
+          PY
+
+      - name: Generate and validate the six individual core catalog entries
+        env:
+          RELEASE_CERT: ${{ secrets.CORVUS_RELEASE_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          for pair in 'gb CorvusGB' 'gbc CorvusGBC' 'gba CorvusGBA'; do
+            read -r core asset <<< "$pair"
+            for abi in arm64-v8a x86_64; do
+              python3 tools/register_core_split.py \
+                --base-apk app/build/outputs/apk/release/app-release.apk \
+                --apk "features/core$core/build/outputs/apk/release/core$core-release.apk" \
+                --core-id "corvus.$core" --abi "$abi" --version 0.14.0 \
+                --url "https://github.com/CorvusSoftware/CorvusRetro/releases/download/$CORVUS_TAG/$asset.apk" \
+                --expected-cert-sha256 "$RELEASE_CERT" \
+                --apksigner "$ANDROID_HOME/build-tools/35.0.0/apksigner" \
+                --aapt "$ANDROID_HOME/build-tools/35.0.0/aapt"
+            done
+          done
+          python3 tools/validate_core_splits.py
+          python3 tools/test_core_splits.py
+          python3 tools/validate_core_catalog.py
+          python3 tools/test_core_catalog.py
+
+      - name: Publish the exact qualified base and three immutable core APKs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$CORVUS_TAG" \
+            "$RUNNER_TEMP/signed-core-apks/CorvusRetro-0.11-base-release.apk" \
+            "$RUNNER_TEMP/signed-core-apks/CorvusGB.apk" \
+            "$RUNNER_TEMP/signed-core-apks/CorvusGBC.apk" \
+            "$RUNNER_TEMP/signed-core-apks/CorvusGBA.apk" \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --verify-tag --prerelease \
+            --title "CorvusRetro $CORVUS_TAG - individual cores" \
+            --notes "Release-signed base APK and independently installable CorvusGB, CorvusGBC and CorvusGBA feature APKs. Install the matching base first; the in-app downloader adds cores using Android confirmation."
+
+      - name: Upload catalog metadata for review
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: CorvusRetro-individual-core-catalog-${{ github.sha }}
+          path: core-repository/cores-v2.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Stage the verified catalog on a review branch
+        run: |
+          set -euo pipefail
+          branch="automation/core-catalog-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          git switch -c "$branch"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add core-repository/cores-v2.json
+          git commit -m "Register released individual Corvus cores"
+          git push origin "HEAD:refs/heads/$branch"
+          echo "Catalog review branch: $branch" >> "$GITHUB_STEP_SUMMARY"
+          echo "Review core-repository/cores-v2.json before merging it into main." >> "$GITHUB_STEP_SUMMARY"
+

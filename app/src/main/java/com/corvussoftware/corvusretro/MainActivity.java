@@ -5,6 +5,9 @@ package com.corvussoftware.corvusretro;
 
 import android.app.NativeActivity;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -19,10 +22,13 @@ import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -49,7 +55,7 @@ public final class MainActivity extends NativeActivity {
 
     private static native void imported(String id, String title, int system, String path, String error);
     static native void coreCatalogUpdated(String[] packages, String error);
-    static native void coreInstallStatus(String message);
+    static native void coreInstallStatus(String message, boolean finished);
 
     @Override public void onCreate(Bundle state) {
         // NativeActivity starts android_main in super.onCreate. Services must already exist.
@@ -106,17 +112,52 @@ public final class MainActivity extends NativeActivity {
         state.putBoolean("picker", pickerOpen); state.putInt("picker_system", pickerSystem);
         super.onSaveInstanceState(state);
     }
+    @Override protected void onResume() {
+        super.onResume();
+        CoreInstallState.resumed(this);
+    }
+    @Override protected void onPause() {
+        CoreInstallState.paused(this);
+        super.onPause();
+    }
+    @Override public void onWindowFocusChanged(boolean focused) {
+        super.onWindowFocusChanged(focused);
+        if (focused) CoreInstallState.showConfirmation(this);
+    }
     @Override protected void onDestroy() {
         synchronized (importLock) {
             destroyed = true;
             if (pending != null) { pending.discard(); pending = null; }
         }
+        CoreInstallState.paused(this);
         io.shutdown();
         super.onDestroy();
     }
     boolean isAlive() { return !destroyed; }
     public void refreshCoreCatalog() { coreRepository.refresh(); }
     public void installCorePack(String packId) { coreRepository.install(packId); }
+    public boolean coreInstallPending() { return CoreInstallState.pending(this); }
+    public String[] installedCoreModules() {
+        ArrayList<String> modules = new ArrayList<>();
+        try {
+            PackageInfo installed = getPackageManager().getPackageInfo(getPackageName(), 0);
+            ApplicationInfo app = installed.applicationInfo;
+            if (app == null || app.nativeLibraryDir == null || installed.splitNames == null)
+                return new String[0];
+            List<String> splits = Arrays.asList(installed.splitNames);
+            File directory = new File(app.nativeLibraryDir).getCanonicalFile();
+            String[] ids = {"gb", "gbc", "gba"};
+            for (String id : ids) {
+                if (!splits.contains("core" + id)) continue;
+                File library = new File(directory, "libcorvus_" + id + ".so").getCanonicalFile();
+                if (directory.equals(library.getParentFile()) && library.isFile() && !library.canWrite())
+                    modules.add(library.getAbsolutePath());
+            }
+        } catch (IOException | PackageManager.NameNotFoundException error) {
+            android.util.Log.w("CorvusRetro", "Installed core discovery failed", error);
+        }
+        return modules.toArray(new String[0]);
+    }
     public float density() { return getResources().getDisplayMetrics().density; }
     public String filesRoot() { return getFilesDir().getAbsolutePath(); }
     public String[] games() {

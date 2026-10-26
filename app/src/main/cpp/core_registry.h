@@ -10,11 +10,11 @@
 
 #define CR_MAX_CORES 32
 
-/* Stable order: bundled official cores first, followed by configured cores.
- * Only native libraries shipped in the application are considered.
+/* Stable order: bundled cores first, followed by installed feature modules.
+ * Only native libraries installed as part of the application are considered.
  * Invalid/incompatible modules are skipped, never loaded as game content. */
 typedef struct {
-    char module[128];
+    char module[4096];
     char id[96];
     char system_id[96];
     char name[128];
@@ -29,6 +29,12 @@ typedef struct {
 size_t cr_registry_count(void);
 const cr_core_descriptor *cr_registry_get(int index);
 int cr_registry_find(const char *core_id);
+/* Called by the trusted platform adapter before the frontend is initialized.
+ * Paths must refer to libraries extracted by Android for this application,
+ * never a downloaded library in app-writable storage. Relative paths are rejected. */
+void cr_registry_add_installed_modules(const char *const *paths, size_t count);
+/* Historic GB/GBC/GBA storage suffix, independent of the runtime module index. */
+int cr_registry_legacy_system(int index);
 /* A stable content storage identifier independent of the package core order. */
 bool cr_registry_content_id(char *out, size_t cap, const char *sha256,
                             const char *core_id);

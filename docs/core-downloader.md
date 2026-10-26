@@ -2,7 +2,17 @@
 
 Copyright (C) 2026 CorvusSoftware. SPDX-License-Identifier: AGPL-3.0-only.
 
-## CorvusRetro 0.10 : application de base et packs officiels
+## CorvusRetro 0.11 : téléchargement cœur par cœur
+
+Le canal actuel utilise des modules Android indépendants pour CorvusGB,
+CorvusGBC et CorvusGBA. L'ajout d'un cœur conserve les autres grâce à
+`PackageInstaller.MODE_INHERIT_EXISTING`. Le nouveau catalogue est
+`core-repository/cores-v2.json` ; voir [le parcours et la publication](individual-cores.md).
+
+Les sections suivantes décrivent le canal historique 0.10 de packs complets.
+Elles ne décrivent pas l'installation individuelle de la version 0.11.
+
+## CorvusRetro 0.10 : packs complets historiques
 
 La nouvelle **APK de base 0.10.0** ne contient plus les modules
 `libcorvus_gb.so`, `libcorvus_gbc.so` ou `libcorvus_gba.so`.

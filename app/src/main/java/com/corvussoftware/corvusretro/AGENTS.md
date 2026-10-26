@@ -14,13 +14,15 @@ Read the root AGENTS.md before editing this directory.
 
 - CorvusRetro is not distributed through Google Play. Android OS security still applies.
 - Never dlopen a downloaded .so from writable app storage.
-- An updater catalog entry describes a full APK update, not independently installable
-  native cores. APK replacement can remove cores not present in the replacement.
+- In 0.11, each format2 entry is an independently installable feature APK. Use
+  MODE_INHERIT_EXISTING to preserve other cores and persist pending session ownership.
+- A full base APK update can remove features; only matching base versionCodes are compatible.
 - Restrict update URLs to CorvusSoftware official HTTPS release assets.
 - Verify declared size and SHA-256. Let PackageInstaller validate package identity,
   release certificate and user confirmation. Do not bypass these system checks.
 - Do not log keys, tokens or private paths. Never store release signing credentials.
-- Keep CoreRepository's input validation aligned with tools/validate_core_catalog.py.
+- Keep CoreRepository's format2 validation aligned with tools/validate_core_splits.py.
+  Keep the legacy format1 validator for 0.10 clients.
 
 ## Compatibility
 

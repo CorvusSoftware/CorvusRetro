@@ -1,19 +1,9 @@
-Le refspec cloud ne met à jour que origin/HEAD. Pour contrôler main explicitement :
-git fetch origin refs/heads/main:refs/remotes/origin/main.
-Un simple git fetch origin main laisse origin/main potentiellement obsolète.
+Catalogue0.10 index.json format1 est vide. Le pack releasev0.10.0-cores.1 existe mais c’est une mise à jour complète, pas3modules individuels.
+APK publiée : versionCode11/versionName0.10.0, contient3modulesARM64/x86_64. Source a366246.
+Ne pas casser les clients0.10 : utiliser nouveau feed cores-v2.json format2 pour0.11.
+Contraintes : aucun dlopen depuis stockage téléchargé modifiable, préserver contrôle signature et confirmationAndroid.
+Piste : APKfeature splits officiels (samepackage/version/signer), MODE_INHERIT_EXISTING, nativeLibDir extrait parOS, découverte après redémarrage.
+Indicescatalogue partiels : frontend import ancien if(system<3) utilisait mauvais suffixe si GBA seul=index0. Corriger vers coreId stable à toutes les frontières.
+Le SDK et CorvusAPI restent figés/intacts. Câble link nonimplémenté, propositiondocs/subsystems-corvusapi-proposal.md toujoursvalable.
 
-main54cb1b7 conserve les évolutions0.9 et migre vers CorvusAPI0 :
-registry dynamique, identités stables, base sans modules et pack explicite.
-Le prototype interrompu est sauvegardé dans un stash nommé
-resume backup: native subsystem work before CorvusAPI migration.
-Ne pas réappliquer engine.c ou les tests directs de ce prototype.
-
-CorvusCore8433980 inclut CorvusAPI188a1a5. corvus_core_api expose load_game,
-un seul callback vidéo et aucun sous-système. Les adaptateurs officiels annoncent
-max_players1 et ignorent player!=0. Le SDK interne sait relier les consoles, mais
-son usage direct dans le frontend violerait la frontière publique actuelle.
-
-La ligne cœur suit engine.handle, et non engine.loaded : le chargement sans jeu
-doit aussi afficher Décharger. Un jeu ajoute seulement Menu rapide avant la ligne.
-Test ROM GBA originale : vraie écriture SRAM, obstruction saves, échec de
-déchargement sans perdre la session, suppression de l’obstruction et nouvelle tentative.
+Android35 peut bloquer silencieusement un lancement de confirmation depuis un receiver en arrière-plan (BAL_BLOCK). CoreInstallState conserve désormais Intent OS privé via URI liée à la session et le lance depuis MainActivity au focus. Dans le harness, attendre la fin du verrou/commit SharedPrefs avant finishInstrumentation. Une selfupdate peut tuer son receiver final : au prochain lancement, SessionInfo absent réconcilie l’état terminé et libère la pause. Preuve SessionApplied=true et CoreInstallState vide après relaunch.

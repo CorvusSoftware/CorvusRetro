@@ -39,5 +39,6 @@ typedef struct {
     void (*quit)(void *);
     void (*refresh_core_catalog)(void *);
     void (*install_core_pack)(void *, const char *);
+    bool (*core_install_pending)(void *);
 } cr_platform;
 #endif

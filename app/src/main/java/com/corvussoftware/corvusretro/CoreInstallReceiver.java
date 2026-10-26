@@ -10,14 +10,16 @@ import android.content.pm.PackageInstaller;
 import android.os.Build;
 import android.util.Log;
 
-/** The OS, not CorvusRetro, confirms and authorizes installing an APK upgrade. */
+/** Android confirms and validates adding a signed feature split to this package. */
 public final class CoreInstallReceiver extends BroadcastReceiver {
-    static final String ACTION = "com.corvussoftware.corvusretro.CORE_PACK_INSTALL";
+    static final String ACTION = "com.corvussoftware.corvusretro.CORE_SPLIT_INSTALL";
     @Override public void onReceive(Context context, Intent intent) {
         if (intent == null || !ACTION.equals(intent.getAction())) return;
+        String operation = intent.getStringExtra("operation");
+        int session = intent.getIntExtra("session", -1);
+        if (!CoreInstallState.owns(context, operation, session)) return;
         int status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS,
                                          PackageInstaller.STATUS_FAILURE);
-        String detail = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE);
         if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
             Intent confirmation;
             if (Build.VERSION.SDK_INT >= 33) {
@@ -26,31 +28,18 @@ public final class CoreInstallReceiver extends BroadcastReceiver {
                 confirmation = intent.getParcelableExtra(Intent.EXTRA_INTENT);
             }
             if (confirmation == null) {
-                report("Confirmation d'installation indisponible");
+                CoreInstallState.cancel(context, operation, session, "Confirmation d'installation indisponible");
                 return;
             }
-            confirmation.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            try {
-                context.startActivity(confirmation);
-                report("Confirme l'installation du pack dans Android");
-            } catch (RuntimeException error) {
-                Log.w("CorvusRetro", "Core update confirmation refused", error);
-                report("Installation annulée ou non autorisée");
-            }
+            CoreInstallState.confirmation(context, operation, session, confirmation);
         } else if (status == PackageInstaller.STATUS_SUCCESS) {
-            report("CorvusRetro mis à jour avec les cœurs sélectionnés");
+            CoreInstallState.status(context, operation, session,
+                    "Cœur installé. Relancez CorvusRetro pour le charger", true);
         } else {
-            Log.w("CorvusRetro", "Core package install status " + status +
-                    (detail == null ? "" : (": " + detail)));
-            report("Installation refusée par Android (statut " + status + ")");
+            Log.w("CorvusRetro", "Core split install status " + status);
+            CoreInstallState.status(context, operation, session,
+                    "Installation refusée par Android (statut " + status + ")", true);
         }
     }
 
-    private static void report(String message) {
-        try {
-            MainActivity.coreInstallStatus(message);
-        } catch (UnsatisfiedLinkError error) {
-            Log.i("CorvusRetro", message);
-        }
-    }
 }

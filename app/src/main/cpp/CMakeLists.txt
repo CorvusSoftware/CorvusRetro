@@ -115,6 +115,20 @@ else()
     target_link_libraries(native_menu_test PRIVATE corvus_frontend)
     target_compile_options(native_menu_test PRIVATE -Wall -Wextra -Werror)
     add_test(NAME native_menu COMMAND native_menu_test)
+    # A separate empty catalog models a base APK whose installed features arrive
+    # in a different order from the three historic console storage suffixes.
+    file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/test-empty")
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/test-empty/cr_bundled_cores.h"
+        "static const char *const cr_bundled_core_modules[] = {0};\n")
+    add_executable(native_split_registry_test "${CORVUS_ROOT}/tests/native_split_registry_test.c"
+        engine.c core_registry.c frontend.c theme.c viewport.c play_layout.c)
+    target_include_directories(native_split_registry_test PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/test-empty")
+    target_link_libraries(native_split_registry_test PRIVATE CorvusAPI::CorvusAPI ${CMAKE_DL_LIBS} m)
+    target_compile_options(native_split_registry_test PRIVATE -Wall -Wextra -Werror)
+    add_dependencies(native_split_registry_test corvus_gb corvus_gbc corvus_gba)
+    add_test(NAME native_split_registry COMMAND native_split_registry_test
+        "$<TARGET_FILE:corvus_gba>" "$<TARGET_FILE:corvus_gb>" "$<TARGET_FILE:corvus_gbc>")
     if(NOT CORVUS_BUNDLED_CORE_TARGETS)
         add_executable(native_nocore_test "${CORVUS_ROOT}/tests/native_nocore_test.c")
         target_link_libraries(native_nocore_test PRIVATE corvus_frontend)
@@ -122,10 +136,10 @@ else()
         add_test(NAME native_nocore COMMAND native_nocore_test)
     endif()
     if(CORVUS_SANITIZE)
-        foreach(target corvus_frontend native_engine_test native_frontend_test native_viewport_test native_controls_test native_menu_test)
+        foreach(target corvus_frontend native_engine_test native_frontend_test native_viewport_test native_controls_test native_menu_test native_split_registry_test)
             target_compile_options(${target} PRIVATE -g -O1 -fsanitize=address,undefined -fno-omit-frame-pointer)
         endforeach()
-        foreach(target native_engine_test native_frontend_test native_viewport_test native_controls_test native_menu_test)
+        foreach(target native_engine_test native_frontend_test native_viewport_test native_controls_test native_menu_test native_split_registry_test)
             target_link_options(${target} PRIVATE -fsanitize=address,undefined)
         endforeach()
     endif()
