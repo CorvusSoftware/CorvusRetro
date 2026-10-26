@@ -23,7 +23,7 @@ typedef struct cr_engine {
     uint32_t *pixels;
     int16_t audio[4096];
     size_t audio_count;
-    char id[80], root[4096], error[256];
+    char id[96], root[4096], error[256];
 } cr_engine;
 
 /* All operations for an engine run on its owning frontend thread. */

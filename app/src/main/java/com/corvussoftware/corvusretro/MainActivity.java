@@ -114,13 +114,15 @@ public final class MainActivity extends NativeActivity {
     public String filesRoot() { return getFilesDir().getAbsolutePath(); }
     public String[] games() {
         List<GameLibrary.Game> games = library.games();
-        String[] records = new String[games.size() * 4];
+        String[] records = new String[games.size() * 6];
         for (int i = 0; i < games.size(); i++) {
             GameLibrary.Game game = games.get(i);
-            records[i * 4] = game.id;
-            records[i * 4 + 1] = game.title;
-            records[i * 4 + 2] = Integer.toString(game.system);
-            records[i * 4 + 3] = Long.toString(game.played);
+            records[i * 6] = game.id;
+            records[i * 6 + 1] = game.title;
+            records[i * 6 + 2] = Integer.toString(game.system);
+            records[i * 6 + 3] = Long.toString(game.played);
+            records[i * 6 + 4] = game.coreId;
+            records[i * 6 + 5] = game.systemId;
         }
         return records;
     }
@@ -192,14 +194,14 @@ public final class MainActivity extends NativeActivity {
     private void notifyError(String message) {
         synchronized (importLock) { if (!destroyed) imported("", "", -1, "", message); }
     }
-    public String finishImport(boolean accept, int system) {
+    public String finishImport(boolean accept, int system, String coreId, String systemId) {
         synchronized (importLock) {
             GameLibrary.Pending ready = pending;
             pending = null;
             if (ready == null) return accept ? "Import interrompu" : null;
             if (!accept || destroyed) { ready.discard(); return accept ? "Import interrompu" : null; }
             if (system < 0 || system >= 32) { ready.discard(); return "Cœur inconnu"; }
-            try { library.commit(ready, system); return null; }
+            try { library.commit(ready, system, coreId, systemId); return null; }
             catch (IOException error) { return error.getMessage() == null ? "Import impossible" : error.getMessage(); }
         }
     }

@@ -71,20 +71,27 @@ static bool ready(cr_engine *engine) {
     return (engine->handle && engine->loaded) || fail(engine, "Aucun contenu chargé");
 }
 bool cr_game_id_valid(const char *id) {
-    if (!id || strlen(id) < 66 || strlen(id) >= 80 || id[64] != '-')
-        return false;
+    if (!id) return false;
+    size_t length = strlen(id);
+    if ((length < 66 || length > 82) || id[64] != '-') return false;
     for (size_t i = 0; i < 64; ++i)
-        if (!((id[i] >= '0' && id[i] <= '9') || (id[i] >= 'a' && id[i] <= 'f')))
-            return false;
-    const char *digits = id + 65;
-    if (!*digits || (digits[0] == '0' && digits[1])) return false;
+        if (!((id[i] >= '0' && id[i] <= '9') ||
+              (id[i] >= 'a' && id[i] <= 'f'))) return false;
+    if (length == 82) {
+        if (id[65] != 'c') return false;
+        for (size_t i = 66; i < 82; ++i)
+            if (!((id[i] >= '0' && id[i] <= '9') ||
+                  (id[i] >= 'a' && id[i] <= 'f'))) return false;
+        return true;
+    }
+    if (id[65] == '0' && length != 66) return false;
     unsigned number = 0;
-    for (; *digits; ++digits) {
-        if (*digits < '0' || *digits > '9') return false;
-        number = number * 10u + (unsigned)(*digits - '0');
+    for (size_t i = 65; i < length; ++i) {
+        if (id[i] < '0' || id[i] > '9') return false;
+        number = number * 10u + (unsigned)(id[i] - '0');
         if (number >= CR_MAX_CORES) return false;
     }
-    return cr_registry_get((int)number) != NULL;
+    return true;
 }
 void cr_engine_init(cr_engine *engine, const char *root) {
     memset(engine, 0, sizeof(*engine));
@@ -344,8 +351,18 @@ bool cr_engine_select(cr_engine *engine, int system) {
 bool cr_engine_open(cr_engine *engine, int system, const char *id, const char *path) {
     if (!valid_system(engine, system))
         return false;
-    if (!cr_game_id_valid(id) || atoi(id + 65) != system)
+    if (!cr_game_id_valid(id))
         return fail(engine, "Identifiant de contenu invalide");
+    if (id[65] == 'c') {
+        const cr_core_descriptor *core = cr_registry_get(system);
+        char expected[96];
+        char hash[65];
+        memcpy(hash, id, 64);
+        hash[64] = '\0';
+        if (!core || !cr_registry_content_id(expected, sizeof(expected), hash, core->id) ||
+            strcmp(id, expected) != 0)
+            return fail(engine, "Le contenu appartient à un autre cœur");
+    }
     cr_engine candidate;
     cr_engine_init(&candidate, engine->root);
     memcpy(candidate.id, id, strlen(id) + 1);
