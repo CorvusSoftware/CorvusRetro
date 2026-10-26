@@ -15,7 +15,7 @@ Vous pouvez ensuite charger et décharger ce cœur. Ajouter un cœur conserve le
 
 Ce parcours suit le téléchargeur natif de RetroArch hors Play Store : archives,
 dossier de cœurs et chargement dynamique. CorvusRetro utilise son propre code et
-CorvusAPI0 pour les moteurs CorvusCore0.14.0. Le téléchargement reste dans
+CorvusAPI0 pour les moteurs CorvusCore0.14.1 de la branche de développement. Le téléchargement reste dans
 l'application, sans installateur APK ni redémarrage.
 Voir [le fonctionnement et les références](docs/individual-cores.md).
 
@@ -85,7 +85,7 @@ Le cache de glyphes natif accepte aussi les noms de contenus Unicode.
 
 - Listes tactiles et onglets Menu principal, Listes de lecture et Réglages.
 - Chargement d'un cœur sans contenu et déchargement réel, avec état **Aucun cœur**.
-- **CorvusGB**, **CorvusGBC** et **CorvusGBA expérimental**, installables séparément, version des moteurs 0.14.0.
+- **CorvusGB**, **CorvusGBC** et **CorvusGBA expérimental**, installables séparément, version des moteurs 0.14.1 dans les builds actuels.
 - Thème **CorvusRetro** bleu nuit/violet par défaut, **ASUS** noir/blanc et **NVIDIA Shield** noir/vert.
 - Icônes originales, module de cœur avec une tête de corbeau et identité CorvusRetro.
 - Import local par le sélecteur Android, listes par console et historique.
