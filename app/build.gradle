@@ -25,8 +25,10 @@ android {
             cmake {
                 // Build only the frontend for the base APK. Core modules become
                 // dependencies solely when explicitly selected for a pack.
-                targets 'corvusretro'
-                arguments "-DCORVUS_OFFICIAL_CORES=${project.findProperty('corvusCores') ?: ''}"
+                def selectedCores = (project.findProperty('corvusCores') ?: '').toString()
+                def bundledTargets = selectedCores.tokenize(',').collect { "corvus_${it}" }
+                targets(*(['corvusretro'] + bundledTargets))
+                arguments "-DCORVUS_OFFICIAL_CORES=${selectedCores}"
             }
         }
     }
