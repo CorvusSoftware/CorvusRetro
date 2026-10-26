@@ -39,7 +39,10 @@ enum {
     ACT_SET_THEME,
     ACT_QUICK,
     ACT_PAGE,
-    ACT_SHOW_INPUT
+    ACT_SHOW_INPUT,
+    ACT_OPEN_DOWNLOADER,
+    ACT_REFRESH_CATALOG,
+    ACT_INSTALL_CORE_PACK
 };
 typedef struct {
     char label[512], hint[256];
@@ -68,7 +71,9 @@ static int rows(const cr_ui *u) {
     if (u->page == CR_LISTS)
         return 1 + (int)cr_registry_count();
     if (u->page == CR_CORES)
-        return (int)cr_registry_count();
+        return 1 + (int)cr_registry_count();
+    if (u->page == CR_CORE_DOWNLOADS)
+        return 1 + (int)u->core_catalog.count;
     if (u->page == CR_SETTINGS)
         return 4;
     if (u->page == CR_INFORMATION)
@@ -131,10 +136,30 @@ static row get_row(const cr_ui *u, int index) {
         snprintf(hint, sizeof(hint), "%d contenu(s)", n);
         fill(&r, system_name(index), hint, CR_ICON_LIST, ACT_SYSTEM, index);
     } else if (u->page == CR_CORES) {
-        fill(&r, core_name(index), system_name(index), CR_ICON_CORE, ACT_SELECT, index);
-        if (index == 2 && strcmp(cr_registry_get(index)->id, "corvus.gba") == 0)
-            snprintf(r.hint, sizeof(r.hint), "%s · Expérimental", system_name(index));
-        r.checked = u->engine.handle && u->engine.system == index;
+        if (index == (int)cr_registry_count()) {
+            fill(&r, "Téléchargeur de cœurs", "Catalogue officiel CorvusSoftware",
+                 CR_ICON_CORE, ACT_OPEN_DOWNLOADER, 0);
+        } else {
+            fill(&r, core_name(index), system_name(index), CR_ICON_CORE, ACT_SELECT, index);
+            if (index == 2 && strcmp(cr_registry_get(index)->id, "corvus.gba") == 0)
+                snprintf(r.hint, sizeof(r.hint), "%s · Expérimental", system_name(index));
+            r.checked = u->engine.handle && u->engine.system == index;
+        }
+    } else if (u->page == CR_CORE_DOWNLOADS) {
+        if (index == 0) {
+            fill(&r, "Actualiser le catalogue",
+                 u->catalog_loading ? "Récupération en cours..." :
+                 (u->core_catalog.error[0] ? u->core_catalog.error :
+                  "Rechercher des packs Android officiels"),
+                 CR_ICON_CORE, ACT_REFRESH_CATALOG, 0);
+        } else {
+            const cr_core_pack *pack = &u->core_catalog.packs[index - 1];
+            char hint[160];
+            snprintf(hint, sizeof(hint), "Version %.56s - %.20s%s",
+                     pack->version, pack->abi,
+                     cr_registry_find(pack->core_id) >= 0 ? " - mise à jour" : "");
+            fill(&r, pack->name, hint, CR_ICON_CORE, ACT_INSTALL_CORE_PACK, index - 1);
+        }
     } else if (u->page == CR_SETTINGS) {
         const char *labels[] = {"Interface utilisateur", "Vidéo", "Audio", "Affichage à l’écran"};
         const char *hints[] = {"Apparence des menus", "Affichage pendant le jeu", "Sortie audio",
@@ -236,6 +261,16 @@ static bool pop_page(cr_ui *u) {
 void cr_ui_message(cr_ui *u, const char *s) {
     snprintf(u->message, sizeof(u->message), "%s", s ? s : "");
     u->message_time = 5;
+}
+void cr_ui_catalog(cr_ui *u, const cr_core_catalog *catalog) {
+    if (!catalog) return;
+    u->core_catalog = *catalog;
+    u->catalog_loading = false;
+    int count = rows(u);
+    if (count > 0 && u->focus >= count) u->focus = count - 1;
+    clamp_scroll(u);
+    if (catalog->error[0]) cr_ui_message(u, catalog->error);
+    else if (!catalog->count) cr_ui_message(u, "Aucun pack CorvusRetro publié pour cet appareil");
 }
 void cr_ui_reload(cr_ui *u) {
     size_t count = 0;
@@ -349,6 +384,32 @@ static void activate(cr_ui *u, row r) {
     switch (r.action) {
     case ACT_CORES:
         push_page(u, CR_CORES);
+        break;
+    case ACT_OPEN_DOWNLOADER:
+        push_page(u, CR_CORE_DOWNLOADS);
+        u->catalog_loading = true;
+        u->core_catalog.count = 0;
+        u->core_catalog.error[0] = '\0';
+        if (u->platform.refresh_core_catalog)
+            u->platform.refresh_core_catalog(u->platform.context);
+        else {
+            u->catalog_loading = false;
+            cr_ui_message(u, "Catalogue Android indisponible");
+        }
+        break;
+    case ACT_REFRESH_CATALOG:
+        if (u->platform.refresh_core_catalog && !u->catalog_loading) {
+            u->catalog_loading = true;
+            u->platform.refresh_core_catalog(u->platform.context);
+        }
+        break;
+    case ACT_INSTALL_CORE_PACK:
+        if (r.value >= 0 && (size_t)r.value < u->core_catalog.count &&
+            u->platform.install_core_pack) {
+            u->platform.install_core_pack(u->platform.context,
+                                          u->core_catalog.packs[r.value].id);
+            cr_ui_message(u, "Vérification du pack CorvusRetro...");
+        }
         break;
     case ACT_UNLOAD:
         if (result(u, cr_engine_close(&u->engine))) {
@@ -864,6 +925,9 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         case CR_CORES:
             title = "Charger un cœur";
             break;
+        case CR_CORE_DOWNLOADS:
+            title = "Téléchargeur de cœurs";
+            break;
         case CR_GAMES:
             title = u->filter < 0 ? "Historique" : system_name(u->filter);
             break;
@@ -924,6 +988,11 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
             else
                 p->icon(p->context, CR_ICON_NEXT, w - 36, y + 29, 18, muted);
             rect(p, 66, y + 75, w - 66, 1, line);
+        }
+        if (u->page == CR_CORE_DOWNLOADS && u->core_catalog.count == 0) {
+            text(p, u->catalog_loading ? "Recherche des packs officiels..." :
+                    "Aucun pack de cœurs disponible actuellement.",
+                 20, 236, 14, fg, w - 40);
         }
         if (u->page == CR_GAMES && !count) {
             text(p,

@@ -77,6 +77,11 @@ jobs:
           print('PASS repository text policy')
           PYCODE
 
+      - name: Validate official Corvus Core Repository metadata
+        run: |
+          python3 tools/validate_core_catalog.py
+          python3 tools/test_core_catalog.py
+
       - name: Test native C frontend and CorvusCore engines
         run: make test CMAKE="$ANDROID_HOME/cmake/3.22.1/bin/cmake"
 

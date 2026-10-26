@@ -23,7 +23,8 @@ enum {
     CR_OSD_SETTINGS,
     CR_OVERLAY_SETTINGS,
     CR_INFORMATION,
-    CR_CORE_INFO
+    CR_CORE_INFO,
+    CR_CORE_DOWNLOADS
 };
 enum { CR_TOUCH_DOWN, CR_TOUCH_MOVE, CR_TOUCH_UP, CR_TOUCH_CANCEL };
 typedef struct {
@@ -42,6 +43,8 @@ typedef struct {
     cr_platform platform;
     cr_game *games;
     size_t game_count;
+    cr_core_catalog core_catalog;
+    bool catalog_loading;
     int page, return_page, filter, theme, focus, tab, menu_pointer, feedback_target;
     bool quick, audio, awake, importing, show_input;
     float width, height, scroll, quick_scroll, text_height;
@@ -72,5 +75,6 @@ int cr_content_system(const char *, int);
 void cr_ui_import(cr_ui *, const cr_import *);
 void cr_ui_message(cr_ui *, const char *);
 void cr_ui_reload(cr_ui *);
+void cr_ui_catalog(cr_ui *, const cr_core_catalog *);
 void cr_ui_update(cr_ui *, double);
 #endif

@@ -26,7 +26,25 @@ android {
             version '3.22.1'
         }
     }
+    // Release signing is strictly opt-in and uses a private keystore OUTSIDE git.
+    // APK core-pack updates must reuse the exact certificate of the installed app.
+    signingConfigs {
+        corvusRelease {
+            def releaseStore = System.getenv('CORVUS_RELEASE_KEYSTORE')
+            if (releaseStore) {
+                storeFile file(releaseStore)
+                storePassword System.getenv('CORVUS_RELEASE_STORE_PASSWORD')
+                keyAlias System.getenv('CORVUS_RELEASE_KEY_ALIAS')
+                keyPassword System.getenv('CORVUS_RELEASE_KEY_PASSWORD')
+            }
+        }
+    }
     buildTypes {
-        release { minifyEnabled false }
+        release {
+            minifyEnabled false
+            if (System.getenv('CORVUS_RELEASE_KEYSTORE')) {
+                signingConfig signingConfigs.corvusRelease
+            }
+        }
     }
 }
