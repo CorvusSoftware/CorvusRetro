@@ -5,7 +5,7 @@ name: Publish native Corvus cores
 
 on:
   push:
-    tags: ['v0.12.*']
+    tags: ['v*']
   workflow_dispatch:
     inputs:
       source_run_id:
@@ -13,10 +13,10 @@ on:
         type: string
         required: false
       tag:
-        description: "Existing tag at the current tested main commit, e.g. v0.12.0"
+        description: "Existing tag at the current tested main commit, e.g. v0.13.0"
         type: string
         required: true
-        default: v0.12.0
+        default: v0.13.0
 
 permissions:
   contents: write
@@ -27,7 +27,7 @@ jobs:
     name: Publish tested base and native core archives
     if: >-
       github.repository == 'CorvusSoftware/CorvusRetro' &&
-      ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v0.12.')) ||
+      ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -40,7 +40,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          [[ "$CORVUS_TAG" =~ ^v0\.12\.[0-9]+$ ]] || { echo "Invalid individual-core release tag"; exit 1; }
+          [[ "$CORVUS_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid individual-core release tag"; exit 1; }
           [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid release revision"; exit 1; }
           if test -n "$REQUESTED_SOURCE_RUN"; then
             [[ "$REQUESTED_SOURCE_RUN" =~ ^[1-9][0-9]*$ ]] || { echo "Invalid signed build run ID"; exit 1; }
@@ -104,13 +104,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
-            --name "CorvusRetro-0.12-signed-$GITHUB_SHA" --dir "$RUNNER_TEMP/signed-core-apks"
+            --name "CorvusRetro-signed-$GITHUB_SHA" --dir "$RUNNER_TEMP/signed-core-apks"
           python3 - <<'PY'
           import hashlib, json, os, subprocess
           from pathlib import Path
           root = Path(os.environ['RUNNER_TEMP']) / 'signed-core-apks'
-          expected = {'CorvusRetro-0.12-base-release.apk', 'CorvusGB.apk',
-                      'CorvusGBC.apk', 'CorvusGBA.apk', 'source.json'}
+          expected = {'CorvusRetro-base-release.apk', 'source.json'}
+          expected.update('libcorvus_' + core + '-' + abi + '.so'
+                          for core in ('gb', 'gbc', 'gba') for abi in ('arm64-v8a', 'x86_64'))
           lines = (root / 'SHA256SUMS').read_text().splitlines()
           checks = {}
           for line in lines:
@@ -127,16 +128,19 @@ jobs:
           def revision(path):
               return subprocess.check_output(['git', '-C', path, 'rev-parse', 'HEAD'], text=True).strip()
           if (provenance.get('source_sha') != os.environ['GITHUB_SHA'] or
-                  provenance.get('corvuscore_sha') != revision('third_party/CorvusCore') or
-                  provenance.get('corvusapi_sha') != revision('third_party/CorvusCore/third_party/CorvusAPI')):
+                  provenance.get('corvuscore_sha') != revision('deps/CorvusCore') or
+                  provenance.get('corvusapi_sha') != revision('deps/CorvusCore/third_party/CorvusAPI') or
+                  provenance.get('rcheevos_sha') != revision('deps/rcheevos')):
               raise SystemExit('Qualification artifact source provenance mismatch')
           PY
-          mkdir -p app/build/outputs/apk/release
-          cp "$RUNNER_TEMP/signed-core-apks/CorvusRetro-0.12-base-release.apk" app/build/outputs/apk/release/app-release.apk
-          for pair in 'coregb CorvusGB' 'coregbc CorvusGBC' 'coregba CorvusGBA'; do
-            read -r split asset <<< "$pair"
-            mkdir -p "features/$split/build/outputs/apk/release"
-            cp "$RUNNER_TEMP/signed-core-apks/$asset.apk" "features/$split/build/outputs/apk/release/$split-release.apk"
+          mkdir -p pkg/android/app/build/outputs/apk/release
+          cp "$RUNNER_TEMP/signed-core-apks/CorvusRetro-base-release.apk" pkg/android/app/build/outputs/apk/release/app-release.apk
+          for core in gb gbc gba; do
+            for abi in arm64-v8a x86_64; do
+              mkdir -p "pkg/android/app/build/native-cores/Release/$abi"
+              cp "$RUNNER_TEMP/signed-core-apks/libcorvus_$core-$abi.so" \
+                "pkg/android/app/build/native-cores/Release/$abi/libcorvus_$core.so"
+            done
           done
 
       - name: Set up Java 21
@@ -162,7 +166,7 @@ jobs:
           subprocess.run(sdk + ['build-tools;35.0.0'], check=True)
           PY
 
-      - name: Verify pinned signatures, split identity and release version
+      - name: Verify the pinned base signature and release version
         env:
           RELEASE_CERT: ${{ secrets.CORVUS_RELEASE_CERT_SHA256 }}
         run: |
@@ -177,13 +181,13 @@ jobs:
           import os, sys
           from pathlib import Path
           sys.path.insert(0, 'tools')
-          from register_core_split import package_info
-          info = package_info(Path('app/build/outputs/apk/release/app-release.apk'),
+          from android_artifacts import package_info
+          info = package_info(Path('pkg/android/app/build/outputs/apk/release/app-release.apk'),
                               os.environ['ANDROID_HOME'] + '/build-tools/35.0.0/aapt')
           if os.environ['CORVUS_TAG'] != 'v' + info.get('versionName', ''):
               raise SystemExit('Release tag does not match the qualified app version')
-          if int(info['versionCode']) < 12:
-              raise SystemExit('Individual core releases require base versionCode 12 or newer')
+          if int(info['versionCode']) < 13:
+              raise SystemExit('Native core releases require base versionCode 13 or newer')
           PY
 
       - name: Generate and validate the six native core archives
@@ -199,12 +203,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          release_base="$RUNNER_TEMP/CorvusRetro-${CORVUS_TAG#v}-base-release.apk"
+          cp "$RUNNER_TEMP/signed-core-apks/CorvusRetro-base-release.apk" "$release_base"
           gh release create "$CORVUS_TAG" \
-            "$RUNNER_TEMP/signed-core-apks/CorvusRetro-0.12-base-release.apk" \
+            "$release_base" \
             "$RUNNER_TEMP/native-cores/"*.zip \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --verify-tag --prerelease \
-            --title "CorvusRetro $CORVUS_TAG - native core downloader" \
-            --notes "Release-signed base APK with an integrated downloader for native CorvusGB, CorvusGBC and CorvusGBA archives. Download a core inside CorvusRetro, then load it immediately. No Android package installer or app restart is needed."
+            --title "CorvusRetro $CORVUS_TAG - RetroAchievements" \
+            --notes "Release-signed native Android frontend with RetroAchievements in normal mode, encrypted account sessions and durable pending awards. Includes six individual native CorvusCore archives for ARM64 and x86_64; download cores inside the app."
 
       - name: Upload catalog metadata for review
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

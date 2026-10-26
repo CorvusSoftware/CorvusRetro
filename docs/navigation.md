@@ -52,13 +52,3 @@ informations d'un vrai cœur, les gestes tap/maintien/reset, une frame lente, le
 menu à un doigt, l'opacité dessinée d'un tap bref, son fondu et la désactivation
 du feedback sans perte d'entrée. Voir [la validation Android](validation-android.md)
 pour les essais et captures sur émulateur.
-
-## Captures
-
-[Réglages](screenshots/settings.png), [listes de lecture](screenshots/playlists.png),
-[informations](screenshots/information.png), [cœur chargé](screenshots/core-information.png).
-
-<p>
-  <img src="screenshots/player.png" width="220" alt="Commandes au repos" />
-  <img src="screenshots/button-pressed.png" width="220" alt="Commande A maintenue et plus opaque" />
-</p>

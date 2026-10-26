@@ -1,9 +1,4 @@
-Objectif : catalogue officiel, sélection, téléchargement ZIP, validation, extraction privée en lecture seule et cœur immédiatement chargeable, sans PackageInstaller.
-Périmètre : service Android, registre et mailbox natifs, génération archives/catalogue, CI et documentation.
-Plan :
-1. Vérifier le mécanisme sur Android15. Fait.
-2. Implémenter téléchargement et stockage conservant les versions actives.
-3. Construire six archives par ABI depuis les modules officiels vérifiés.
-4. Tester installation intégrée, reprise, absence de boîte système, conservation des autres cœurs et jeux.
-5. Review, CI, publier APK signé et archives réelles, promouvoir catalogue vérifié.
-Risques : intégrité native, ABI, remplacement de module utilisé, interruption de téléchargement et migration0.11.
+Objectif : vraie organisation de composants RetroArch, nettoyage utile et succès RetroAchievements natifs.
+Critères : compilationAPKzeroCore, archives6.so sanssplits, chemins cohérents/docscourantes ; login/tokenchiffré, hashROM/chargementsuccès, mémoireofficielle facultative et évaluation parframe, affichageliste/notifications, déconnexion/erreurs/récréation sûres ; pas de fauxhardcore.
+Plan : structure (faite), extensionpublique APIetfournisseur (publiés, CI àsuivre), clientrcheevos (fait/78checks), UI/JNI/IME/HTTPS (en cours), tests etreview, main+CI+version signée+nouveauxZIP/candidatactuel.
+Invariants : codeCorvusoriginal ; ABI0/anciensmodules lisibles ; threadfrontend seul appellecœurs/client ; HTTP/cryptoIOhorsboucle ; credentialspasswordjamaispersisté ; sourcesTLSstrictes ; contenuetsauvegardespréservés ; longstiretsinterdits.

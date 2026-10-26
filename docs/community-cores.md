@@ -2,74 +2,36 @@
 
 Copyright (C) 2026 CorvusSoftware. SPDX-License-Identifier: AGPL-3.0-only.
 
-## Architecture
+CorvusAPI est le contrat natif commun. CorvusCore fournit les moteurs officiels ;
+le frontend conserve ses propres menus, stockage, graphismes et entrées.
+Le registre négocie l'ABI0, vérifie les fonctions obligatoires et les groupes
+optionnels, puis lit les métadonnées fournies par chaque module.
 
-CorvusRetro utilise CorvusAPI comme **contrat natif commun**. CorvusCore
-reste l'implementation des cœurs officiels Game Boy, Game Boy Color et
-Game Boy Advance. L'interface, les moteurs et l'application sont des
-projets independants : leur implementation n'est pas confondue.
+Sur Android, les modules téléchargés proviennent du catalogue officiel. Ils sont
+vérifiés, extraits dans un emplacement privé en lecture seule puis présentés au
+registre. Les cœurs ne sont pas inclus dans la base. Aucun fichier arbitraire du
+stockage externe n'est chargé comme bibliothèque native.
 
-En debut d'execution, CorvusRetro examine uniquement la liste de modules
-**integres dans sa propre compilation**. Pour chaque module, il charge la
-bibliotheque native, demande l'ABI `corvus_get_api`, verifie les fonctions
-obligatoires et lit `get_info`. Seuls les modules compatibles et aux
-identifiants uniques apparaissent dans le gestionnaire de cœurs.
+## Développement de modules
 
-Les noms de modules ne sont plus stockes dans `engine.c` et les noms
-de cœurs, versions, formats et systemes sont fournis par leurs propres
-metadonnees. Les ecrans sont construits depuis ce registre.
+Les tests hôtes peuvent ajouter des sources CorvusAPI via les options CMake
+`CORVUS_EXTRA_CORE_DIRECTORIES` et `CORVUS_EXTRA_CORE_TARGETS`. Chaque cible doit
+être une bibliothèque partagée exportant `corvus_get_api`. Le catalogue généré
+permet de découvrir ses métadonnées sans modifier les tableaux des menus.
 
-## Integration d'un cœur communautaire
+Le catalogue de distribution Android accepte actuellement les trois identités
+officielles. L'ajout d'un autre fournisseur implique une revue de son origine,
+de sa licence, de ses métadonnées et de la compatibilité de ses bibliothèques.
+L'existence du mécanisme d'extension CMake ne contourne pas ces contrôles.
 
-Le distributeur de l'application peut ajouter un repertoire source de
-module CorvusAPI avec l'option CMake
-`CORVUS_EXTRA_CORE_DIRECTORIES`, et nommer ses cibles de bibliotheques
-natives dans `CORVUS_EXTRA_CORE_TARGETS`. Les deux options sont des
-listes CMake, et chacune des cibles doit etre une bibliotheque
-`SHARED_LIBRARY` exportant `corvus_get_api`.
+## Identités et sauvegardes
 
-CMake cree alors un catalogue des bibliotheques produites, et
-CorvusRetro les detecte a partir de leurs metadonnees **sans ajouter
-de ligne dans les tableaux des menus ou de `engine.c`**.
+Le registre est limité à32cœurs. Les indices peuvent différer selon les modules
+présents ; ils ne servent jamais d'identité de stockage. Les identifiants publics
+`corvus.gb`, `corvus.gbc` et `corvus.gba` conservent les suffixes historiques0/1/2.
+Les autres cœurs utilisent un identifiant permanent et un suffixe de stockage
+indépendant de leur position. Voir [les identités de contenu](stable-content-identities.md).
 
-Le frontend ne telecharge pas d'executables natifs et ne charge pas
-les fichiers `.so` arbitraires presents sur le telephone.
-
-Le catalogue est limite a 32 cœurs au total. Les trois moteurs
-officiels conservent leurs positions historiques 0, 1 et 2 pour la
-compatibilite des enregistrements existants.
-
-## Identifiants et sauvegardes
-
-Les identifiants de jeux historiques se terminant par `-0`, `-1`
-et `-2` sont conserves. Des indices decimaux `-3` a `-31` sont
-acceptes pour les paquets et les cœurs additionnels. Le code
-de persistance atomique de CorvusRetro reste inchange.
-
-**Limitation connue** : dans l'ABI et la bibliotheque de jeux actuelles,
-l'identifiant de sauvegarde repose encore sur l'index du cœur dans
-le paquet. Un distributeur doit maintenir le meme ordre de cœurs
-d'une version de son application a la suivante, faute de quoi les
-associations des jeux communautaires peuvent changer. Une migration
-future vers des identifiants de cœurs permanents permettra de lever
-cette limite avant la generalisation de la distribution externe.
-
-## Fonctions optionnelles
-
-Les fonctions de serialisation et de sauvegarde batterie sont des
-groupes optionnels tout-ou-rien, conformement a CorvusAPI. Un module
-n'est pas rejete parce qu'il ne propose pas de sauvegardes batterie.
-Les commandes indisponibles doivent etre gerees sans dereferencement
-de pointeurs `NULL`.
-
-## Stabilisation
-
-CorvusAPI est toujours en **ABI version 0**. Avant de publier une
-version 1.0 stable, il faudra normaliser les extensions de type
-capteurs, manettes, vibration, BIOS et cheats, traiter l'identification
-permanente des jeux communautaires et valider la compatibilite ABI
-C/C++ sur les plateformes cibles. L'existence d'un registre dynamique
-ne garantit pas a elle seule une ABI stable.
-
-Les adaptateurs CorvusCore conservent AGPL-3.0-only, l'application
-CorvusRetro reste sous AGPL-3.0-only et le contrat CorvusAPI demeure MIT.
+Les groupes de sérialisation et de batterie sont optionnels et cohérents : tout
+le groupe est présent ou absent. L'absence d'une capacité ne rend pas les autres
+fonctions du cœur invalides. CorvusAPI0 demeure une ABI expérimentale.

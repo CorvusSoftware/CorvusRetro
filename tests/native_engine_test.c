@@ -143,7 +143,17 @@ int main(void) {
                   strcmp(info.version, CR_CORE_VERSION) == 0,
               "pinned core version via CorvusAPI", &engine);
         check(!cr_engine_step(&engine, 0), "idle frame rejected", &engine);
+        const uint32_t consoles[] = {4, 6, 5};
+        uint8_t achievement_byte = 0;
+        check(engine.achievements.api_version == CORVUS_ACHIEVEMENTS_API_VERSION &&
+                  engine.achievements.console_id == consoles[system] && engine.achievements.read_memory,
+              "negotiate optional memory extension through the loaded module", &engine);
+        check(cr_engine_read_achievement_memory(&engine, 0, &achievement_byte, 1) == 0,
+              "idle core has no readable achievement memory", &engine);
         check(cr_engine_open(&engine, system, ids[system], roms[system]), "load content", &engine);
+        check(cr_engine_read_achievement_memory(&engine, system == 2 ? 0 : 0xc000, &achievement_byte, 1) == 1 &&
+                  cr_engine_read_achievement_memory(&engine, UINT32_MAX, &achievement_byte, 1) == 0,
+              "frontend reads only valid provider memory after game loading", &engine);
         check(engine.loaded && engine.width == (system == 2 ? 240 : 160) &&
                   engine.height == (system == 2 ? 160 : 144),
               "dimensions", &engine);

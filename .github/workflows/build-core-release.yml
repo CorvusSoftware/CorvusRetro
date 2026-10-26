@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   build:
-    name: Signed base and individual cores
+    name: Signed base and native cores
     if: >-
       github.repository == 'CorvusSoftware/CorvusRetro' &&
       ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
@@ -126,17 +126,15 @@ jobs:
           actual=$(sha256sum "$RUNNER_TEMP/corvus-release-cert.der" | cut -d' ' -f1)
           test "${actual,,}" = "${RELEASE_CERT,,}" || { echo "Pinned release certificate mismatch"; exit 1; }
 
-      - name: Build the signed base and three feature APKs
+      - name: Build the signed base and native modules
         env:
           CORVUS_RELEASE_STORE_PASSWORD: ${{ secrets.CORVUS_RELEASE_STORE_PASSWORD }}
           CORVUS_RELEASE_KEY_ALIAS: ${{ secrets.CORVUS_RELEASE_KEY_ALIAS }}
           CORVUS_RELEASE_KEY_PASSWORD: ${{ secrets.CORVUS_RELEASE_KEY_PASSWORD }}
         run: |
-          ./gradlew --no-daemon :app:assembleRelease \
-            :features:coregb:assembleRelease :features:coregbc:assembleRelease \
-            :features:coregba:assembleRelease
+          ./gradlew --no-daemon :app:assembleRelease
 
-      - name: Validate all four signed APKs
+      - name: Validate the signed base and native modules
         env:
           RELEASE_CERT: ${{ secrets.CORVUS_RELEASE_CERT_SHA256 }}
         run: |
@@ -149,29 +147,34 @@ jobs:
       - name: Stage signed artifacts and provenance
         run: |
           mkdir -p build/signed-preview
-          cp app/build/outputs/apk/release/app-release.apk build/signed-preview/CorvusRetro-0.12-base-release.apk
-          cp features/coregb/build/outputs/apk/release/coregb-release.apk build/signed-preview/CorvusGB.apk
-          cp features/coregbc/build/outputs/apk/release/coregbc-release.apk build/signed-preview/CorvusGBC.apk
-          cp features/coregba/build/outputs/apk/release/coregba-release.apk build/signed-preview/CorvusGBA.apk
+          cp pkg/android/app/build/outputs/apk/release/app-release.apk build/signed-preview/CorvusRetro-base-release.apk
+          for core in gb gbc gba; do
+            for abi in arm64-v8a x86_64; do
+              cp "pkg/android/app/build/native-cores/Release/$abi/libcorvus_$core.so" \
+                "build/signed-preview/libcorvus_$core-$abi.so"
+            done
+          done
           python3 - <<'PY'
           import json, os, subprocess
           from pathlib import Path
           def revision(path):
               return subprocess.check_output(['git', '-C', path, 'rev-parse', 'HEAD'], text=True).strip()
           data = {'source_sha': os.environ['SOURCE_SHA'],
-                  'corvuscore_sha': revision('third_party/CorvusCore'),
-                  'corvusapi_sha': revision('third_party/CorvusCore/third_party/CorvusAPI')}
+                  'corvuscore_sha': revision('deps/CorvusCore'),
+                  'corvusapi_sha': revision('deps/CorvusCore/third_party/CorvusAPI'),
+                  'rcheevos_sha': revision('deps/rcheevos')}
           Path('build/signed-preview/source.json').write_text(json.dumps(data, indent=2) + '\n')
           PY
-          (cd build/signed-preview && sha256sum *.apk source.json > SHA256SUMS)
-          echo "Signed qualification APKs only. No Release or catalog was published." >> "$GITHUB_STEP_SUMMARY"
+          (cd build/signed-preview && sha256sum *.apk *.so source.json > SHA256SUMS)
+          echo "Signed base and native qualification inputs only. No Release or catalog was published." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the signed qualification build
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: CorvusRetro-0.12-signed-${{ env.SOURCE_SHA }}
+          name: CorvusRetro-signed-${{ env.SOURCE_SHA }}
           path: |
             build/signed-preview/*.apk
+            build/signed-preview/*.so
             build/signed-preview/source.json
             build/signed-preview/SHA256SUMS
           if-no-files-found: error

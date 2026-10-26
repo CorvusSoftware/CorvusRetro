@@ -10,9 +10,9 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 OFFICIAL_CORES = {
-    "corvus.gb": ("coregb", "libcorvus_gb.so", "CorvusGB"),
-    "corvus.gbc": ("coregbc", "libcorvus_gbc.so", "CorvusGBC"),
-    "corvus.gba": ("coregba", "libcorvus_gba.so", "CorvusGBA"),
+    "corvus.gb": ("libcorvus_gb.so", "CorvusGB"),
+    "corvus.gbc": ("libcorvus_gbc.so", "CorvusGBC"),
+    "corvus.gba": ("libcorvus_gba.so", "CorvusGBA"),
 }
 COLUMNS = {"id", "name", "description", "version", "abi", "sha256", "size",
            "archive_url", "library_name", "api_version"}
@@ -32,7 +32,7 @@ def valid_cores(raw):
             raise ValueError("invalid core fields")
         if not isinstance(item["id"], str) or item["id"] not in OFFICIAL_CORES:
             raise ValueError("unknown official core")
-        if item["library_name"] != OFFICIAL_CORES[item["id"]][1]:
+        if item["library_name"] != OFFICIAL_CORES[item["id"]][0]:
             raise ValueError("core and native library do not match")
         for field in ("name", "description"):
             value = item[field]

@@ -1,7 +1,7 @@
 // CorvusRetro - CorvusSoftware
 // Copyright (C) 2026 CorvusSoftware
 // SPDX-License-Identifier: AGPL-3.0-only
-#include "frontend.h"
+#include "menu_driver.h"
 #include "viewport.h"
 #include <stdio.h>
 #include <stdlib.h>

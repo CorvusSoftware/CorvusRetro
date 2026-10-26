@@ -1,6 +1,0 @@
-// CorvusRetro - CorvusSoftware
-// Copyright (C) 2026 CorvusSoftware
-// SPDX-License-Identifier: AGPL-3.0-only
-plugins { id 'com.android.dynamic-feature' }
-ext.corvusCore = 'gb'
-apply from: rootProject.file('features/core-module.gradle')

@@ -32,30 +32,38 @@ def verify_elf(data, abi):
         raise ValueError("missing loadable CorvusAPI module")
 
 
-def build(variant, output, tag, version):
+def provider_version():
+    source = Path("deps/CorvusCore/CMakeLists.txt").read_text(encoding="utf-8")
+    match = re.search(r"\bproject\(\s*CorvusCore\s+VERSION\s+([0-9]+\.[0-9]+\.[0-9]+)\b", source)
+    if not match:
+        raise ValueError("cannot determine the pinned CorvusCore version")
+    return match.group(1)
+
+
+def build(variant, output, tag, version=None):
+    version = version or provider_version()
     output.mkdir(parents=True, exist_ok=True)
     entries = []
-    for core_id, (split, library, name) in OFFICIAL_CORES.items():
-        apk = Path(f"features/{split}/build/outputs/apk/{variant}/{split}-{variant}.apk")
-        with zipfile.ZipFile(apk) as source:
-            for abi in ("arm64-v8a", "x86_64"):
-                data = source.read(f"lib/{abi}/{library}")
-                verify_elf(data, abi)
-                archive = output / f"{name}-{version}-android-{abi}.zip"
-                info = zipfile.ZipInfo(library, (2026, 1, 1, 0, 0, 0))
-                info.external_attr = 0o100444 << 16
-                info.compress_type = zipfile.ZIP_DEFLATED
-                with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as target:
-                    target.writestr(info, data)
-                entries.append({
-                    "id": core_id, "name": name,
-                    "description": {"corvus.gb": "Game Boy", "corvus.gbc": "Game Boy Color",
-                                    "corvus.gba": "Game Boy Advance"}[core_id],
-                    "version": version, "abi": abi, "api_version": 0,
-                    "library_name": library, "size": archive.stat().st_size,
-                    "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
-                    "archive_url": f"https://github.com/CorvusSoftware/CorvusRetro/releases/download/{tag}/{archive.name}",
-                })
+    for core_id, (library, name) in OFFICIAL_CORES.items():
+        for abi in ("arm64-v8a", "x86_64"):
+            module = Path("pkg/android/app/build/native-cores") / variant.capitalize() / abi / library
+            data = module.read_bytes()
+            verify_elf(data, abi)
+            archive = output / f"{name}-{version}-android-{abi}.zip"
+            info = zipfile.ZipInfo(library, (2026, 1, 1, 0, 0, 0))
+            info.external_attr = 0o100444 << 16
+            info.compress_type = zipfile.ZIP_DEFLATED
+            with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as target:
+                target.writestr(info, data)
+            entries.append({
+                "id": core_id, "name": name,
+                "description": {"corvus.gb": "Game Boy", "corvus.gbc": "Game Boy Color",
+                                "corvus.gba": "Game Boy Advance"}[core_id],
+                "version": version, "abi": abi, "api_version": 0,
+                "library_name": library, "size": archive.stat().st_size,
+                "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
+                "archive_url": f"https://github.com/CorvusSoftware/CorvusRetro/releases/download/{tag}/{archive.name}",
+            })
     catalog = {"format": 3, "cores": entries}
     valid_cores(catalog)
     return catalog
@@ -67,7 +75,7 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--catalog", type=Path, required=True)
     parser.add_argument("--tag", required=True)
-    parser.add_argument("--version", default="0.14.1")
+    parser.add_argument("--version", help="Override the pinned provider version for a qualified custom build")
     args = parser.parse_args()
     if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", args.tag):
         parser.error("invalid release tag")

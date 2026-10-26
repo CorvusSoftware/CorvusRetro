@@ -1,7 +1,0 @@
-// CorvusRetro - CorvusSoftware
-// Copyright (C) 2026 CorvusSoftware
-// SPDX-License-Identifier: AGPL-3.0-only
-plugins {
-    id 'com.android.application' version '8.9.1' apply false
-    id 'com.android.dynamic-feature' version '8.9.1' apply false
-}

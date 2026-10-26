@@ -1,3 +1,9 @@
-L’ancienne architecture imposait à tort des APK comme nécessité du targetSDK35. Le test réel native_probe réussit sur API35 : bibliothèque officielle copiée en stockage privé, marquée en lecture seule, System.load réussi. Android10 limite execve, ce qui ne prouve pas une interdiction générale de dlopen.
-RetroArch : tasks/task_core_updater.c télécharge et extrait, libretro-common/dynamic/dylib.c appelle dlopen; le Play Store possède une autre branche PlayFeatureDelivery. Stable1.22.2 utilise cible28 hors Play mais notre preuve permet de garder35.
-Ne pas recopier code ni ABI libretro; adapter le parcours à CorvusAPI0.
+RetroArch est une référence d'organisation et de comportement, pas une source à recopier.
+Référence examinée : dda31fef21aeb472be9de7ee53eb386cc8db1417, cheevos/cheevos.c et callbacks rc_client.
+rcheevos officiel MIT assure protocole, hash et évaluation ; code frontend original AGPL.
+L'extension facultative corvus_get_achievements_api est dans le header public unique corvusapi.h, ABI0 inchangée.
+Tous les accès au client et à la RAM appartiennent au thread frontend ; HTTPS/crypto/disque appartiennent aux services.
+Les succès doivent survivre à la fermeture du jeu ; file chiffrée persistée avant envoi et invalidée à la déconnexion.
+Les lectures du frontend ne doivent pas attendre les verrous de chiffrement ou les écritures disque.
+Le targetSDK35 accepte dlopen des modules privés vérifiés en lecture seule, prouvé sur Android15 ; aucune baisse de cible.
+Conserver les identités et sauvegardes historiques, les anciens catalogues et le signataire durable de la base.

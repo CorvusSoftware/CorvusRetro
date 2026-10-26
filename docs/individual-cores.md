@@ -1,4 +1,4 @@
-# Cœurs natifs CorvusRetro 0.12
+# Cœurs natifs CorvusRetro
 
 Copyright (C) 2026 CorvusSoftware. SPDX-License-Identifier: AGPL-3.0-only.
 
@@ -53,11 +53,11 @@ Un échec conserve les anciens cœurs. Aucun installateur de paquets n'intervien
 
 ## Publication
 
-Les projets features/coregb, coregbc et coregba servent de builders natifs.
-La CI vérifie leurs APK et leur signature avec celle de la base, puis
-`tools/build_core_archives.py` extrait les bibliothèques et crée six ZIP déterministes
-(un cœur et une ABI), vérifiant ELF, export CorvusAPI et segments16Ko.
-Le publisher réutilise la base signée qualifiée et publie les ZIP. Il génère
-cores-v3.json sur une branche de revue ; le catalogue n'est promu qu'après
-vérification des assets publics. Aucune URL ou empreinte fictive n'est publiée.
-Les anciens cores-v2.json et index.json gardent leurs formats et leurs assets.
+Le build NDK compile directement les trois moteurs pour les deux architectures.
+Gradle exclut ces bibliothèques de l'APK de base. Les modules sont disponibles dans
+`pkg/android/app/build/native-cores/<Debug|Release>/<ABI>/`.
+`tools/build_core_archives.py` vérifie les ELF et crée six ZIP déterministes.
+La CI signe uniquement la base Android et conserve la provenance et les empreintes
+des six bibliothèques. Le publisher réutilise ces fichiers qualifiés sans reconstruire
+les moteurs, puis génère le catalogue sur une branche de revue.
+Les anciens cores-v2.json et index.json restent servis pour leurs clients publiés.

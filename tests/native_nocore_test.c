@@ -2,7 +2,7 @@
 // Copyright (C) 2026 CorvusSoftware
 // SPDX-License-Identifier: AGPL-3.0-only
 #define _POSIX_C_SOURCE 200809L
-#include "frontend.h"
+#include "menu_driver.h"
 #include "core_registry.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -46,6 +46,6 @@ int main(void) {
     check(ui.page == CR_MAIN, "back navigation works without installed cores");
 
     cr_ui_destroy(&ui);
-    puts("PASS core-free CorvusRetro 0.12");
+    puts("PASS core-free CorvusRetro 0.13");
     return 0;
 }

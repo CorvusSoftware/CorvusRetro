@@ -2,10 +2,9 @@
 # CorvusRetro - CorvusSoftware
 # Copyright (C) 2026 CorvusSoftware
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Check a base and its three build outputs before distributing individual cores.
+"""Check the core-free Android base and six native archive inputs.
 
-Debug checks compare their signing identities. Release publication additionally
-requires the independently pinned certificate supplied by the caller.
+Release publication requires an independently pinned base certificate.
 """
 import argparse
 import re
@@ -13,8 +12,9 @@ import subprocess
 import zipfile
 from pathlib import Path
 
-from register_core_split import package_info, verify_signer
-from validate_core_splits import OFFICIAL_CORES
+from android_artifacts import package_info, verify_signer
+from validate_core_archives import OFFICIAL_CORES
+from build_core_archives import verify_elf
 
 
 def main():
@@ -25,7 +25,7 @@ def main():
     parser.add_argument("--zipalign", default="zipalign")
     parser.add_argument("--expected-cert-sha256")
     args = parser.parse_args()
-    base = Path(f"app/build/outputs/apk/{args.variant}/app-{args.variant}.apk")
+    base = Path(f"pkg/android/app/build/outputs/apk/{args.variant}/app-{args.variant}.apk")
     result = subprocess.run([args.apksigner, "verify", "--print-certs", str(base)],
                             text=True, capture_output=True, check=True)
     certificates = re.findall(r"Signer #\d+ certificate SHA-256 digest:\s*([0-9a-fA-F]{64})",
@@ -44,23 +44,12 @@ def main():
         expected = {f"lib/{abi}/libcorvusretro.so" for abi in ("arm64-v8a", "x86_64")}
         if libraries != expected:
             parser.error("base APK must contain only the frontend for both ABIs")
-    files = [base]
-    for split, library, _ in OFFICIAL_CORES.values():
-        apk = Path(f"features/{split}/build/outputs/apk/{args.variant}/{split}-{args.variant}.apk")
-        verify_signer(apk, args.apksigner, pin.lower())
-        info = package_info(apk, args.aapt)
-        if (info.get("split") != split or info["versionCode"] != base_info["versionCode"] or
-                info.get("versionName") != base_info.get("versionName")):
-            parser.error("feature split name or base version mismatch")
-        with zipfile.ZipFile(apk) as archive:
-            libraries = {n for n in archive.namelist() if n.startswith("lib/") and n.endswith(".so")}
-            expected = {f"lib/{abi}/{library}" for abi in ("arm64-v8a", "x86_64")}
-            if libraries != expected:
-                parser.error("feature must contain only its own emulator for both ABIs")
-        files.append(apk)
-    for apk in files:
-        subprocess.run([args.zipalign, "-c", "-P", "16", "4", str(apk)], check=True)
-    print("PASS base and three independent cores: package, version, signatures, ABIs and alignment")
+    for library, _ in OFFICIAL_CORES.values():
+        for abi in ("arm64-v8a", "x86_64"):
+            module = Path("pkg/android/app/build/native-cores") / args.variant.capitalize() / abi / library
+            verify_elf(module.read_bytes(), abi)
+    subprocess.run([args.zipalign, "-c", "-P", "16", "4", str(base)], check=True)
+    print("PASS signed core-free base and six native modules: package, signature, ABIs and 16 KB alignment")
 
 
 if __name__ == "__main__":

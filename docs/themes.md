@@ -1,7 +1,7 @@
 # Thèmes de CorvusRetro
 
 Les palettes et tous les rôles du rendu sont définis en C dans
-`app/src/main/cpp/theme.c`. Java stocke le choix et applique aux barres système
+`menu/theme.c`. Java stocke le choix et applique aux barres système
 la couleur ARGB transmise par le frontend natif.
 
 ## CorvusRetro par défaut

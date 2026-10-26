@@ -1,281 +1,64 @@
-# Qualification 0.12 : archives natives individuelles
+# Validation Android et native
 
-Vérification du 26 octobre 2026, cible API 35 conservée.
+Le build et les tests sont indépendants de l'agencement du projet Gradle.
+Le code portable est construit par le CMake racine ; le wrapper `./gradlew`
+exécute le projet de `pkg/android/`.
 
-- Six tests CTest normaux et six sous ASan/UBSan réussis, y compris remplacement
-  d'un module à chemin différent pendant un jeu actif et conservation des capacités.
-- Zéro cœur au départ : test natif séparé réussi. Dix-neuf tests Python réussis
-  pour catalogues historiques, archives et contrôles de publication.
-- Gradle assembleDebug, assembleDebugAndroidTest et lintDebug réussis. Base et
-  trois builders vérifiés : identités, signatures, architectures et alignement 16 Ko.
-- Android 15 x86_64 :39 contrôles réels catalogue/stockage/service réussis, avec les
-  véritables bibliothèques compilées. Extraction vers files/cores, lecture seule,
-  chargement natif, ajout cumulatif, reprise après recréation pendant transfert,
-  refus de hash/ABI/traversal, téléchargement tronqué sans perte des modules.
-- Android 15 : anciens jeux GB et GBA réellement joués depuis files/cores, puis
-  déchargés/rechargés. La batterie GBA historique suffixe-2 est identique par SHA-256
-  à la version précédente. Aucun crash natif et seule permission INTERNET demandée.
-- La liste native puis le chargement d'un cœur ont été capturés dans la même
-  activité après téléchargement, sans redémarrage et sans session PackageInstaller.
-
-Le transport HTTPS est une fixture déterministe dans l'instrumentation, afin
-que les défauts de CA du proxy de laboratoire ne conditionnent pas ces tests.
-La validation TLS publique de production reste stricte. Ces preuves ne sont
-pas une qualification de téléphone physique ni d'exécution ARM64.
-
-Publication : source1c50916, CI Android40342714444, build signé40343296103 et
-publisher40343898470 réussis. Les sept fichiers de v0.12.0 ont été téléchargés :
-la base0.12/code13 utilise le certificat de confiance indépendant des versions
-précédentes ; les six ZIP contiennent le bon module et respectent les architectures
-et segments 16 Ko. Le catalogue a été reproduit à l'identique depuis leurs vrais octets.
-
-Les39contrôles d'instrumentation ont aussi été repassés avec les véritables ZIP
-publiés, avec succès. Sur Android10, le véritable APK signé0.12 a remplacé la
-version0.11 en place ; les captures confirment le thème ASUS et l'historique conservés.
-
-## Qualifications historiques
-
-# Validation Android
-
-## Version 0.11 : cœurs Android individuels
-
-La base et trois APK de fonctionnalité distincts sont construits ensemble :
-package commun, versionCode12/versionName0.11.0, signatures identiques, ARM64 et
-x86_64, contrôle d'alignement 16 Ko. La base contient seulement libcorvusretro.so ;
-chaque module contient uniquement son propre module CorvusAPI.
-
-Preuves locales avant publication :
-
-- Six suites CTest normales et ASan/UBSan ; le nouveau test démarre sans registre,
-  ajoute GBA seul à l'indice0 puis GB/GBC, conserve les identifiants historiques
-  et vérifie import, commandes GBA et batteries suffixées `-2`.
-- Test natif zéro cœur ; quinze tests Python pour catalogue0.10, catalogue0.11 et
-  portes réelles des workflows de signature/publication (source, fork, SHA, tag,
-  hash et provenance).
-- Compilation de la base, des trois modules et des tests Android ; lintDebug passe.
-- Android 15 x86_64 : GBA seul installé par Android, puis ajout GB avec
-  MODE_INHERIT_EXISTING ; GBA reste présent et chargé. Les bibliothèques sont
-  extraites dans le répertoire système du package, non modifiable par l'application.
-- Vrai programme GBA original exécuté avec ses commandes L/R. Son fichier batterie
-  historique `SHA-2.sav` conserve les mêmes octets après ajout de GB et changement
-  d'indice dans le registre. Un GB existant reste jouable.
-- Instrumentation Android :37 contrôles de catalogue, types JSON, identités et
-  cycle d'installation ; vraie session en attente, recréation Activity puis
-  annulation. Une session scellée est retrouvée après mort du processus, et les
-  callbacks d'une ancienne opération ne libèrent pas une nouvelle opération.
-- Confirmation différée en arrière-plan, affichée au retour au premier plan ;
-  annulation sans boucle. Une vraie session créée par l'UID de l'application est
-  appliquée après UPDATE, et le lancement suivant réconcilie son état terminé.
-  Un callback final peut être perdu lors de la mise à jour du package lui-même.
-- Revue indépendante des outils, workflows et de la correction du cycle de vie :
-  aucun finding concret restant. Le défaut initial de perte de barrière lors
-  d'une recréation Activity a été corrigé avant publication.
-
-Les captures et journaux restent hors git. Après publication de la préversion
-v0.11.0, les quatre APK réels ont été téléchargés et leurs certificats comparés
-à celui de l'ancienne release0.10 déjà installée. Les six entrées du catalogue
-ont été reproduites indépendamment depuis ces APK : mêmes URL, tailles et SHA-256.
-
-Android10 x86_64 : mise à niveau de la vraie release11 vers la base12, historique
-GBA et thème ASUS conservés, aucun moteur dans la base. Ajout GBA seul, reprise
-du jeu existant, ajout GB puis GBC sans retirer les autres modules ; reprise du
-même GBA après changement d'indice. Android refuse un module debug dont le
-certificat est différent et refuse la réinstallation de la base11 plus ancienne,
-sans altérer les trois modules présents.
-
-L'installation de modules a été exercée avec les API système et avec une session
-créée par l'UID de l'application. Le transport HTTPS est vérifié depuis le
-workspace ; le proxy TLS privé de l'environnement empêche de qualifier ce
-transport depuis les émulateurs sans installer sa CA système. Aucun contrôle
-TLS de l'application n'a été désactivé ou modifié pour contourner cette limite.
-Aucune qualification sur téléphone physique ou d'exécution ARM64 n'est revendiquée.
-
-## Reprise 0.10 : ligne unique et migration CorvusAPI
-
-Reprise sur main `54cb1b7`, sans modifier les nouveaux modules, le téléchargeur,
-les identités de contenu ou les sous-modules. La ligne « Charger un cœur » devient
-« Décharger le cœur » dès qu'une instance existe, même sans jeu. Un contenu actif
-ajoute le menu rapide avant cette ligne. Un échec batterie garde le jeu et l'action
-Décharger ; une nouvelle tentative après correction du stockage fonctionne.
-
-Preuves exécutées sur cette modification :
-
-- Cinq suites CTest normales et ASan/UBSan, avec les modules officiels explicites.
-- Test natif zéro cœur et cinq tests du catalogue officiel.
-- Régression menu avec ROM GBA originale écrivant en SRAM, obstruction du dossier
-  de sauvegarde, conservation de la session puis déchargement avec sauvegarde réussie.
-- `:app:assembleDebug :app:lintDebug` pour la base ; `-PcorvusCores=gb,gbc,gba
-  :app:assembleDebug` pour le pack. Les deux APK passent signature et alignement 16 Ko.
-- Inspection ZIP : base limitée à libcorvusretro.so ; pack avec les trois modules
-  officiels ; présence vérifiée pour ARM64 et x86_64.
-- Revue indépendante du comportement et du contrat proposé : aucun finding concret.
-
-Android 15 x86_64, données existantes conservées : base sans cœur, accès au
-téléchargeur depuis les deux actions de chargement et retour arrière ; pack avec
-chargement/déchargement des trois cœurs, informations du cœur GB, ligne unique en
-portrait et paysage. Un GB déjà présent est ouvert depuis sa liste, puis déchargé
-depuis le menu principal après le menu rapide. Les captures restent hors git selon
-les nouvelles conventions. Le lanceur Quickstep puis SystemUI ont présenté des
-boîtes ANR avant stabilisation ; les essais valides ont été repris ensuite.
-
-Le câble link n'est pas activé : CorvusAPI0 ne fournit aucune déclaration de
-sous-systèmes ou liaison. Le [contrat proposé](subsystems-corvusapi-proposal.md)
-doit d'abord être traité dans CorvusAPI, puis dans l'adaptateur CorvusCore.
-Aucun essai sur téléphone physique ou d'exécution ARM64 n'est revendiqué.
-
-## Version 0.9 : feedback et catégories
-
-Cinq suites CTest passent normalement et sous ASan/UBSan. `native_menu` couvre :
-arborescence réelle, informations d'un cœur chargé, retour avec filtre/sélection
-conservés, fondu du toucher, tap/maintien/reset, timestamps indépendants du rendu,
-menu à un doigt, annulation et défilement. Il vérifie aussi le premier flash d'un
-tap malgré une frame lente et la consommation des pulses moteur, son extinction
-sans entrée coincée, et la désactivation du feedback sans perte d'entrée.
-Revue indépendante et compléments latch visuel/reset : aucun problème bloquant.
-APK ARM64/x86_64 et lint sans erreur ; signature et alignement 16Ko vérifiés.
-
-Sur Android 15 x86_64 (480x960, densité200, sans KVM), données 0.8 conservées :
-
-- Nouveaux réglages et retour dans les parents ; maintien d'une catégorie sans ouverture, puis tap pour l'ouvrir.
-- Réglage audio : maintien court sans modification, tap modifie la valeur sauvegardée, restauration de la valeur initiale.
-- Afficher les appuis désactivé, choix conservé après redémarrage, puis réactivé.
-- Historique dans Listes de lecture ; GB existant réellement relancé depuis sa liste.
-- Commande A tenue : comparaison des pixels de sa zone entre repos/appui/relâchement ; l'appui diffère, le relâchement retrouve exactement le repos.
-- Informations du vrai cœur GB, accès au menu rapide depuis le menu principal et reprise, menu central après rotation.
-- APK final réinstallé : appui de1200ms sur Audio désactivé restaure effectivement la préférence activée ; retour Audio/Réglages/Menu principal correct.
-- Aucun crash fatal de CorvusRetro observé ; le démarrage de l'émulateur a de nouveau présenté une boîte SystemUI avant stabilisation et essais valides.
-
-[Références et captures](navigation.md). Les gestes multitouch simultanés restent
-vérifiés dans le modèle C ; pas de qualification sur téléphone physique.
-
-## Version 0.8 : écran et commandes
-
-Quatre suites CTest passent normalement et sous ASan/UBSan, dont `native_controls`.
-Cette dernière couvre trois systèmes et dix tailles de fenêtre : ratios natifs,
-cibles dans les limites et sans collisions, diagonales/centre neutre, menu central,
-rendu sans titre, correspondance entre l'icône dessinée et son toucher, pause avec
-un autre doigt sur A, reprise, déplacement et annulation sans entrée coincée.
-APK ARM64/x86_64, lint, signature et alignement 16 Ko passent. Revue indépendante :
-aucun problème bloquant relevé.
-
-Essais Android 15 x86_64, 480 x 960, densité 200, sans KVM :
-
-- Import GB réel par le sélecteur Android ; vidéo et commandes séparées en portrait, menu tactile central puis reprise par Retour Android.
-- Appui sur A recalibré : modification des pixels du programme GB original, prouvant l'entrée dans le moteur.
-- Portrait/paysage/portrait : contenu conservé, proportions natives respectées, menu central utilisable après rotation et fermeture du contenu par le menu rapide.
-- Import GBA réel : boutons L/R visibles et menu central utilisable en portrait et paysage ; aucun crash fatal de CorvusRetro observé. La fixture GBA teste la batterie et affiche un fond noir.
-- Surface utile portrait `0,30,480,900`, paysage `0,30,900,480` ; les barres Android restent séparées du lecteur.
-- Comme en 0.7, le démarrage à froid a montré une boîte ANR de SystemUI de l'émulateur, avant les essais valides de CorvusRetro.
-
-Captures : [portrait](screenshots/player.png), [paysage](screenshots/player-landscape.png),
-[menu rapide](screenshots/quick-menu.png), [GBA portrait](screenshots/player-gba.png),
-[GBA paysage](screenshots/player-gba-landscape.png). Références et géométrie dans
-[les commandes](controls.md). Pas de qualification sur téléphone physique.
-
-## Version 0.7 : marges système et retrait du thème sombre
-
-Le service Android publie un snapshot immuable des dimensions de la fenêtre et
-des marges des barres système/encoches. La surface NativeActivity utilise les
-coordonnées de la fenêtre entière sur toutes les versions prises en charge.
-Le rendu C en déduit le viewport, le clipping et la même origine tactile.
-Un snapshot d'orientation périmée est rejeté. Aucune marge en dp n'est codée en dur.
-
-CTest `native_viewport` couvre barres haut/bas, navigation gestuelle, encoche,
-barre latérale en paysage, rotation, surface déjà réduite et valeurs transitoires
-invalides. Les trois suites CTest passent avec et sans ASan/UBSan.
-Le catalogue C ne contient plus que CorvusRetro, NVIDIA Shield et ASUS ; l'ancien
-ID `1` revient à Corvus sans réassigner les IDs publiés `0`, `2`, `3`.
-APK et lint sans erreur, signature et alignement 16 Ko vérifiés.
-Revue indépendante : aucun problème bloquant relevé.
-
-Sur Android 10 x86_64, 480 x 960, densité 200 :
-
-- Surface complète 480 x 960, viewport portrait `0,30,480,900` : horloge et navigation entièrement séparées du menu.
-- Paysage : surface 960 x 480, viewport `0,30,900,480`, barre de navigation à droite respectée ; retour en portrait correct.
-- Chargement/déchargement tactiles en portrait et paysage, dont cœur GBA après rotation.
-- Ancienne clé `dark` injectée dans les préférences de test : remplacée par `corvus`, démarrage avec le thème Corvus, données conservées.
-- Les trois choix du catalogue sont sélectionnables, persistants après relance ; captures actualisées.
-- Installation finale 0.7.0/code7 et démarrage réussis, aucun crash Android observé.
-
-
-Sur Android 15 x86_64 (API35, APK ciblant35), même résolution/densité :
-
-- Le menu natif réserve bien le viewport `0,30,480,900` dans la surface pleine fenêtre `480x960` ; titre et onglets hors des barres.
-- Chargement puis déchargement d'un cœur par toucher, catalogue réduit à trois choix, sélection ASUS et retour au menu vérifiés.
-- Paysage : surface `960x480`, viewport `0,30,900,480` ; chargement tactile GBC réussi avec la barre de navigation à droite.
-- La zone de barre Corvus garde `#090D14`, vérifiée sur la capture de l'APK final.
-- Le démarrage à froid sans KVM a provoqué un ANR de SystemUI de l'émulateur ; la boîte a été fermée avant les essais de CorvusRetro. Ce blocage de l'environnement n'est pas compté comme un essai applicatif réussi.
-
-## Version 0.6 : thèmes
-
-Tests CTest passés pour les quatre choix, le nouveau défaut Corvus, les valeurs
-inconnues et les identifiants historiques. Build APK et lint sans erreur.
-Revue indépendante : aucun finding bloquant sur les préférences et les rôles
-visuels du thème clair.
-
-Sur émulateur Android 10 x86_64 : préférence Shield 0.5 conservée après mise à
-jour, Corvus et ASUS conservés après relance, lecteur et menu rapide ASUS lisibles,
-retour aux anciens thèmes sombre et Shield avec persistance, puis absence de
-préférence simulée sans supprimer contenus/sauvegardes : démarrage Corvus confirmé.
-Captures des quatre choix et du nouveau catalogue réalisées ; aucun crash observé.
-
-## Frontend natif 0.5
-
-## Tests hôtes et construction
-
-- CMake compile réellement les fichiers du frontend en C11 ; les moteurs CorvusCore restent en C++20.
-- CTest `native_engine` : GB/GBC/GBA réels, cœur vide, frames ARGB/PCM, reset, états disque, batterie, fermeture/rechargement et refus de contenu invalide sans perdre le moteur courant.
-- Tests de panne disque : un échec d'écriture bloque remplacement et fermeture, conserve la batterie sale et permet une reprise. La réouverture du même jeu persiste la RAM récente avant de relire la batterie.
-- CTest `native_frontend` : navigation tactile/manette, thèmes, annulation, association des extensions, appuis simultanés, annulation des entrées, impulsion courte, pause et défilement du menu rapide en paysage.
-- AddressSanitizer et UndefinedBehaviorSanitizer exécutés sur notre C portable et ses tests, SDK non instrumenté.
-- APK ARM64/x86_64 et lint Android sans erreur.
-- Revue indépendante : résultat SAF conservé avant initialisation du Looper, focus du menu rapide visible en paysage et veille limitée au jeu actif.
-
-## Exécution Android
-
-Émulateur AOSP Android 10 x86_64, 480 × 960 pixels, densité 200, sans KVM.
-Les essais utilisent les programmes synthétiques originaux générés par
-`python tests/generate_roms.py`. Aucun jeu commercial ou BIOS constructeur.
-
-Scénarios exécutés sur le frontend natif :
-
-- Démarrage NativeActivity, menus/rendu C OpenGL, chargement/remplacement/déchargement des trois cœurs sans contenu.
-- Onglets, historique existant et choix natif des thèmes Shield et sombre, avec préférences Android.
-- GB : appui A avec changement effectif de palette, état enregistré sur disque, seconde modification et restauration avec pixels identiques.
-- Arrière-plan/reprise : session et image conservées.
-- Rotation portrait/paysage/portrait : EGL recréé, moteur conservé et menu rapide utilisable avec focus défilant.
-
-Sur l'APK avec liaison JNI corrigée :
-
-- Annulation SAF : retour au menu C, puis un nouvel import reste possible.
-- Contenu invalide : refus, cœur non chargé et liste des fichiers ROM identique avant/après, sans temporaire résiduel.
-- Import GBC et GBA : système associé en C, contenu réellement exécuté et fermeture native.
-- Nouvelle batterie GBA : fichier de notre fixture supprimé avant lancement, puis première valeur disque `0x5a` vérifiée après fermeture.
-- Aucun crash dans le buffer Android de cette exécution corrigée.
-- Un état GBA créé par le lecteur 0.4 a été chargé par le lecteur C 0.5, sans conversion.
-- Crédits et licence natifs, défilement, Retour Android et menu à 320 dp vérifiés.
-- L'horloge des notifications est réinitialisée à la reprise pour conserver les erreurs reçues depuis le sélecteur.
-- Dernier APK : nouvel import GB avec copie sérialisée, entrée native puis fermeture, aucun crash. Le gestionnaire de fenêtres confirme `mHoldScreenWindow=null` dans le menu : la veille n'y est pas bloquée.
-- Paquet vérifié : anciens menus/lecteur Java absents, points d'entrée NativeActivity/C et JNI de services présents, notices NDK/CorvusCore embarquées ; signature et alignements ZIP/ELF 16 Ko valides sur les deux ABIs.
-
-## Reproduire
+## Tests hôtes
 
 ```sh
-python tests/generate_roms.py
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb push build/test-roms/. /sdcard/Download/
-adb shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n com.corvussoftware.corvusretro/.MainActivity
+make test
+make test SANITIZE=ON
+cmake -S . -B build/corefree -DCORVUS_OFFICIAL_CORES=
+cmake --build build/corefree --target native_nocore_test
+(cd build/corefree && ./native_nocore_test)
+python3 tools/validate_core_archives.py
+python3 tools/test_core_archives.py
+python3 tools/test_release_workflows.py
 ```
 
-Tester les cœurs vides, les thèmes, un contenu depuis l'historique, A, les états,
-le menu rapide, la rotation et l'arrière-plan. Annuler le sélecteur puis importer
-un fichier invalide : l'application doit rester disponible sans fichier résiduel.
-Importer GBC et GBA, vérifier le cœur choisi et la persistance de la batterie GBA.
+Vérifier les générations de batterie, les identifiants historiques GB/GBC/GBA,
+les ajouts de moteurs, le remplacement d'un module pendant un jeu et le registre
+vide. Les tests de mémoire instrumentent le code portable original.
 
-## Limites
+## Build Android
 
-Émulateurs Android 10 et 15 exercés ; pas de téléphone physique ni d'exécution ARM64 validés.
-La qualité audio à l'écoute, les performances mobiles et la compatibilité d'un
-catalogue restent à mesurer ; GBA reste expérimental. Les menus OpenGL n'exposent
-pas encore d'arbre d'accessibilité TalkBack. Les manettes physiques et les gestes
-multitouch réels n'ont pas été exercés ; le modèle C teste leurs contrats d'entrée.
+```sh
+./gradlew --no-daemon :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest
+python3 tools/check_core_apks.py \
+  --apksigner "$ANDROID_HOME/build-tools/35.0.0/apksigner" \
+  --aapt "$ANDROID_HOME/build-tools/35.0.0/aapt" \
+  --zipalign "$ANDROID_HOME/build-tools/35.0.0/zipalign"
+python3 tools/build_core_archives.py --variant debug --tag v0.13.0 \
+  --output build/native-cores --catalog build/native-cores.json
+```
+
+La base `pkg/android/app/build/outputs/apk/debug/app-debug.apk` doit contenir
+uniquement `libcorvusretro.so` pour ARM64 et x86_64. Les six bibliothèques du
+répertoire `pkg/android/app/build/native-cores/Debug/` doivent exposer CorvusAPI,
+correspondre à l'architecture annoncée et avoir des segments ELF de16Ko.
+Chaque ZIP contient une seule bibliothèque.
+
+## Qualification de l'application
+
+Tester sur Android la base vide, le téléchargement GBA seul puis GB/GBC cumulés,
+la liste immédiatement actualisée, le chargement et le déchargement, la reprise
+après recréation pendant un transfert et les téléchargements invalides. Aucun
+installateur de paquet ne doit être lancé pour un cœur.
+
+Vérifier également portrait/paysage, marges système, commandes multitouch et
+menu central, reprise des jeux existants, historique, thèmes et batterie GBA
+historique suffixe-2. Un échec d'écriture de batterie conserve le moteur.
+
+L'instrumentation utilise des programmes de test originaux et un transport
+HTTPS déterministe. Un passage de ces tests ne prouve pas une connexion au
+service public depuis un téléphone. Distinguer explicitement build, tests hôtes,
+émulateur Android, exécution ARM64 et appareil physique.
+
+## Publication
+
+Le build signé doit employer le certificat durable de la base déjà distribuée.
+Le publisher exige une CI réussie du commit exact, la provenance des dépendances,
+les empreintes de tous les fichiers et le tag correspondant à la version APK.
+Il réutilise ces fichiers qualifiés, publie les vraies archives puis prépare
+leur catalogue pour revue. Vérifier les octets publics avant promotion du catalogue.
