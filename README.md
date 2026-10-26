@@ -6,7 +6,50 @@ C/C++ et de la navigation MaterialUI de RetroArch. Les moteurs sont ceux de
 [CorvusAPI](https://github.com/CorvusSoftware/CorvusAPI).
 Code applicatif sous **AGPL-3.0-only**, Copyright (C) 2026 CorvusSoftware.
 
-## Version 0.9 : appuis et catégories
+## Version 0.10 : application sans cœurs préinstallés
+
+CorvusRetro 0.10 adopte le comportement d'un frontend libretro : l'application
+de base n'embarque aucun émulateur. Les moteurs officiels CorvusGB,
+CorvusGBC et CorvusGBA sont sélectionnés pour une **compilation APK de pack**
+distincte, destinée au [Téléchargeur de cœurs](docs/core-downloader.md).
+
+L'APK principal peut ouvrir le menu **Charger un cœur > Téléchargeur de cœurs**
+sans émulateur présent. Les trois moteurs sont donc optionnels dans l'APK
+distribuée ; CorvusCore reste le fournisseur officiel sans être une
+dépendance runtime obligatoire pour les utilisateurs.
+
+**Important :** le canal Android actuel fournit des **APK CorvusRetro
+complets** mis à jour via PackageInstaller. Un pack remplace l'ensemble
+de l'application et les moteurs inclus, sans installer des fichiers
+`.so` indépendants et cumulables comme RetroArch. Le catalogue est vide
+jusqu'à ce que des APK de release réellement signés soient publiés.
+Aucune ROM ou BIOS commercial n'est fourni.
+
+### Construire la base et les moteurs en option
+
+```sh
+# APK 0.10 légère, sans CorvusGB, CorvusGBC ni CorvusGBA :
+./gradlew :app:assembleDebug
+
+# APK contenant explicitement les trois moteurs officiels :
+./gradlew -PcorvusCores=gb,gbc,gba :app:assembleDebug
+
+# Tests natifs : ils utilisent toujours les trois moteurs :
+make test
+make test SANITIZE=ON
+```
+
+Pour une publication officielle, la même clé de signature durable doit
+être utilisée pour l'APK de base et les packs. Les consignes sont dans
+[core-downloader.md](docs/core-downloader.md). Sans cette étape de
+signature et de publication, le catalogue n'est pas encore utilisable
+pour télécharger les moteurs.
+
+Le fichier [AGENTS.md](AGENTS.md) et les instructions de répertoire
+préparent Codex à travailler sur cette architecture, selon une
+organisation inspirée des conventions de développement de RetroArch.
+
+## Historique : version 0.9, appuis et catégories
 
 Les commandes de jeu deviennent plus visibles pendant l'appui, puis reviennent
 progressivement au repos. Les menus donnent un retour visuel au toucher : un tap
@@ -48,7 +91,7 @@ Le cache de glyphes natif accepte aussi les noms de contenus Unicode.
 
 - Listes tactiles et onglets Menu principal, Listes de lecture et Réglages.
 - Chargement d'un cœur sans contenu et déchargement réel, avec état **Aucun cœur**.
-- **CorvusGB**, **CorvusGBC** et **CorvusGBA expérimental**, version 0.14.0.
+- **CorvusGB**, **CorvusGBC** et **CorvusGBA expérimental**, disponibles dans le pack officiel optionnel, version des moteurs 0.14.0.
 - Thème **CorvusRetro** bleu nuit/violet par défaut, **ASUS** noir/blanc et **NVIDIA Shield** noir/vert.
 - Icônes originales, module de cœur avec une tête de corbeau et identité CorvusRetro.
 - Import local par le sélecteur Android, listes par console et historique.

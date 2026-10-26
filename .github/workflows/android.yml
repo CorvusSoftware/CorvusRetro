@@ -21,7 +21,7 @@ jobs:
   build:
     name: Tests, lint and debug APK
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -88,27 +88,52 @@ jobs:
       - name: Check original C code with memory sanitizers
         run: make test SANITIZE=ON CMAKE="$ANDROID_HOME/cmake/3.22.1/bin/cmake"
 
+      - name: Test core-free frontend and downloader
+        run: |
+          "$ANDROID_HOME/cmake/3.22.1/bin/cmake" -S app/src/main/cpp -B build/corefree \
+            -DCMAKE_BUILD_TYPE=Release -DCORVUS_OFFICIAL_CORES=
+          "$ANDROID_HOME/cmake/3.22.1/bin/cmake" --build build/corefree --target native_nocore_test --parallel 2
+          "$ANDROID_HOME/cmake/3.22.1/bin/cmake" -E chdir build/corefree ./native_nocore_test
+
       - name: Build APK and run Android lint
         run: ./gradlew --no-daemon :app:assembleDebug :app:lintDebug
 
-      - name: Verify bundled CorvusAPI core modules
+      - name: Verify base 0.10 APK contains no emulator cores
         run: |
+          apk=app/build/outputs/apk/debug/app-debug.apk
+          for abi in arm64-v8a x86_64; do
+            unzip -Z -1 "$apk" | grep -Fx "lib/$abi/libcorvusretro.so"
+          done
+          if unzip -Z -1 "$apk" | grep -E '^lib/(arm64-v8a|x86_64)/libcorvus_(gb|gbc|gba)\.so$'; then
+            echo "FAIL: CorvusRetro 0.10 base APK unexpectedly bundles official emulator engines"
+            exit 1
+          fi
+          mkdir -p build/apk-variants
+          cp "$apk" build/apk-variants/CorvusRetro-0.10-base-debug.apk
+
+      - name: Build optional official CorvusAPI pack
+        run: |
+          ./gradlew --no-daemon -PcorvusCores=gb,gbc,gba :app:assembleDebug
+
+      - name: Verify downloadable official core pack
+        run: |
+          apk=app/build/outputs/apk/debug/app-debug.apk
           for abi in arm64-v8a x86_64; do
             for core in gb gbc gba; do
-              unzip -Z -1 app/build/outputs/apk/debug/app-debug.apk |
-                grep -Fx "lib/$abi/libcorvus_$core.so"
+              unzip -Z -1 "$apk" | grep -Fx "lib/$abi/libcorvus_$core.so"
             done
           done
+          cp "$apk" build/apk-variants/CorvusRetro-0.10-official-cores-debug.apk
 
       - name: Verify APK signature and 16 KB alignment
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify app/build/outputs/apk/debug/app-debug.apk
           "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 16 4 app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Upload debug APK
+      - name: Upload base and optional core-pack debug APKs
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: CorvusRetro-debug-${{ github.sha }}
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: CorvusRetro-0.10-variants-${{ github.sha }}
+          path: build/apk-variants/*.apk
           if-no-files-found: error
           retention-days: 14

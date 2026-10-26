@@ -117,7 +117,9 @@ static row get_row(const cr_ui *u, int index) {
         }
         if (index == n++)
             fill(&r, "Charger du contenu",
-                 u->importing ? "Import du contenu…" : "Ouvrir un fichier de jeu compatible",
+                 u->importing ? "Import du contenu…" :
+                 (cr_registry_count() == 0 ? "Téléchargez un cœur pour jouer" :
+                  "Ouvrir un fichier de jeu compatible"),
                  CR_ICON_CONTENT, ACT_PICK, 0);
         if (index == n)
             fill(&r, "Informations", "Application, cœur et licences", CR_ICON_INFO, ACT_PAGE,
@@ -380,22 +382,25 @@ static void open_game(cr_ui *u, int system, const char *id, const char *title, c
         u->platform.touch(u->platform.context, id);
     cr_ui_reload(u);
 }
+static void show_core_downloader(cr_ui *u) {
+    push_page(u, CR_CORE_DOWNLOADS);
+    u->catalog_loading = true;
+    u->core_catalog.count = 0;
+    u->core_catalog.error[0] = '\0';
+    if (u->platform.refresh_core_catalog)
+        u->platform.refresh_core_catalog(u->platform.context);
+    else {
+        u->catalog_loading = false;
+        cr_ui_message(u, "Catalogue Android indisponible");
+    }
+}
 static void activate(cr_ui *u, row r) {
     switch (r.action) {
     case ACT_CORES:
         push_page(u, CR_CORES);
         break;
     case ACT_OPEN_DOWNLOADER:
-        push_page(u, CR_CORE_DOWNLOADS);
-        u->catalog_loading = true;
-        u->core_catalog.count = 0;
-        u->core_catalog.error[0] = '\0';
-        if (u->platform.refresh_core_catalog)
-            u->platform.refresh_core_catalog(u->platform.context);
-        else {
-            u->catalog_loading = false;
-            cr_ui_message(u, "Catalogue Android indisponible");
-        }
+        show_core_downloader(u);
         break;
     case ACT_REFRESH_CATALOG:
         if (u->platform.refresh_core_catalog && !u->catalog_loading) {
@@ -418,6 +423,10 @@ static void activate(cr_ui *u, row r) {
         }
         break;
     case ACT_PICK:
+        if (cr_registry_count() == 0) {
+            show_core_downloader(u);
+            break;
+        }
         if (!u->importing && u->platform.pick) {
             u->importing = true;
             u->platform.pick(u->platform.context, u->engine.handle ? u->engine.system : 0);

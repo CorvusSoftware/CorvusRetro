@@ -2,6 +2,66 @@
 
 Copyright (C) 2026 CorvusSoftware. SPDX-License-Identifier: AGPL-3.0-only.
 
+## CorvusRetro 0.10 : application de base et packs officiels
+
+La nouvelle **APK de base 0.10.0** ne contient plus les modules
+`libcorvus_gb.so`, `libcorvus_gbc.so` ou `libcorvus_gba.so`.
+La liste des cœurs installés est vide au premier démarrage, mais
+le téléchargeur est disponible.
+
+Les trois moteurs restent développés dans CorvusCore. Une APK
+optionnelle les intègre uniquement lorsque le build reçoit
+`-PcorvusCores=gb,gbc,gba`. Le paquet contenant les trois
+moteurs sera proposé dans le catalogue officiel **après** signature
+release, création de la GitHub Release et validation de la fiche
+`core-repository/index.json`.
+
+Ce modèle est un **pack APK complet**, pas trois téléchargements
+de `.so` indépendants et cumulables. Changer de pack remplace
+la collection de moteurs embarqués dans l'APK. Tant qu'un format
+de plug-in natif séparé n'a pas passé les tests Android, il ne faut
+pas le présenter comme l'installation individuelle de cœurs de RetroArch.
+
+Version de l'APK de base : **0.10.0 (versionCode 10)**.
+VersionCode minimal du pack : **11** ; chaque publication ultérieure
+doit employer une valeur supérieure à celles déjà distribuées.
+
+```sh
+# APK de base sans moteurs :
+./gradlew :app:assembleRelease
+
+# Pack officiel explicite (3 moteurs) :
+./gradlew -PcorvusCores=gb,gbc,gba \
+  -PcorvusVersionCode=11 \
+  -PcorvusVersionName=0.10.0 :app:assembleRelease
+```
+
+## Publication depuis GitHub Actions
+
+La procédure de publication officielle se trouve dans
+`.github/workflows/publish-core-pack.yml`. Elle s'exécute manuellement
+depuis `main` uniquement. Elle exige des secrets GitHub enregistrés
+**par un responsable du dépôt**, et non dans un commit :
+
+- `CORVUS_RELEASE_KEYSTORE_B64` : keystore signé durable, encodé en base64 ;
+- `CORVUS_RELEASE_STORE_PASSWORD` : mot de passe du magasin ;
+- `CORVUS_RELEASE_KEY_ALIAS` : alias de signature ;
+- `CORVUS_RELEASE_KEY_PASSWORD` : mot de passe de la clé ;
+- `CORVUS_RELEASE_CERT_SHA256` : empreinte publique du certificat
+  de l'application déjà installée et approuvée.
+
+Avec un tag de release neuf de forme `v0.10.0-cores.1`, un
+`version_code` croissant et un `version_name` tel que `0.10.0`,
+ce workflow construit le pack, vérifie sa signature et la présence
+des cœurs pour les deux architectures, puis publie l'APK de pack
+dans une GitHub Release. Il fournit ensuite un fichier de catalogue
+prêt à être **soumis et relu**, mais ne l'enregistre pas automatiquement
+sur `main`.
+
+La mise à jour du catalogue n'est publique qu'une fois l'APK
+réellement téléchargeable. Ne jamais ajouter de fausse URL de
+release ni de faux SHA-256 pour simuler des cœurs disponibles.
+
 ## Etat du telechargeur
 
 Le nouveau menu natif **Charger un cœur > Téléchargeur de cœurs**

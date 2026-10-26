@@ -1,0 +1,166 @@
+# CorvusRetro - CorvusSoftware
+# Copyright (C) 2026 CorvusSoftware
+# SPDX-License-Identifier: AGPL-3.0-only
+name: Publish official CorvusAPI core pack
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "New immutable release tag, e.g. v0.10.0-cores.1"
+        type: string
+        required: true
+      version_code:
+        description: "Strictly higher than the installed CorvusRetro APK version code"
+        type: number
+        required: true
+      version_name:
+        description: "Visible application version"
+        type: string
+        required: true
+        default: "0.10.0"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Build, sign and stage official GB/GBC/GBA pack
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      CORVUS_TAG: ${{ inputs.tag }}
+      CORVUS_VERSION_CODE: ${{ inputs.version_code }}
+      CORVUS_VERSION_NAME: ${{ inputs.version_name }}
+    steps:
+      - name: Checkout pinned sources
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          submodules: recursive
+
+      - name: Verify release prerequisites without logging secrets
+        env:
+          RELEASE_KEYSTORE: ${{ secrets.CORVUS_RELEASE_KEYSTORE_B64 }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.CORVUS_RELEASE_STORE_PASSWORD }}
+          RELEASE_ALIAS: ${{ secrets.CORVUS_RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.CORVUS_RELEASE_KEY_PASSWORD }}
+          RELEASE_CERT: ${{ secrets.CORVUS_RELEASE_CERT_SHA256 }}
+        run: |
+          test -n "$RELEASE_KEYSTORE" || { echo "Missing release keystore secret"; exit 1; }
+          test -n "$RELEASE_STORE_PASSWORD" || { echo "Missing release store password"; exit 1; }
+          test -n "$RELEASE_ALIAS" || { echo "Missing release alias"; exit 1; }
+          test -n "$RELEASE_KEY_PASSWORD" || { echo "Missing release key password"; exit 1; }
+          [[ "$RELEASE_CERT" =~ ^[0-9a-fA-F]{64}$ ]] || { echo "Missing pinned release signer SHA256"; exit 1; }
+          [[ "$CORVUS_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-cores\.[0-9]+$ ]] || { echo "Invalid release tag"; exit 1; }
+          [[ "$CORVUS_VERSION_CODE" =~ ^[1-9][0-9]*$ ]] || { echo "Invalid versionCode"; exit 1; }
+          test "$CORVUS_VERSION_CODE" -gt 10 || { echo "Core pack versionCode must exceed base 10"; exit 1; }
+          [[ "$CORVUS_VERSION_NAME" =~ ^0[.]10[.][0-9]+$ ]] || { echo "Invalid CorvusRetro 0.10 version name"; exit 1; }
+
+      - name: Set up Java 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        run: |
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/android-cli.zip" \
+            https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip
+          echo "5fdcc763663eefb86a5b8879697aa6088b041e70  $RUNNER_TEMP/android-cli.zip" | sha1sum --check
+          unzip -q "$RUNNER_TEMP/android-cli.zip" -d "$RUNNER_TEMP/android-cli"
+          echo "$RUNNER_TEMP/android-cli/cmdline-tools/bin" >> "$GITHUB_PATH"
+
+      - name: Install pinned Android packages
+        run: |
+          python3 - <<'PY'
+          import os, subprocess
+          sdk = ['sdkmanager', '--sdk_root=' + os.environ['ANDROID_HOME']]
+          subprocess.run(sdk + ['--licenses'], input='y\n' * 100, text=True, check=True)
+          subprocess.run(sdk + ['platforms;android-35', 'build-tools;35.0.0', 'ndk;27.2.12479018', 'cmake;3.22.1'], check=True)
+          PY
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4
+
+      - name: Import externally generated release signing identity
+        env:
+          CORVUS_RELEASE_KEYSTORE_B64: ${{ secrets.CORVUS_RELEASE_KEYSTORE_B64 }}
+          CORVUS_RELEASE_STORE_PASSWORD: ${{ secrets.CORVUS_RELEASE_STORE_PASSWORD }}
+          CORVUS_RELEASE_KEY_ALIAS: ${{ secrets.CORVUS_RELEASE_KEY_ALIAS }}
+          CORVUS_RELEASE_KEY_PASSWORD: ${{ secrets.CORVUS_RELEASE_KEY_PASSWORD }}
+        run: |
+          umask 077
+          printf '%s' "$CORVUS_RELEASE_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/corvus-release.jks"
+          echo "CORVUS_RELEASE_KEYSTORE=$RUNNER_TEMP/corvus-release.jks" >> "$GITHUB_ENV"
+
+      - name: Build the complete official core pack APK
+        run: |
+          ./gradlew --no-daemon -PcorvusCores=gb,gbc,gba \
+            -PcorvusVersionCode=$CORVUS_VERSION_CODE \
+            -PcorvusVersionName=$CORVUS_VERSION_NAME :app:assembleRelease
+
+      - name: Verify signer, native modules and APK alignment
+        env:
+          RELEASE_CERT: ${{ secrets.CORVUS_RELEASE_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          apk=app/build/outputs/apk/release/app-release.apk
+          test -f "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$apk" > "$RUNNER_TEMP/certs.txt"
+          actual=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/certs.txt" | head -n 1)
+          test "${actual,,}" = "${RELEASE_CERT,,}" || { echo "Release signer mismatch"; exit 1; }
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 16 4 "$apk"
+          for abi in arm64-v8a x86_64; do
+            for core in gb gbc gba; do
+              unzip -Z -1 "$apk" | grep -Fx "lib/$abi/libcorvus_$core.so"
+            done
+          done
+
+      - name: Publish immutable signed APK to GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="$CORVUS_TAG"
+          apk=app/build/outputs/apk/release/app-release.apk
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release already exists: refusing to overwrite an immutable core pack"
+            exit 1
+          fi
+          cp "$apk" "$RUNNER_TEMP/CorvusRetro-0.10-official-corepack.apk"
+          gh release create "$tag" "$RUNNER_TEMP/CorvusRetro-0.10-official-corepack.apk" \
+            --target "$GITHUB_SHA" --title "CorvusRetro official core pack $tag" \
+            --notes "Release-signed CorvusRetro APK with CorvusGB, CorvusGBC and CorvusGBA (CorvusAPI ABI 0). Installs as a full application update, not as loose .so modules."
+
+      - name: Generate reviewed catalog metadata (not published until reviewed)
+        env:
+          RELEASE_CERT: ${{ secrets.CORVUS_RELEASE_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          apk=app/build/outputs/apk/release/app-release.apk
+          asset="https://github.com/CorvusSoftware/CorvusRetro/releases/download/$CORVUS_TAG/CorvusRetro-0.10-official-corepack.apk"
+          for abi in arm64-v8a x86_64; do
+            python3 tools/register_core_pack.py \
+              --apk "$apk" --apksigner "$ANDROID_HOME/build-tools/35.0.0/apksigner" \
+              --abi "$abi" --id official-gb-gbc-gba \
+              --name "CorvusGB / CorvusGBC / CorvusGBA" \
+              --description "Pack officiel CorvusCore, version 0.14.0" \
+              --version "$CORVUS_VERSION_NAME" --core-id corvus.gb \
+              --core-library libcorvus_gb.so \
+              --url "$asset" --expected-cert-sha256 "$RELEASE_CERT"
+          done
+          python3 tools/validate_core_catalog.py
+          python3 tools/test_core_catalog.py
+
+      - name: Upload catalog update for review before publication
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: CorvusRetro-official-pack-catalog-${{ github.sha }}
+          path: core-repository/index.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Erase temporary signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/corvus-release.jks" "$RUNNER_TEMP/certs.txt"
