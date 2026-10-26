@@ -112,6 +112,18 @@ class WorkflowGates(unittest.TestCase):
             path.write_text(data)
             self.assertNotEqual(self.run_gate("publish-core-archives.yml", step).returncode, 0)
 
+
+    def test_new_release_auto_promotion_is_version_pinned(self):
+        source = (ROOT / ".github/workflows/build-core-release.yml").read_text(
+            encoding="utf-8")
+        self.assertIn("Publish signed CorvusRetro v0.14.0", source)
+        self.assertIn("gh release view v0.14.0", source)
+        self.assertIn("test \"$existing\" = \"$SOURCE_SHA\"", source)
+        self.assertIn("inputs[source_run_id]=$GITHUB_RUN_ID", source)
+        self.assertIn("github.event_name == 'workflow_run'", source)
+        self.assertIn("contents: write", source)
+        self.assertIn("actions: write", source)
+
     def test_publisher_exports_corvuscore_metadata_only(self):
         source = (ROOT / ".github/workflows/publish-core-archives.yml").read_text(
             encoding="utf-8")

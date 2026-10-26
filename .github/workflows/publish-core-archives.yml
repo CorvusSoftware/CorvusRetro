@@ -207,8 +207,8 @@ jobs:
             "$release_base" \
             "$RUNNER_TEMP/native-cores/"*.zip \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --verify-tag --prerelease \
-            --title "CorvusRetro $CORVUS_TAG - RetroAchievements" \
-            --notes "Release-signed native Android frontend with RetroAchievements in normal mode, encrypted account sessions and durable pending awards. Includes six individual native CorvusCore archives for ARM64 and x86_64; download cores inside the app."
+            --title "CorvusRetro $CORVUS_TAG - Multi-provider core downloader" \
+            --notes "Signed Android release with automatic discovery of validated provider catalogs in CorvusRepository/catalog, CorvusAPI native core downloads, and RetroAchievements in normal mode. Includes official CorvusCore 0.14.1 native ZIPs for ARM64 and x86_64; open the in-app core downloader to install a core. Android 8.0+."
 
       - name: Upload catalog metadata for CorvusRepository review
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
