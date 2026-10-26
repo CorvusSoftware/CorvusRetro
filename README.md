@@ -1,147 +1,162 @@
+<div align="center">
+
 # CorvusRetro
 
-**Un frontend Android natif pour jouer avec les moteurs Game Boy, Game Boy Color et Game Boy Advance de CorvusSoftware.**
+**L'émulation rétro sur Android, avec des cœurs indépendants.**
 
-CorvusRetro propose une interface originale en **C11**, des commandes tactiles, un téléchargeur de cœurs et la prise en charge de RetroAchievements. Les moteurs fonctionnent séparément grâce à **[CorvusAPI](https://github.com/CorvusSoftware/CorvusAPI)** : l'application n'embarque aucun émulateur dans son APK de base.
+Un frontend natif, une interface tactile originale et des moteurs téléchargeables à la demande.
 
-[![Android CI](https://github.com/CorvusSoftware/CorvusRetro/actions/workflows/android.yml/badge.svg)](https://github.com/CorvusSoftware/CorvusRetro/actions/workflows/android.yml)
-[![Version](https://img.shields.io/badge/version-0.13.0-6C5CE7)](https://github.com/CorvusSoftware/CorvusRetro/releases/tag/v0.13.0)
-[![Licence](https://img.shields.io/badge/licence-AGPL--3.0--only-555555)](LICENSE)
+[![Build Android](https://github.com/CorvusSoftware/CorvusRetro/actions/workflows/android.yml/badge.svg)](https://github.com/CorvusSoftware/CorvusRetro/actions/workflows/android.yml)
+[![Release](https://img.shields.io/badge/release-v0.13.0-7965C1?style=flat-square)](https://github.com/CorvusSoftware/CorvusRetro/releases/tag/v0.13.0)
+[![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=flat-square&logo=android&logoColor=white)](https://github.com/CorvusSoftware/CorvusRetro/releases)
+[![Licence](https://img.shields.io/badge/licence-AGPL--3.0--only-555555?style=flat-square)](LICENSE)
 
-**[Télécharger l'APK v0.13.0](https://github.com/CorvusSoftware/CorvusRetro/releases/download/v0.13.0/CorvusRetro-0.13.0-base-release.apk)** · [Toutes les versions](https://github.com/CorvusSoftware/CorvusRetro/releases) · [Documentation](docs/navigation.md)
+### [Télécharger CorvusRetro pour Android](https://github.com/CorvusSoftware/CorvusRetro/releases/download/v0.13.0/CorvusRetro-0.13.0-base-release.apk)
 
-> **État du projet :** la version 0.13.0 est une **préversion**. Les moteurs officiels sont disponibles séparément en version 0.14.1. CorvusGBA et l'ABI CorvusAPI 0 restent expérimentaux.
+[Voir la version v0.13.0](https://github.com/CorvusSoftware/CorvusRetro/releases/tag/v0.13.0) · [Guide d'utilisation](#premiers-pas) · [Documentation](#documentation) · [Compiler](#compilation)
 
-## Commencer à jouer
+<sub>Version 0.13.0 en préversion · CorvusCore 0.14.1 · Aucun jeu ni BIOS fourni</sub>
 
-1. **Installer CorvusRetro** avec l'APK disponible ci-dessus (Android 8.0 ou plus, appareils compatibles).
-2. Ouvrir **Charger un cœur > Téléchargeur de cœurs**.
-3. Choisir **CorvusGB**, **CorvusGBC** ou **CorvusGBA** et télécharger le module correspondant.
-4. Revenir à **Charger un cœur**, sélectionner le moteur, puis ouvrir un jeu obtenu légalement.
+</div>
 
-Les cœurs téléchargés sont vérifiés et installés dans le stockage privé de l'application. **Aucun APK supplémentaire ni redémarrage n'est nécessaire.** Décharger un cœur ferme son instance, mais conserve son module et les données de jeu.
+---
 
-| Cœur officiel | Console | Statut |
-| :--- | :--- | :--- |
-| **CorvusGB** | Game Boy | Moteur natif |
-| **CorvusGBC** | Game Boy Color | Moteur natif |
+## Présentation
+
+**CorvusRetro** est un frontend Android développé par [CorvusSoftware](https://github.com/CorvusSoftware), conçu autour d'une idée simple : **l'application et les moteurs d'émulation sont séparés**.
+
+L'APK de base contient l'interface, les commandes et les services Android, **mais aucun moteur d'émulation**. Les cœurs sont téléchargés individuellement depuis le catalogue officiel, vérifiés puis chargés via [CorvusAPI](https://github.com/CorvusSoftware/CorvusAPI), sans installer un second APK.
+
+### Moteurs disponibles
+
+| Cœur | Console | État |
+| :-- | :-- | :-- |
+| **CorvusGB** | Game Boy | Disponible |
+| **CorvusGBC** | Game Boy Color | Disponible |
 | **CorvusGBA** | Game Boy Advance | Expérimental |
 
-Le catalogue officiel distribue les modules CorvusAPI sous forme d'archives natives distinctes pour **ARM64** et **x86_64**. Les jeux, BIOS et fichiers commerciaux ne sont pas fournis.
+Les moteurs officiels sont fournis par [CorvusCore](https://github.com/CorvusSoftware/CorvusCore). Les archives natives sont distribuées séparément pour **ARM64** et **x86_64**.
 
-[En savoir plus sur le téléchargeur](docs/individual-cores.md) · [Cœurs et compatibilité](docs/community-cores.md)
+## Premiers pas
+
+1. Téléchargez et installez **[l'APK CorvusRetro](https://github.com/CorvusSoftware/CorvusRetro/releases/download/v0.13.0/CorvusRetro-0.13.0-base-release.apk)** sur un appareil compatible.
+2. Dans l'application, ouvrez **Charger un cœur → Téléchargeur de cœurs**.
+3. Téléchargez **CorvusGB**, **CorvusGBC** ou **CorvusGBA**.
+4. Sélectionnez le cœur dans **Charger un cœur**, puis ouvrez votre jeu.
+
+Le moteur devient disponible dès la fin du téléchargement. **Pas de second APK, pas de redémarrage.** Le déchargement d'un cœur n'efface ni son fichier ni vos sauvegardes.
+
+[Guide du téléchargeur de cœurs](docs/individual-cores.md)
 
 ## Fonctionnalités
 
-- **Interface tactile originale :** menus, navigation, commandes virtuelles et menu rapide.
-- **Portrait et paysage :** image adaptée à l'écran, boutons tactiles et prise en charge du multitouch.
-- **Thèmes :** CorvusRetro, NVIDIA Shield et ASUS.
-- **Bibliothèque :** jeux importés, historique et identifiants de contenu conservés entre les versions.
-- **Sauvegardes :** données batterie et états instantanés selon les capacités du cœur.
-- **Cœurs indépendants :** téléchargement, vérification, chargement et déchargement sans installation d'APK supplémentaire.
-- **RetroAchievements :** connexion au compte, consultation et suivi des succès des jeux reconnus.
-
-[Commandes tactiles](docs/controls.md) · [Navigation](docs/navigation.md) · [Thèmes](docs/themes.md) · [Conservation des données](docs/stable-content-identities.md)
+| | |
+| :-- | :-- |
+| **Interface native** | Menus en C11, navigation tactile, menu rapide et commandes virtuelles |
+| **Affichage** | Modes portrait et paysage, disposition adaptée et multitouch |
+| **Personnalisation** | Thèmes CorvusRetro, NVIDIA Shield et ASUS |
+| **Bibliothèque** | Importation des jeux, historique et préservation des identifiants de contenu |
+| **Sauvegardes** | Batterie et états instantanés selon les capacités de chaque cœur |
+| **RetroAchievements** | Connexion, consultation et progression des succès compatibles |
 
 ### RetroAchievements
 
-Depuis **Réglages > RetroAchievements**, connectez votre compte ; les succès du jeu sont ensuite accessibles dans **Menu rapide > Succès**.
+Les succès sont accessibles depuis **Réglages → RetroAchievements**, puis **Menu rapide → Succès** pendant le jeu.
 
-CorvusRetro utilise la bibliothèque officielle **rcheevos** et l'extension mémoire facultative de CorvusAPI. Le **mode normal** est pris en charge, mais **pas encore le mode Hardcore**. Le mot de passe n'est pas conservé ; les jetons de session et les succès en attente d'envoi sont protégés par Android Keystore.
+L'intégration repose sur **rcheevos** et l'extension mémoire optionnelle de CorvusAPI. Le **mode normal** est disponible ; **Hardcore n'est pas encore pris en charge**. Le mot de passe n'est pas stocké et les données de session persistantes sont protégées avec Android Keystore.
 
-Un moteur sans extension mémoire reste jouable, mais ne peut pas fournir les succès.
-
-[Documentation RetroAchievements](docs/retroachievements.md)
+[Lire la documentation des succès](docs/retroachievements.md)
 
 ## Architecture
 
-CorvusRetro sépare le frontend Android des moteurs d'émulation. L'interface, les entrées, l'affichage et l'audio sont assurés par le frontend ; les moteurs sont chargés comme bibliothèques natives avec le contrat C public CorvusAPI.
-
 ```text
-CorvusRetro (frontend Android)
-  |-- Interface, commandes, audio, vidéo      C11
-  |-- Services Android, stockage, réseau      Java
-  |-- Succès                                 rcheevos
-  |
-  +-- CorvusAPI (ABI C expérimentale, v0)
-        |-- CorvusGB    (CorvusCore)
-        |-- CorvusGBC   (CorvusCore)
-        +-- CorvusGBA   (CorvusCore)
+CorvusRetro
+├── Interface et menus         C11
+├── Rendu et audio             OpenGL ES 2 / AAudio
+├── Services Android           Java
+├── RetroAchievements          rcheevos
+└── Chargement des cœurs       CorvusAPI
+    ├── CorvusGB               CorvusCore
+    ├── CorvusGBC              CorvusCore
+    └── CorvusGBA              CorvusCore
 ```
 
-| Répertoire | Rôle |
-| :--- | :--- |
-| [`menu/`](menu/) | Menus, navigation et thèmes |
-| [`frontend/`](frontend/) | Cycle de vie de l'application et services de plateforme |
-| [`gfx/`](gfx/), [`audio/`](audio/), [`input/`](input/) | Graphismes, sortie audio et commandes |
-| [`cores/`](cores/) | Chargement CorvusAPI, registre, états et sauvegardes |
-| [`cheevos/`](cheevos/), [`tasks/`](tasks/) | Succès et échanges asynchrones |
-| [`pkg/android/`](pkg/android/) | Projet Android, Gradle, manifeste et services Java |
-| [`deps/`](deps/) | Sous-modules Git : CorvusCore et rcheevos |
-| [`core-repository/`](core-repository/) | Catalogue officiel des cœurs téléchargeables |
-| [`tests/`](tests/), [`tools/`](tools/) | Tests natifs, validation et outils de publication |
+Le code natif du frontend est organisé dans `menu/`, `frontend/`, `gfx/`, `audio/`, `input/` et `cores/`. Le projet Android réside dans `pkg/android/` ; les dépendances versionnées dans `deps/`.
 
-CorvusRetro est **inspiré de certains principes d'organisation et de navigation de RetroArch**, mais il utilise son propre frontend et **n'est pas compatible avec l'ABI libretro**.
+CorvusRetro s'inspire de certains principes d'interface de RetroArch, mais utilise son propre code et **n'implémente pas l'ABI libretro**.
 
-[Organisation détaillée](docs/repository-structure.md) · [Contrat CorvusAPI](https://github.com/CorvusSoftware/CorvusAPI)
+[Explorer l'organisation du dépôt](docs/repository-structure.md)
 
-## Développement
+## Compilation
 
-### Prérequis
+<details>
+<summary><strong>Prérequis et compilation Android</strong></summary>
 
-- **JDK 17** ou supérieur ;
-- **Android SDK 35** et **NDK 27.2.12479018** ;
-- **CMake 3.22.1** et un compilateur C/C++ approprié ;
-- **Git**, pour initialiser les sous-modules.
+<br>
 
-Le projet utilise **Gradle 8.13** et **Android Gradle Plugin 8.9.1**. Les scripts `gradlew` à la racine redirigent vers le projet situé dans `pkg/android/`.
-
-### Compiler l'application Android
+- JDK **17** ou supérieur
+- Android SDK **35** et NDK **27.2.12479018**
+- CMake **3.22.1**, Git et un environnement Android de compilation
+- Gradle **8.13** et Android Gradle Plugin **8.9.1** (via le wrapper fourni)
 
 ```sh
 git clone --recurse-submodules https://github.com/CorvusSoftware/CorvusRetro.git
 cd CorvusRetro
-
 ./gradlew --no-daemon :app:assembleDebug
 ```
 
-**APK de développement :** `pkg/android/app/build/outputs/apk/debug/app-debug.apk`.
+**APK généré :** `pkg/android/app/build/outputs/apk/debug/app-debug.apk`
 
-La compilation produit aussi les **six bibliothèques natives** des trois moteurs pour ARM64 et x86_64, sous `pkg/android/app/build/native-cores/Debug/`. Ces bibliothèques **sont exclues de l'APK de base** et servent à préparer les archives téléchargeables.
+Le build produit aussi six bibliothèques natives des moteurs officiels dans `pkg/android/app/build/native-cores/Debug/`. Elles sont **exclues de l'APK de base** et destinées aux archives téléchargeables.
 
-### Exécuter les tests
+</details>
+
+<details>
+<summary><strong>Tests et vérifications</strong></summary>
+
+<br>
 
 ```sh
-# Tests natifs (frontend et moteurs de test)
+# Régressions natives
 make test
 
-# Vérifications mémoire avec ASan / UBSan
+# Vérifications mémoire
 make test SANITIZE=ON
 
-# Build Android, lint et APK de tests
-./gradlew --no-daemon :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest
+# Android et lint
+./gradlew --no-daemon :app:assembleDebug :app:lintDebug
 
-# Validation des catalogues et archives natives
+# Vérification des archives natives
 python3 tools/validate_core_archives.py
 python3 tools/test_core_archives.py
 ```
 
-Les tests natifs activent volontairement les moteurs officiels ; **cela ne change pas l'APK Android sans cœurs**. La CI contrôle également la compilation, les APK et la distribution des modules. Les tests automatisés ne remplacent pas une validation sur appareil physique.
+La [CI Android](https://github.com/CorvusSoftware/CorvusRetro/actions/workflows/android.yml) vérifie également la structure de l'APK et les modules distribuables. Ces tests ne remplacent pas les vérifications sur appareil physique.
 
-[Validation Android](docs/validation-android.md) · [CI GitHub Actions](https://github.com/CorvusSoftware/CorvusRetro/actions/workflows/android.yml)
+[Guide de validation](docs/validation-android.md)
 
-## Cœurs et publications
+</details>
 
-Le catalogue actuel est **[`core-repository/cores-v3.json`](core-repository/cores-v3.json)**. Il contient les métadonnées de distribution des archives natives officielles. Les anciens catalogues sont conservés pour les versions déjà diffusées.
+## Documentation
 
-Les releases et les modules sont publiés depuis des artefacts vérifiés. Les fichiers téléchargés sont contrôlés avant leur chargement ; aucun module arbitraire du stockage externe n'est exécuté.
+| Guide | Contenu |
+| :-- | :-- |
+| [Navigation](docs/navigation.md) | Menus et paramètres |
+| [Commandes](docs/controls.md) | Contrôles tactiles et dispositions |
+| [Thèmes](docs/themes.md) | Personnalisation de l'interface |
+| [Téléchargement des cœurs](docs/individual-cores.md) | Installation et mise à jour |
+| [RetroAchievements](docs/retroachievements.md) | Succès et sécurité |
+| [Identifiants et sauvegardes](docs/stable-content-identities.md) | Compatibilité des données |
+| [Catalogue officiel](core-repository/README.md) | Distribution des archives natives |
 
-[Téléchargements officiels](https://github.com/CorvusSoftware/CorvusRetro/releases) · [Documentation des archives](docs/individual-cores.md)
+## Licence
 
-## Licence et crédits
+CorvusRetro est développé par **CorvusSoftware** sous licence **[AGPL-3.0-only](LICENSE)**. Les moteurs [CorvusCore](https://github.com/CorvusSoftware/CorvusCore) conservent leur licence AGPL-3.0-only ; [CorvusAPI](https://github.com/CorvusSoftware/CorvusAPI) et [rcheevos](https://github.com/RetroAchievements/rcheevos) conservent leurs licences MIT.
 
-**CorvusRetro** est développé par **CorvusSoftware** et distribué sous licence **[AGPL-3.0-only](LICENSE)**. **[CorvusCore](https://github.com/CorvusSoftware/CorvusCore)** utilise également l'AGPL-3.0-only ; **[CorvusAPI](https://github.com/CorvusSoftware/CorvusAPI)** et **[rcheevos](https://github.com/RetroAchievements/rcheevos)** conservent leurs licences MIT respectives.
+Aucune ROM ni aucun BIOS commercial n'est distribué. CorvusRetro n'est affilié ni à Nintendo, ni à RetroAchievements, ni à RetroArch.
 
-Les noms, marques et consoles cités appartiennent à leurs ayants droit. CorvusRetro n'est affilié ni à Nintendo, ni à RetroAchievements, ni à RetroArch.
+<div align="center">
 
-**Copyright © 2026 CorvusSoftware.**
+<sub>© 2026 CorvusSoftware · [Code source](https://github.com/CorvusSoftware/CorvusRetro) · [Releases](https://github.com/CorvusSoftware/CorvusRetro/releases)</sub>
+
+</div>
