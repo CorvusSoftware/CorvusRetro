@@ -222,7 +222,7 @@ int main(void) {
     c = draw(&u);
     check(!u.catalog_loading && strstr(c.text, "CorvusGB") && strstr(c.text, "mise à jour"),
           "individual core with a different version is presented as an update");
-    snprintf(catalog.packs[0].version, sizeof(catalog.packs[0].version), "0.14.0");
+    snprintf(catalog.packs[0].version, sizeof(catalog.packs[0].version), "0.14.1");
     cr_ui_catalog(&u, &catalog);
     c = draw(&u);
     check(strstr(c.text, "Installé") && !strstr(c.text, "mise à jour"),
@@ -269,7 +269,7 @@ int main(void) {
     row(&u, 2);
     row(&u, 1);
     c = draw(&u);
-    check(u.page == CR_CORE_INFO && strstr(c.text, "CorvusGB") && strstr(c.text, "0.14.0"),
+    check(u.page == CR_CORE_INFO && strstr(c.text, "CorvusGB") && strstr(c.text, "0.14.1"),
           "real core information is reachable");
     cr_ui_back(&u);
     cr_ui_back(&u);
