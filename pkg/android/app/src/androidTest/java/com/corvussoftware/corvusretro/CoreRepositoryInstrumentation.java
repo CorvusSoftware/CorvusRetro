@@ -183,6 +183,28 @@ public final class CoreRepositoryInstrumentation extends Instrumentation {
         check(altered.setWritable(true), "create altered fixture");
         check(store.modules().length == 1, "writable executable rejected on discovery");
         check(altered.setReadOnly(), "restore fixture permissions");
+        // A second provider persists without modifying official CorvusCore identities.
+        File customZip = new File(root, "community.zip");
+        try (java.util.zip.ZipFile source = new java.util.zip.ZipFile(archive("gb"));
+             ZipOutputStream output = new ZipOutputStream(new FileOutputStream(customZip))) {
+            ZipEntry original = source.entries().nextElement();
+            output.putNextEntry(new ZipEntry("libdemo_handheld.so"));
+            try (InputStream input = source.getInputStream(original)) {
+                byte[] buffer = new byte[8192];
+                int count;
+                while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+            }
+            output.closeEntry();
+        }
+        JSONObject custom = community().put("sha256", CoreStore.hash(customZip))
+                .put("size", customZip.length());
+        store.install(new CoreRepository.Core(custom, "demo.json"), customZip);
+        String[] persisted = store.modules();
+        check(persisted.length == 3, "community core persisted alongside official cores");
+        check(Arrays.stream(persisted).anyMatch(file -> file.contains("libdemo_handheld-")),
+                "community module rediscovered by its own library name");
+        check(new CoreStore(context).modules().length == 3,
+                "community provider survives store recreation");
     }
     private void transport() {
         URL.setURLStreamHandlerFactory(protocol -> "https".equals(protocol) ? new URLStreamHandler() {
