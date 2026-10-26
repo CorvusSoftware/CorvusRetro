@@ -4,7 +4,7 @@
 #ifndef CORVUSRETRO_ENGINE_H
 #define CORVUSRETRO_ENGINE_H
 
-#include <corvus/api.h>
+#include <corvusapi.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
