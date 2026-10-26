@@ -94,6 +94,28 @@ jobs:
           printf '%s' "$CORVUS_RELEASE_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/corvus-release.jks"
           echo "CORVUS_RELEASE_KEYSTORE=$RUNNER_TEMP/corvus-release.jks" >> "$GITHUB_ENV"
 
+      - name: Validate the keystore and pinned signing certificate
+        env:
+          CORVUS_RELEASE_STORE_PASSWORD: ${{ secrets.CORVUS_RELEASE_STORE_PASSWORD }}
+          CORVUS_RELEASE_KEY_ALIAS: ${{ secrets.CORVUS_RELEASE_KEY_ALIAS }}
+          RELEASE_CERT: ${{ secrets.CORVUS_RELEASE_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          test -s "$CORVUS_RELEASE_KEYSTORE" || { echo "Release keystore file is empty"; exit 1; }
+          # Check the store password and alias without exposing either secret.
+          if ! keytool -exportcert -keystore "$CORVUS_RELEASE_KEYSTORE" \
+              -storepass:env CORVUS_RELEASE_STORE_PASSWORD \
+              -alias "$CORVUS_RELEASE_KEY_ALIAS" \
+              -file "$RUNNER_TEMP/corvus-release-cert.der" >/dev/null 2>&1; then
+            echo "Keystore password, format, or key alias is incorrect"
+            exit 1
+          fi
+          actual=$(sha256sum "$RUNNER_TEMP/corvus-release-cert.der" | cut -d' ' -f1)
+          if [[ "${actual,,}" != "${RELEASE_CERT,,}" ]]; then
+            echo "Release certificate SHA-256 does not match the pinned certificate"
+            exit 1
+          fi
+
       - name: Build the complete official core pack APK
         env:
           CORVUS_RELEASE_STORE_PASSWORD: ${{ secrets.CORVUS_RELEASE_STORE_PASSWORD }}
@@ -167,4 +189,4 @@ jobs:
 
       - name: Erase temporary signing material
         if: always()
-        run: rm -f "$RUNNER_TEMP/corvus-release.jks" "$RUNNER_TEMP/certs.txt"
+        run: rm -f "$RUNNER_TEMP/corvus-release.jks" "$RUNNER_TEMP/corvus-release-cert.der" "$RUNNER_TEMP/certs.txt"
