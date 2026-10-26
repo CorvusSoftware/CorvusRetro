@@ -203,7 +203,7 @@ jobs:
             echo "v0.14.0 is already published. Its assets remain immutable."
             exit 0
           fi
-          existing=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v0.14.0" --jq .object.sha 2>/dev/null || true)
+          existing=$(git ls-remote origin "refs/tags/v0.14.0" | awk '{print $1}')
           if test -n "$existing"; then
             test "$existing" = "$SOURCE_SHA" || {
               echo "v0.14.0 tag points to a different revision"
