@@ -5,7 +5,7 @@ Le téléchargeur récupère un catalogue natif (format 3) depuis
 télécharge un ZIP pour le cœur et l'architecture choisis.
 
 **Catalogue actuel :**
-`https://raw.githubusercontent.com/CorvusSoftware/CorvusRepository/main/cores-v3.json`
+`https://raw.githubusercontent.com/CorvusSoftware/CorvusRepository/main/catalog/cores-v3.json`
 
 Les six entrées initiales sont **identiques** à celles du catalogue historique
 de CorvusRetro, et leurs archives ZIP restent sur les releases officielles de
