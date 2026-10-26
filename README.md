@@ -10,6 +10,8 @@ communiquent avec le frontend par l'interface publique CorvusAPI.
 
 ## Utilisation
 
+[Télécharger l’APK signé 0.13.0](https://github.com/CorvusSoftware/CorvusRetro/releases/download/v0.13.0/CorvusRetro-0.13.0-base-release.apk).
+
 La base ne contient aucun moteur. Ouvrir **Charger un cœur > Téléchargeur de cœurs**
 et choisir CorvusGB, CorvusGBC ou CorvusGBA. L'archive native vérifiée est enregistrée
 puis le cœur devient immédiatement disponible dans **Charger un cœur**.
