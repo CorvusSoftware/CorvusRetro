@@ -38,6 +38,7 @@ public final class MainActivity extends NativeActivity {
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final Object importLock = new Object();
     private GameLibrary library;
+    private CoreRepository coreRepository;
     private GameLibrary.Pending pending;
     private volatile boolean destroyed;
     private boolean pickerOpen;
@@ -47,10 +48,13 @@ public final class MainActivity extends NativeActivity {
     private volatile int[] windowArea;
 
     private static native void imported(String id, String title, int system, String path, String error);
+    static native void coreCatalogUpdated(String[] packages, String error);
+    static native void coreInstallStatus(String message);
 
     @Override public void onCreate(Bundle state) {
         // NativeActivity starts android_main in super.onCreate. Services must already exist.
         library = new GameLibrary(this);
+        coreRepository = new CoreRepository(this, io);
         if (state != null) {
             pickerOpen = state.getBoolean("picker", false);
             pickerSystem = state.getInt("picker_system", 0);
@@ -110,6 +114,9 @@ public final class MainActivity extends NativeActivity {
         io.shutdown();
         super.onDestroy();
     }
+    boolean isAlive() { return !destroyed; }
+    public void refreshCoreCatalog() { coreRepository.refresh(); }
+    public void installCorePack(String packId) { coreRepository.install(packId); }
     public float density() { return getResources().getDisplayMetrics().density; }
     public String filesRoot() { return getFilesDir().getAbsolutePath(); }
     public String[] games() {
