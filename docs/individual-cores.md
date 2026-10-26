@@ -1,98 +1,63 @@
-# Cœurs individuels CorvusRetro 0.11
+# Cœurs natifs CorvusRetro 0.12
 
 Copyright (C) 2026 CorvusSoftware. SPDX-License-Identifier: AGPL-3.0-only.
 
 ## Utilisation
 
-L'APK de base ne contient aucun émulateur. Ouvrir **Charger un cœur >
-Téléchargeur de cœurs**, puis choisir **CorvusGB**, **CorvusGBC** ou **CorvusGBA**.
-Le téléchargement correspond au cœur choisi, pas à une nouvelle application
-contenant les trois moteurs. Android demande la confirmation d'installation.
-Au démarrage suivant, **Charger un cœur** propose les modules installés.
+Ouvrir **Charger un cœur > Téléchargeur de cœurs**, choisir CorvusGB, CorvusGBC ou
+CorvusGBA et attendre la fin du téléchargement. Revenir à **Charger un cœur** : le
+cœur est immédiatement disponible. Android ne demande pas d'installer un APK.
+**Décharger le cœur** libère son instance en mémoire ; le fichier téléchargé reste
+installé pour la prochaine utilisation. Ajouter un cœur conserve les autres.
 
-Ajouter CorvusGB conserve un CorvusGBA déjà installé. Les jeux, leur historique
-et leurs sauvegardes restent dans le stockage privé de CorvusRetro. Le fichier
-d'une sauvegarde GBA conserve son identité même si GBA est le premier ou le seul
-cœur dans la liste. **Décharger le cœur** libère l'instance en mémoire ; il ne
-désinstalle pas le module Android.
+Les jeux, l'historique, les réglages et sauvegardes sont conservés. Une base0.11
+mise à jour peut perdre ses anciens splits Android : retélécharger les moteurs
+souhaités suffit, les contenus restent présents. Les futurs modules natifs ne
+sont plus liés au versionCode de l'application.
 
-Le catalogue ne propose que les modules correspondant à l'architecture du
-processus et au `versionCode` de la base. Une nouvelle version de l'application
-peut nécessiter de retélécharger les modules correspondants. Les anciens jeux
-ne sont pas supprimés si leur cœur n'est plus disponible.
+## Référence RetroArch réellement examinée
 
-## Distribution Android
+Révision [dda31fef](https://github.com/libretro/RetroArch/tree/dda31fef21aeb472be9de7ee53eb386cc8db1417),
+comparée à [1.22.2](https://github.com/libretro/RetroArch/tree/69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576).
 
-Chaque moteur est une fonctionnalité Android native séparée : `coregb`,
-`coregbc` ou `coregba`. Les quatre APK partagent le package
-`com.corvussoftware.corvusretro`, le même `versionCode` et le même certificat.
-Le service utilise `PackageInstaller.MODE_INHERIT_EXISTING`, ce qui ajoute le
-module choisi aux modules présents. Android valide le package, le nom du split,
-la version et le certificat avant de rendre le code disponible.
+- [menu/cbs/menu_cbs_ok.c](https://github.com/libretro/RetroArch/blob/dda31fef21aeb472be9de7ee53eb386cc8db1417/menu/cbs/menu_cbs_ok.c)
+  déclenche les tâches du téléchargeur depuis la sélection d'une entrée.
+- [tasks/task_core_updater.c](https://github.com/libretro/RetroArch/blob/dda31fef21aeb472be9de7ee53eb386cc8db1417/tasks/task_core_updater.c)
+  télécharge l'archive, attend la décompression, prépare le remplacement et actualise
+  les informations. La variante Play Feature Delivery suit un autre chemin.
+- [frontend/drivers/platform_unix.c](https://github.com/libretro/RetroArch/blob/dda31fef21aeb472be9de7ee53eb386cc8db1417/frontend/drivers/platform_unix.c)
+  définit le dossier Android privé des cœurs.
+- [libretro-common/dynamic/dylib.c](https://github.com/libretro/RetroArch/blob/dda31fef21aeb472be9de7ee53eb386cc8db1417/libretro-common/dynamic/dylib.c)
+  charge les bibliothèques avec dlopen.
 
-L'APK téléchargé est vérifié par origine HTTPS, taille et SHA-256. Les
-bibliothèques sont extraites par Android dans `nativeLibraryDir`, non modifiable
-par l'application. Le frontend charge uniquement les bibliothèques de ses
-propres modules installés et valide CorvusAPI 0. Aucun `.so` du cache ou des
-téléchargements n'est chargé directement.
+CorvusRetro adapte ce parcours à CorvusAPI0. Aucun code ni ABI libretro n'est copié.
+L'ancien choix APK confondait des restrictions execve avec une interdiction de tout
+chargement natif privé. Le chargement d'un vrai CorvusGB privé en lecture seule a
+été vérifié sur Android15, cible35, sans changer les protections Android.
 
-Avant une installation, le frontend enregistre la batterie puis suspend
-l'émulation jusqu'à un résultat Android terminal. La suspension doit survivre
-à la recréation de l'activité pendant la confirmation système. Une erreur de
-sauvegarde empêche le lancement de l'installation.
+## Implémentation CorvusRetro
 
-## Catalogue
+CoreRepository récupère le format3 par HTTPS et filtre l'architecture et l'ABI
+CorvusAPI0. Il vérifie l'origine, la taille exacte et le SHA-256. CoreStore impose
+une archive à une seule entrée connue, borne l'extraction et contrôle l'en-tête ELF.
+Le module temporaire est marqué en lecture seule avant écriture via le descripteur
+ouvert, synchronisé puis renommé atomiquement dans le stockage privé files/cores.
+Son nom inclut le SHA-256 du module. Son empreinte et ses permissions sont revérifiées
+au démarrage avant toute découverte native. Les fichiers du cache ne sont pas chargés.
 
-`core-repository/cores-v2.json` utilise le format2. Chaque entrée porte :
+Java publie les chemins au mailbox natif. Le thread frontend négocie CorvusAPI,
+actualise les descripteurs en préservant leurs indices et recharge la bibliothèque
+de jeux. Un moteur déjà actif garde son ancien handle et son ancien fichier ; une
+mise à jour ne remplace jamais cet inode. Les sauvegardes gardent leurs identités.
+Un échec conserve les anciens cœurs. Aucun installateur de paquets n'intervient.
 
-| Champ | Rôle |
-| --- | --- |
-| `id` | Identité CorvusAPI stable : corvus.gb, corvus.gbc ou corvus.gba |
-| `name`, `description` | Nom et description du cœur |
-| `version` | Version du moteur, actuellement 0.14.0 |
-| `abi` | arm64-v8a ou x86_64 |
-| `sha256`, `size`, `apk_url` | Fichier APK signé réellement publié |
-| `split_name` | coregb, coregbc ou coregba |
-| `base_version_code` | Version exacte de la base compatible |
+## Publication
 
-L'unicité porte sur identité du cœur, ABI et version de base. Les entrées des
-anciennes bases peuvent être conservées lors de la publication d'une nouvelle
-base. Le format1 `index.json` reste réservé aux clients 0.10 et à leurs packs
-complets ; il n'est pas transformé en faux catalogue de cœurs individuels.
-
-La génération utilise `tools/register_core_split.py` avec la base signée,
-l'APK du cœur et l'empreinte du certificat déjà approuvé. Le certificat du
-candidat téléchargé ne devient jamais son propre ancrage de confiance.
-`tools/validate_core_splits.py` et `tools/test_core_splits.py` contrôlent le
-schéma et la conservation des entrées. Aucun catalogue réel ne contient
-d'URL, de taille ou de SHA-256 fictifs.
-
-## Construire et publier
-
-```sh
-./gradlew :app:assembleDebug :app:lintDebug \
-  :features:coregb:assembleDebug :features:coregbc:assembleDebug \
-  :features:coregba:assembleDebug :app:assembleDebugAndroidTest
-python3 tools/check_core_apks.py --apksigner "$ANDROID_HOME/build-tools/35.0.0/apksigner" \
-  --aapt "$ANDROID_HOME/build-tools/35.0.0/aapt" \
-  --zipalign "$ANDROID_HOME/build-tools/35.0.0/zipalign"
-```
-
-Le workflow Android produit une base et trois APK de cœur debug. Le workflow
-de preview signé reprend un commit main validé, réutilise les secrets de
-signature durables et produit les quatre APK signés sans publier de Release.
-Le publisher de cœurs reprend ces APK du même commit, contrôle leur certificat
-et leurs versions, puis publie la base et les trois modules sous le tag choisi.
-Il ne reconstruit pas les APK et ne remplace aucun tag ou asset existant.
-
-Le catalogue généré est proposé dans une branche candidate pour revue. Seules
-les métadonnées vérifiées des assets réellement accessibles sont ensuite
-intégrées à `main`, afin de rendre les trois téléchargements visibles.
-
-## Essais sur appareil
-
-Les tests hôtes couvrent le registre vide, GBA seul, l'ajout des autres cœurs,
-les identités historiques et l'échec batterie avant installation. Les tests
-Android couvrent le format du catalogue, le filtrage ABI/version et les
-confirmations système. Distinguer les essais sur émulateur d'une qualification
-sur téléphone physique ; voir [les preuves exécutées](validation-android.md).
+Les projets features/coregb, coregbc et coregba servent de builders natifs.
+La CI vérifie leurs APK et leur signature avec celle de la base, puis
+`tools/build_core_archives.py` extrait les bibliothèques et crée six ZIP déterministes
+(un cœur et une ABI), vérifiant ELF, export CorvusAPI et segments16Ko.
+Le publisher réutilise la base signée qualifiée et publie les ZIP. Il génère
+cores-v3.json sur une branche de revue ; le catalogue n'est promu qu'après
+vérification des assets publics. Aucune URL ou empreinte fictive n'est publiée.
+Les anciens cores-v2.json et index.json gardent leurs formats et leurs assets.

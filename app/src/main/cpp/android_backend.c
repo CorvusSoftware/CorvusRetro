@@ -19,6 +19,9 @@ static cr_import import_value;
 static bool import_ready;
 static ALooper *import_looper;
 static pthread_mutex_t core_mutex = PTHREAD_MUTEX_INITIALIZER;
+static char pending_modules[CR_MAX_CORES][4096];
+static size_t pending_module_count;
+static bool modules_ready;
 static cr_core_catalog pending_catalog;
 static bool catalog_ready;
 static char core_status[256];
@@ -113,6 +116,40 @@ JNIEXPORT void JNICALL Java_com_corvussoftware_corvusretro_MainActivity_coreCata
     catalog_ready = true;
     pthread_mutex_unlock(&core_mutex);
     wake_frontend();
+}
+JNIEXPORT void JNICALL Java_com_corvussoftware_corvusretro_MainActivity_coreModulesUpdated(
+    JNIEnv *env, jclass cls, jobjectArray paths) {
+    (void)cls;
+    if (!paths) return;
+    jsize count = (*env)->GetArrayLength(env, paths);
+    if (count < 0 || count > CR_MAX_CORES) return;
+    pthread_mutex_lock(&core_mutex);
+    pending_module_count = 0;
+    for (jsize i = 0; i < count; ++i) {
+        jstring path = (*env)->GetObjectArrayElement(env, paths, i);
+        if (path && (*env)->GetStringUTFLength(env, path) < 4096) {
+            string_copy(env, path, pending_modules[pending_module_count], 4096);
+            ++pending_module_count;
+        }
+        if (path) (*env)->DeleteLocalRef(env, path);
+    }
+    modules_ready = true;
+    pthread_mutex_unlock(&core_mutex);
+    wake_frontend();
+}
+bool cr_android_update_modules(void) {
+    // Only this frontend-thread consumer may negotiate CorvusAPI or mutate the registry.
+    pthread_mutex_lock(&core_mutex);
+    bool changed = modules_ready;
+    if (changed) {
+        for (size_t i = 0; i < pending_module_count; ++i) {
+            const char *path = pending_modules[i];
+            cr_registry_add_installed_modules(&path, 1);
+        }
+        modules_ready = false;
+    }
+    pthread_mutex_unlock(&core_mutex);
+    return changed;
 }
 JNIEXPORT void JNICALL Java_com_corvussoftware_corvusretro_MainActivity_coreInstallStatus(
     JNIEnv *env, jclass cls, jstring value, jboolean finished) {

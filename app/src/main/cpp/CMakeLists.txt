@@ -27,7 +27,7 @@ set(CORVUS_EXTRA_CORE_DIRECTORIES "" CACHE STRING
     "Semicolon-separated additional core source directories, absolute or relative to repository root")
 set(CORVUS_EXTRA_CORE_TARGETS "" CACHE STRING
     "Semicolon-separated native shared library targets provided by those directories")
-# 0.10 base APK contains NO emulators. Full core-pack APKs explicitly
+# The base APK contains NO emulators. Native core builders explicitly
 # enable one or several official engines with -D CORVUS_OFFICIAL_CORES=...
 # Use comma-separated IDs so Gradle can pass it safely as one CMake argument.
 set(CORVUS_OFFICIAL_CORES "" CACHE STRING

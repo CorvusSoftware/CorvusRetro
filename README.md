@@ -6,42 +6,38 @@ C/C++ et de la navigation MaterialUI de RetroArch. Les moteurs sont ceux de
 [CorvusAPI](https://github.com/CorvusSoftware/CorvusAPI).
 Code applicatif sous **AGPL-3.0-only**, Copyright (C) 2026 CorvusSoftware.
 
-## Version 0.11 : cœurs téléchargés séparément
+## Version 0.12 : téléchargeur de cœurs natifs
 
-L'application de base n'embarque aucun moteur. Dans **Charger un cœur >
-Téléchargeur de cœurs**, choisissez **CorvusGB**, **CorvusGBC** ou **CorvusGBA**.
-Chaque téléchargement installe uniquement le cœur choisi. Ajouter CorvusGB
-conserve CorvusGBA et CorvusGBC s'ils sont déjà présents.
+La base ne contient aucun moteur. Dans **Charger un cœur > Téléchargeur de cœurs**,
+choisissez **CorvusGB**, **CorvusGBC** ou **CorvusGBA**. CorvusRetro télécharge une
+archive du cœur choisi, la vérifie et l'ajoute immédiatement à **Charger un cœur**.
+Vous pouvez ensuite charger et décharger ce cœur. Ajouter un cœur conserve les autres.
 
-Android confirme l'ajout d'un module signé, puis CorvusRetro retrouve les cœurs
-installés au démarrage. Les trois modules utilisent CorvusAPI et les moteurs
-CorvusCore 0.14.0. Aucun jeu commercial ni BIOS constructeur n'est distribué.
+Ce parcours suit le téléchargeur natif de RetroArch hors Play Store : archives,
+dossier de cœurs et chargement dynamique. CorvusRetro utilise son propre code et
+CorvusAPI0 pour les moteurs CorvusCore0.14.0. Le téléchargement reste dans
+l'application, sans installateur APK ni redémarrage.
+Voir [le fonctionnement et les références](docs/individual-cores.md).
 
-La distribution utilise trois **APK de module Android**, distincts de l'APK de
-base. L'installation hérite des modules existants et vérifie le package, la
-signature et la version de base. Aucun fichier natif téléchargé dans le cache
-n'est exécuté. Les cœurs proposés doivent correspondre au `versionCode` de la
-base ; une mise à jour complète de la base demande des modules compatibles.
-Voir [les téléchargements individuels](docs/individual-cores.md).
-
-### Construire la base et les trois modules
+### Construire la base et les archives
 
 ```sh
 ./gradlew :app:assembleDebug :app:lintDebug \
   :features:coregb:assembleDebug :features:coregbc:assembleDebug \
   :features:coregba:assembleDebug
+python3 tools/build_core_archives.py --variant debug --tag v0.12.0 \
+  --output build/native-cores --catalog build/native-cores.json
 make test
 make test SANITIZE=ON
-python3 tools/validate_core_splits.py
-python3 tools/test_core_splits.py
+python3 tools/validate_core_archives.py
+python3 tools/test_core_archives.py
 ```
 
-Base : `app/build/outputs/apk/debug/app-debug.apk`. Cœurs :
-`features/coregb*/build/outputs/apk/debug/coregb*-debug.apk`.
-Les quatre APK doivent partager le même package, la même version et le même
-certificat. Le catalogue `core-repository/cores-v2.json` est alimenté uniquement
-avec des APK signés réellement publiés. L'ancien catalogue de packs 0.10 reste
-séparé dans `core-repository/index.json` pour les anciennes versions.
+Base : `app/build/outputs/apk/debug/app-debug.apk`. Les projets `features/coregb*`
+servent à construire les bibliothèques. Les fichiers distribués aux utilisateurs
+sont six ZIP, un cœur et une architecture par archive, et une base APK signée.
+Le catalogue courant est `core-repository/cores-v3.json`. Les catalogues des
+versions0.10 et0.11 sont conservés pour leurs anciens clients.
 
 Le fichier [AGENTS.md](AGENTS.md) et les instructions de répertoire
 préparent Codex à travailler sur cette architecture, selon une
@@ -168,7 +164,7 @@ sous-modules, contrôle la ponctuation, teste le C et les moteurs avec et sans
 sanitizers, construit l'APK, exécute lint et vérifie signature et alignement 16 Ko.
 
 Téléchargement : **Actions → Android APK → exécution réussie → Artifacts →
-CorvusRetro-0.11-individual-cores-…**. Le ZIP contient la base et les trois modules ; artefacts conservés 14 jours.
+CorvusRetro-0.12-native-cores-…**. Le ZIP contient la base et les six archives natives ; artefacts conservés 14 jours.
 Les modules sont installés par le téléchargeur, pas comme une nouvelle base.
 
 ## Architecture et origine

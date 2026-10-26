@@ -83,6 +83,8 @@ jobs:
           python3 tools/test_core_catalog.py
           python3 tools/validate_core_splits.py
           python3 tools/test_core_splits.py
+          python3 tools/validate_core_archives.py
+          python3 tools/test_core_archives.py
           python3 tools/test_split_release_workflows.py
 
       - name: Test native C frontend and CorvusCore engines
@@ -115,7 +117,7 @@ jobs:
             exit 1
           fi
           mkdir -p build/apk-variants
-          cp "$apk" build/apk-variants/CorvusRetro-0.11-base-debug.apk
+          cp "$apk" build/apk-variants/CorvusRetro-0.12-base-debug.apk
 
       - name: Verify three independent core APKs
         run: |
@@ -132,8 +134,12 @@ jobs:
               echo "FAIL: individual core unexpectedly contains the frontend"
               exit 1
             fi
-            cp "$apk" "build/apk-variants/CorvusRetro-0.11-core$core-debug.apk"
           done
+
+      - name: Package native cores for the integrated downloader
+        run: |
+          python3 tools/build_core_archives.py --variant debug --tag v0.12.0 \
+            --output build/apk-variants --catalog build/debug-core-catalog.json
 
       - name: Verify APK signatures and 16 KB alignment
         run: |
@@ -142,10 +148,12 @@ jobs:
             "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 16 4 "$apk"
           done
 
-      - name: Upload base and three individual debug cores
+      - name: Upload the base and downloadable native core archives
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: CorvusRetro-0.11-individual-cores-${{ github.sha }}
-          path: build/apk-variants/*.apk
+          name: CorvusRetro-0.12-native-cores-${{ github.sha }}
+          path: |
+            build/apk-variants/*.apk
+            build/apk-variants/*.zip
           if-no-files-found: error
           retention-days: 14

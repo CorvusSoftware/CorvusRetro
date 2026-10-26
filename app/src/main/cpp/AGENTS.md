@@ -12,12 +12,14 @@ Applies to app/src/main/cpp. Read the repository AGENTS.md first.
 
 ## No-core APK
 
-- The 0.11 base APK is valid with zero emulator modules.
+- The 0.12 base APK is valid with zero emulator modules.
 - cr_registry_count() == 0 must not crash the renderer, game library or downloader.
 - The "Téléchargeur de cœurs" menu entry stays present with zero cores.
 - Null/empty CMake module catalogs must remain valid C11 across Linux and Android.
-- Do not reintroduce bundled CorvusGB/GBC/GBA into the base APK. Discover installed
-  features only through the platform-provided read-only nativeLibraryDir paths.
+- Do not reintroduce bundled CorvusGB/GBC/GBA into the base APK. Discover verified
+  read-only private modules and legacy OS-installed nativeLibraryDir paths only.
+- Registry updates run on the frontend thread, preserve indices and full metadata,
+  and reload the game library. Active engines retain their original module handles.
 - A registry index is not a historic console storage suffix; use the stable core ID.
 
 ## Loading, saves and thread-safety

@@ -237,6 +237,8 @@ void android_main(struct android_app *app) {
         cr_core_catalog core_catalog;
         if (cr_android_core_catalog(&core_catalog))
             cr_ui_catalog(&a->ui, &core_catalog);
+        if (cr_android_update_modules())
+            cr_ui_reload(&a->ui);
         char install_status[256];
         bool install_finished;
         if (cr_android_core_status(install_status, sizeof(install_status), &install_finished))

@@ -80,16 +80,17 @@ static void register_module(const char *name) {
                         info.system_name) &&
             copy_string(descriptor.extensions, sizeof(descriptor.extensions),
                         info.extensions)) {
+            set_system_id(&descriptor);
+            descriptor.max_players = info.max_players;
+            descriptor.state_support = has_state;
+            descriptor.battery_support = has_battery;
             bool unique = true;
             for (size_t i = 0; i < registry_size; ++i)
-                if (strcmp(registry[i].id, descriptor.id) == 0)
+                if (strcmp(registry[i].id, descriptor.id) == 0) {
+                    registry[i] = descriptor;
                     unique = false;
+                }
             if (unique) {
-                set_system_id(&descriptor);
-                descriptor.max_players = info.max_players;
-                descriptor.state_support = api.serialize_size && api.serialize && api.unserialize;
-                descriptor.battery_support = api.battery_size && api.battery_dirty &&
-                                             api.battery_copy && api.battery_acknowledge;
                 registry[registry_size++] = descriptor;
             }
         }

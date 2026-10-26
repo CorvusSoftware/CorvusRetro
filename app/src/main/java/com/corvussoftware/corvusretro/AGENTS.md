@@ -4,25 +4,22 @@ Read the root AGENTS.md before editing this directory.
 
 ## Responsibilities
 
-- Android NativeActivity host, SAF, fonts, storage, HTTPS and PackageInstaller only.
-- Keep the actual CorvusRetro menus, emulation and rendering in the C11 frontend.
-- Java IO runs on an executor. UI-thread activity operations use runOnUiThread.
-- Event results cross into the native frontend through synchronized bounded mailboxes.
-- Avoid lifecycle bugs: check destruction, cancellation and callback ownership.
+- NativeActivity host, SAF, fonts, storage and HTTPS only. Application menus stay C11.
+- Java network/archive IO runs on an executor; UI operations use the Android thread.
+- Native results cross bounded synchronized mailboxes. Never mutate native core state
+  from Java worker threads. Keep lifecycle, cancellation and callback ownership explicit.
 
 ## Downloaded code
 
-- CorvusRetro is not distributed through Google Play. Android OS security still applies.
-- Never dlopen a downloaded .so from writable app storage.
-- In 0.11, each format2 entry is an independently installable feature APK. Use
-  MODE_INHERIT_EXISTING to preserve other cores and persist pending session ownership.
-- A full base APK update can remove features; only matching base versionCodes are compatible.
-- Restrict update URLs to CorvusSoftware official HTTPS release assets.
-- Verify declared size and SHA-256. Let PackageInstaller validate package identity,
-  release certificate and user confirmation. Do not bypass these system checks.
-- Do not log keys, tokens or private paths. Never store release signing credentials.
-- Keep CoreRepository's format2 validation aligned with tools/validate_core_splits.py.
-  Keep the legacy format1 validator for 0.10 clients.
+- Validate official HTTPS URLs, size, SHA-256, exact ZIP entry, CorvusAPI version and ELF ABI.
+- Store libraries only in private files/cores. Mark temporary modules read-only before
+  writing via the open descriptor; fsync and rename atomically. Validate hashes on discovery.
+- Never load writable/unverified files or libraries in cache/external storage.
+- Keep old content-addressed files while a core may still use them. Preserve games/saves.
+- The downloader does not request APK installation permission or open PackageInstaller.
+- Keep CoreRepository format3 validation aligned with tools/validate_core_archives.py.
+- Preserve discovery of legacy OS-installed splits and old catalogs for previous clients.
+- Never log credentials or private paths. Do not change target35 to work around a failure.
 
 ## Compatibility
 

@@ -5,283 +5,244 @@ package com.corvussoftware.corvusretro;
 
 import android.app.Activity;
 import android.app.Instrumentation;
-import android.app.PendingIntent;
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.Intent;
-import android.content.pm.PackageInfo;
-import android.content.pm.PackageInstaller;
-import android.content.pm.PackageManager;
-import android.os.Build;
+import android.content.SharedPreferences;
 import android.os.Bundle;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.lang.reflect.Method;
+import java.io.InputStream;
+import java.net.URL;
+import java.net.URLConnection;
+import java.net.URLStreamHandler;
+import java.security.cert.Certificate;
 import java.util.Arrays;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+import javax.net.ssl.HttpsURLConnection;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-/** Framework-only tests: no network, downloaded executable or private platform API. */
+/** Real compiled cores with a deterministic HTTPS transport fixture. */
 public final class CoreRepositoryInstrumentation extends Instrumentation {
     private int checks;
-    private String phase;
-
+    private File fixtures;
+    private boolean truncated;
+    private String requestedCore = "";
+    private volatile java.util.concurrent.CountDownLatch transferStarted;
+    private volatile java.util.concurrent.CountDownLatch transferRelease;
     private void check(boolean condition, String message) {
         if (!condition) throw new AssertionError(message);
         checks++;
     }
-
-    private JSONObject core(String id, String abi, long code) throws Exception {
-        String split = "core" + id.substring("corvus.".length());
-        return new JSONObject().put("id", id).put("name", "Official test core")
-                .put("description", "Synthetic catalog fixture").put("version", "0.14.0")
-                .put("abi", abi).put("sha256", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").put("size", 42)
-                .put("apk_url", "https://github.com/CorvusSoftware/CorvusRetro/releases/download/test/" + split + ".apk")
-                .put("split_name", split).put("base_version_code", code);
+    private File archive(String id) {
+        return new File(fixtures, "Corvus" + id.toUpperCase(java.util.Locale.ROOT) + "-0.14.0-android-x86_64.zip");
     }
-
+    private JSONObject core(String id) throws Exception {
+        File file = archive(id);
+        return new JSONObject().put("id", "corvus." + id).put("name", "Corvus" + id.toUpperCase(java.util.Locale.ROOT))
+                .put("description", "Official core test fixture").put("version", "0.14.0")
+                .put("abi", "x86_64").put("sha256", CoreStore.hash(file)).put("size", file.length())
+                .put("archive_url", "https://github.com/CorvusSoftware/CorvusRetro/releases/download/v0.12.0/" + file.getName())
+                .put("library_name", "libcorvus_" + id + ".so").put("api_version", 0);
+    }
     private String feed(JSONObject... entries) throws Exception {
-        JSONArray cores = new JSONArray();
-        for (JSONObject entry : entries) cores.put(entry);
-        return new JSONObject().put("format", 2).put("cores", cores).toString();
+        JSONArray array = new JSONArray();
+        for (JSONObject entry : entries) array.put(entry);
+        return new JSONObject().put("format", 3).put("cores", array).toString();
     }
-
-    private void reject(JSONObject entry, String description) throws Exception {
+    private void reject(JSONObject entry) throws Exception {
         try {
             new CoreRepository.Core(entry);
-            throw new AssertionError(description);
+            throw new AssertionError("invalid catalog entry accepted");
         } catch (IOException | org.json.JSONException expected) { checks++; }
     }
-
     private void catalogs() throws Exception {
-        CoreRepository.Catalog empty = CoreRepository.parseCatalog(feed(), 12, "x86_64");
-        check(empty.cores.isEmpty() && empty.records.length == 0 && empty.error.isEmpty(), "empty catalog");
-        CoreRepository.Catalog selected = CoreRepository.parseCatalog(feed(
-                core("corvus.gb", "arm64-v8a", 12), core("corvus.gba", "x86_64", 12),
-                core("corvus.gba", "x86_64", 13)), 12, "x86_64");
-        check(selected.cores.size() == 1 && selected.cores.containsKey("corvus.gba"), "ABI and base version filter");
-        check(Arrays.equals(selected.records, new String[] {"corvus.gba", "Official test core", "0.14.0", "corvus.gba", "x86_64"}), "JNI identity fields");
-        CoreRepository.Catalog newer = CoreRepository.parseCatalog(feed(core("corvus.gb", "x86_64", 13)), 12, "x86_64");
-        check(newer.cores.isEmpty() && !newer.error.isEmpty(), "base update required message");
+        check(CoreRepository.parseCatalog(feed(), "x86_64").cores.isEmpty(), "empty catalog");
+        CoreRepository.Catalog catalog = CoreRepository.parseCatalog(feed(core("gb"), core("gba")
+                .put("abi", "arm64-v8a")), "x86_64");
+        check(catalog.cores.size() == 1 && catalog.cores.containsKey("corvus.gb"), "ABI filter");
+        check(Arrays.equals(catalog.records, new String[] {"corvus.gb", "CorvusGB", "0.14.0", "corvus.gb", "x86_64"}), "JNI fields");
         try {
-            CoreRepository.parseCatalog(feed(core("corvus.gb", "x86_64", 12), core("corvus.gb", "x86_64", 12)), 12, "x86_64");
+            CoreRepository.parseCatalog(feed(core("gb"), core("gb")), "x86_64");
             throw new AssertionError("duplicate core accepted");
         } catch (IOException expected) { checks++; }
-        reject(core("corvus.gb", "x86_64", 12).put("split_name", "coregba"), "foreign split identity");
-        reject(core("corvus.gb", "x86_64", 12).put("apk_url", "https://example.com/core.apk"), "untrusted origin");
-        reject(core("corvus.gb", "x86_64", 12).put("apk_url", "https://github.com/CorvusSoftware/CorvusRetro/releases/download/../core.apk"), "traversal URL");
-        reject(core("corvus.gb", "x86_64", 12).put("apk_url", "https://github.com/CorvusSoftware/CorvusRetro/releases/download/test/co%72e.apk"), "encoded URL");
-        reject(core("corvus.gb", "x86_64", 12).put("name", "bad\u0085name"), "control character");
-        reject(core("corvus.gb", "x86_64", 12).put("name", 1), "numeric name");
-        reject(core("corvus.gb", "x86_64", 12).put("description", true), "boolean description");
-        reject(core("corvus.gb", "x86_64", 12).put("version", 0.14), "numeric version");
-        reject(core("corvus.gb", "x86_64", 12).put("base_version_code", 12.0), "fractional base version");
-        reject(core("corvus.gb", "x86_64", 12).put("sha256", "bad"), "invalid hash");
-        reject(core("corvus.gb", "x86_64", 12).put("extra", "field"), "unknown field");
+        reject(core("gb").put("api_version", 1));
+        reject(core("gb").put("api_version", true));
+        reject(core("gb").put("size", 12.0));
+        reject(core("gb").put("name", 1));
+        reject(core("gb").put("library_name", "../libcorvus_gb.so"));
+        reject(core("gb").put("archive_url", "https://example.com/core.zip"));
+        reject(core("gb").put("base_version_code", 13));
     }
-
-    private void identities() throws Exception {
-        Method storage = GameLibrary.class.getDeclaredMethod("storageId", String.class, String.class);
-        storage.setAccessible(true);
-        String hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-        check((hash + "-0").equals(storage.invoke(null, hash, "corvus.gb")), "historic GB suffix");
-        check((hash + "-1").equals(storage.invoke(null, hash, "corvus.gbc")), "historic GBC suffix");
-        check((hash + "-2").equals(storage.invoke(null, hash, "corvus.gba")), "historic GBA suffix without registry order");
-        String community = (String) storage.invoke(null, hash, "other.core");
-        check(community.length() == 82 && community.equals(storage.invoke(null, hash, "other.core")), "stable community ID");
-    }
-
-    private void copy(String source, File target) throws IOException {
-        try (FileInputStream input = new FileInputStream(source); FileOutputStream output = new FileOutputStream(target)) {
-            byte[] buffer = new byte[65536];
-            int count;
-            while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
-        }
-    }
-
-    private void archiveProbe(Bundle result) throws Exception {
-        Context context = getTargetContext();
-        int flags = Build.VERSION.SDK_INT >= 28 ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES;
-        PackageInfo host = context.getPackageManager().getPackageInfo(context.getPackageName(), flags);
-        check(host.applicationInfo != null, "installed application metadata");
-        if (host.splitNames == null || host.splitNames.length == 0) {
-            result.putString("archive_probe", "SKIPPED: no installed core split");
-            return;
-        }
-        String[] paths = host.applicationInfo.splitSourceDirs;
-        check(paths != null && paths.length == host.splitNames.length, "split archive mapping");
-        PackageInfo alone = context.getPackageManager().getPackageArchiveInfo(paths[0], flags);
-        File cluster = new File(context.getCacheDir(), "core-archive-probe");
-        check(cluster.mkdir() || cluster.isDirectory(), "temporary archive cluster");
-        File base = new File(cluster, "base.apk"), split = new File(cluster, "core.apk");
-        try {
-            copy(host.applicationInfo.sourceDir, base);
-            copy(paths[0], split);
-            PackageInfo info = context.getPackageManager().getPackageArchiveInfo(cluster.getAbsolutePath(), flags);
-            result.putString("archive_probe", "standalone=" + (alone != null) + ", cluster=" + (info != null));
-            if (info != null) {
-                check(context.getPackageName().equals(info.packageName), "cluster package identity");
-                check(info.splitNames != null && info.splitNames.length == 1 && host.splitNames[0].equals(info.splitNames[0]), "cluster split identity");
+    private void store() throws Exception {
+        Context target = getTargetContext();
+        File root = new File(target.getCacheDir(), "native-core-store-test");
+        check(root.isDirectory() || root.mkdirs(), "isolated module storage");
+        Context context = new ContextWrapper(target) {
+            @Override public File getFilesDir() { return root; }
+            @Override public SharedPreferences getSharedPreferences(String key, int mode) {
+                return super.getSharedPreferences("test_" + key, mode);
             }
-        } finally {
-            base.delete(); split.delete(); cluster.delete();
-        }
-    }
-
-    private void installationLifecycle() throws Exception {
-        Context context = getTargetContext();
-        check(!CoreInstallState.pending(context), "no pending installation before lifecycle test");
-        String download = CoreInstallState.begin(context);
-        check(download != null && CoreInstallState.pending(context), "download survives service recreation");
-        check(CoreInstallState.begin(context) == null, "another Activity cannot start a second download");
-        CoreInstallState.downloaded(context, "old-operation", false, "ignored");
-        check(CoreInstallState.pending(context), "stale download completion cannot release pause");
-        CoreInstallState.downloaded(context, download, false, "Test cancellation");
-        check(!CoreInstallState.pending(context), "download cancellation releases pause");
-
-        PackageInfo host = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
-        check(host.applicationInfo != null && host.applicationInfo.splitSourceDirs != null &&
-                host.applicationInfo.splitSourceDirs.length > 0, "installed core for real pending session");
-        PackageInstaller installer = context.getPackageManager().getPackageInstaller();
-        PackageInstaller.SessionParams params = new PackageInstaller.SessionParams(
-                PackageInstaller.SessionParams.MODE_INHERIT_EXISTING);
-        params.setAppPackageName(context.getPackageName());
-        if (Build.VERSION.SDK_INT >= 31)
-            params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_REQUIRED);
-        int id = installer.createSession(params);
-        String operation = CoreInstallState.begin(context);
-        MainActivity first = null, recreated = null;
+        };
+        context.getSharedPreferences("native_cores", Context.MODE_PRIVATE).edit().clear().commit();
+        CoreStore store = new CoreStore(context);
+        check(store.modules().length == 0, "zero downloaded cores");
+        CoreRepository.Core gba = new CoreRepository.Core(core("gba"));
+        store.install(gba, archive("gba"));
+        String first = store.modules()[0];
+        check(!new File(first).canWrite(), "installed library is read-only");
+        System.load(first);
+        check(true, "actual native module loads on the current Android target");
+        store.install(new CoreRepository.Core(core("gb")), archive("gb"));
+        check(store.modules().length == 2 && Arrays.asList(store.modules()).contains(first), "adding GB preserves GBA");
+        check(new CoreStore(context).modules().length == 2, "modules survive service recreation");
+        store.install(gba, archive("gba"));
+        check(store.modules().length == 2, "same-version download is idempotent");
         try {
-            try (PackageInstaller.Session session = installer.openSession(id)) {
-                try (FileInputStream input = new FileInputStream(host.applicationInfo.splitSourceDirs[0]);
-                     OutputStream output = session.openWrite(host.splitNames[0] + ".apk", 0, -1)) {
-                    byte[] bytes = new byte[65536];
-                    int count;
-                    while ((count = input.read(bytes)) != -1) output.write(bytes, 0, count);
-                    session.fsync(output);
+            store.install(new CoreRepository.Core(core("gb").put("sha256", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")), archive("gb"));
+            throw new AssertionError("bad hash accepted");
+        } catch (IOException expected) { checks++; }
+        try {
+            store.install(new CoreRepository.Core(core("gb").put("abi", "arm64-v8a")), archive("gb"));
+            throw new AssertionError("wrong ELF machine accepted");
+        } catch (IOException expected) { checks++; }
+        File unsafe = new File(root, "traversal.zip");
+        try (ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(unsafe))) {
+            zip.putNextEntry(new ZipEntry("../libcorvus_gb.so")); zip.write(new byte[32]); zip.closeEntry();
+        }
+        try {
+            store.install(new CoreRepository.Core(core("gb").put("sha256", CoreStore.hash(unsafe)).put("size", unsafe.length())), unsafe);
+            throw new AssertionError("archive path traversal accepted");
+        } catch (IOException expected) { checks++; }
+        check(store.modules().length == 2, "failed downloads preserve installed modules");
+        File altered = new File(first);
+        check(altered.setWritable(true), "create altered fixture");
+        check(store.modules().length == 1, "writable executable rejected on discovery");
+        check(altered.setReadOnly(), "restore fixture permissions");
+    }
+    private void transport() {
+        URL.setURLStreamHandlerFactory(protocol -> "https".equals(protocol) ? new URLStreamHandler() {
+            @Override protected URLConnection openConnection(URL url) {
+                return new HttpsURLConnection(url) {
+                    @Override public int getResponseCode() { return 200; }
+                    @Override public InputStream getInputStream() throws IOException {
+                        try {
+                            if (url.toString().endsWith("cores-v3.json"))
+                                return new ByteArrayInputStream(feed(core("gb"), core("gbc"), core("gba")).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                            requestedCore = new File(url.getPath()).getName();
+                            if (requestedCore.startsWith("CorvusGB-") && transferStarted != null) {
+                                transferStarted.countDown();
+                                if (!transferRelease.await(20, java.util.concurrent.TimeUnit.SECONDS))
+                                    throw new IOException("fixture transfer timeout");
+                            }
+                            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                            try (FileInputStream input = new FileInputStream(new File(fixtures, requestedCore))) {
+                                byte[] buffer = new byte[65536];
+                                int count;
+                                while ((count = input.read(buffer)) != -1) bytes.write(buffer, 0, count);
+                            }
+                            byte[] payload = bytes.toByteArray();
+                            return new ByteArrayInputStream(truncated ? Arrays.copyOf(payload, payload.length / 2) : payload);
+                        } catch (Exception error) { throw new IOException(error); }
+                    }
+                    @Override public void disconnect() { }
+                    @Override public boolean usingProxy() { return false; }
+                    @Override public void connect() { }
+                    @Override public String getCipherSuite() { return "fixture"; }
+                    @Override public Certificate[] getLocalCertificates() { return null; }
+                    @Override public Certificate[] getServerCertificates() { return null; }
+                };
+            }
+        } : null);
+    }
+    private void downloader() throws Exception {
+        transport();
+        MainActivity activity = (MainActivity) startActivitySync(new Intent(getTargetContext(), MainActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            CoreRepository repository = new CoreRepository(activity, executor);
+            repository.refresh();
+            executor.submit(() -> { }).get();
+            for (String id : new String[] {"gba", "gb", "gbc"}) {
+                if ("gb".equals(id)) {
+                    transferStarted = new java.util.concurrent.CountDownLatch(1);
+                    transferRelease = new java.util.concurrent.CountDownLatch(1);
                 }
-                Intent result = new Intent(context, CoreInstallReceiver.class).setAction(CoreInstallReceiver.ACTION)
-                        .putExtra("operation", operation).putExtra("session", id);
-                PendingIntent callback = PendingIntent.getBroadcast(context, id, result,
-                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
-                CoreInstallState.commit(context, operation, id, session, callback.getIntentSender());
+                repository.install("corvus." + id);
+                if ("gb".equals(id)) {
+                    check(transferStarted.await(10, java.util.concurrent.TimeUnit.SECONDS), "download running before recreation");
+                    ActivityMonitor monitor = addMonitor(MainActivity.class.getName(), null, false);
+                    MainActivity old = activity;
+                    runOnMainSync(old::recreate);
+                    activity = (MainActivity) monitor.waitForActivityWithTimeout(15000);
+                    removeMonitor(monitor);
+                    check(activity != null && activity != old && activity.coreInstallPending(), "recreated activity retains pending download");
+                    transferRelease.countDown();
+                }
+                executor.submit(() -> { }).get();
+                if ("gb".equals(id)) {
+                    check(activity.installedCoreModules().length == 2, "recreated activity sees the new module after completion");
+                    transferStarted = null;
+                    repository = new CoreRepository(activity, executor);
+                    repository.refresh();
+                    executor.submit(() -> { }).get();
+                }
+                check(!CoreRepository.downloading(), "download completes without an installer session");
+                check(!requestedCore.isEmpty(), "production downloader requested the archive");
             }
-            CoreInstallState.downloaded(context, operation, true, "unused");
-            check(CoreInstallState.pending(context), "sealed session retains pause after worker exits");
-            awaitConfirmation(context);
-            first = (MainActivity) startActivitySync(new Intent(context, MainActivity.class)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-            check(first.coreInstallPending(), "new Activity restores sealed session pause");
-            ActivityMonitor monitor = addMonitor(MainActivity.class.getName(), null, false);
-            MainActivity old = first;
-            runOnMainSync(old::recreate);
-            recreated = (MainActivity) monitor.waitForActivityWithTimeout(15000);
-            removeMonitor(monitor);
-            check(recreated != null && recreated != first && recreated.coreInstallPending(),
-                    "recreated Activity keeps pending confirmation paused");
-            CoreInstallState.status(context, "stale-operation", id, "ignored", true);
-            check(CoreInstallState.pending(context), "stale installer callback cannot release pause");
-            CoreInstallState.cancel(context, operation, id, "Test cancellation");
-            check(!CoreInstallState.pending(context), "abandoning pending session releases pause");
+            check(repository.installedModules().length == 3, "all three modules downloaded individually");
+            android.os.SystemClock.sleep(400);
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER);
+            android.os.SystemClock.sleep(400);
+            android.graphics.Bitmap screen = getUiAutomation().takeScreenshot();
+            check(screen != null, "core list captured in the same running activity after downloads");
+            try (FileOutputStream output = new FileOutputStream(new File(activity.getFilesDir(), "test-immediate-core-list.png"))) {
+                screen.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, output);
+            }
+            screen.recycle();
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER);
+            android.os.SystemClock.sleep(400);
+            screen = getUiAutomation().takeScreenshot();
+            try (FileOutputStream output = new FileOutputStream(new File(activity.getFilesDir(), "test-immediate-loaded-core.png"))) {
+                screen.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, output);
+            }
+            screen.recycle();
+            String[] before = repository.installedModules();
+            truncated = true;
+            repository.install("corvus.gb");
+            executor.submit(() -> { }).get();
+            check(Arrays.equals(before, repository.installedModules()), "truncated download retains existing modules");
+            check(activity.getPackageManager().getPackageInstaller().getMySessions().isEmpty(), "no Android installation session");
+            check(new CoreStore(activity).modules().length == 3, "modules persist for next launch");
         } finally {
-            CoreInstallState.cancel(context, operation, id, "Test cleanup");
-            CoreInstallState.downloaded(context, operation, false, "Test cleanup");
-            try { installer.abandonSession(id); } catch (RuntimeException ignored) { }
-            MainActivity active = recreated != null ? recreated : first;
-            if (active != null) runOnMainSync(active::finish);
+            executor.shutdown();
+            if (transferRelease != null) transferRelease.countDown();
+            MainActivity last = activity;
+            if (last != null) runOnMainSync(last::finish);
         }
     }
-
-    private void awaitConfirmation(Context context) {
-        long deadline = android.os.SystemClock.uptimeMillis() + 10000;
-        while (android.os.SystemClock.uptimeMillis() < deadline) {
-            android.content.SharedPreferences state = context.getSharedPreferences("core_install", Context.MODE_PRIVATE);
-            if (!state.getString("confirmation", "").isEmpty() &&
-                    CoreInstallState.owns(context, state.getString("operation", ""), state.getInt("session", -1))) {
-                check(true, "Android confirmation intent is persisted before foreground launch");
-                return;
-            }
-            android.os.SystemClock.sleep(25);
-        }
-        throw new AssertionError("Android confirmation was not persisted");
-    }
-
-    private void prepareProcessDeath() throws Exception {
-        Context context = getTargetContext();
-        check(!CoreInstallState.pending(context), "no earlier pending installation");
-        PackageInfo host = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
-        PackageInstaller installer = context.getPackageManager().getPackageInstaller();
-        PackageInstaller.SessionParams params = new PackageInstaller.SessionParams(
-                PackageInstaller.SessionParams.MODE_INHERIT_EXISTING);
-        params.setAppPackageName(context.getPackageName());
-        if (Build.VERSION.SDK_INT >= 31)
-            params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_REQUIRED);
-        int id = installer.createSession(params);
-        String operation = CoreInstallState.begin(context);
-        boolean committed = false;
-        try (PackageInstaller.Session session = installer.openSession(id)) {
-            try (FileInputStream input = new FileInputStream(host.applicationInfo.splitSourceDirs[0]);
-                 OutputStream output = session.openWrite(host.splitNames[0] + ".apk", 0, -1)) {
-                byte[] bytes = new byte[65536];
-                int count;
-                while ((count = input.read(bytes)) != -1) output.write(bytes, 0, count);
-                session.fsync(output);
-            }
-            Intent intent = new Intent(context, CoreInstallReceiver.class).setAction(CoreInstallReceiver.ACTION)
-                    .putExtra("operation", operation).putExtra("session", id);
-            PendingIntent callback = PendingIntent.getBroadcast(context, id, intent,
-                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
-            CoreInstallState.commit(context, operation, id, session, callback.getIntentSender());
-            committed = true;
-        } finally {
-            if (!committed) installer.abandonSession(id);
-            CoreInstallState.downloaded(context, operation, committed, "Test cleanup");
-        }
-        check(CoreInstallState.pending(context), "sealed session persists before process death");
-        awaitConfirmation(context);
-    }
-
-    private void recoverProcessDeath() throws Exception {
-        Context context = getTargetContext();
-        String operation = context.getSharedPreferences("core_install", Context.MODE_PRIVATE)
-                .getString("operation", "");
-        int id = context.getSharedPreferences("core_install", Context.MODE_PRIVATE).getInt("session", -1);
-        MainActivity activity = null;
-        try {
-            check(CoreInstallState.pending(context), "sealed session restores after process death");
-            check(!context.getSharedPreferences("core_install", Context.MODE_PRIVATE)
-                    .getString("confirmation", "").isEmpty(), "confirmation URI survives process death");
-            activity = (MainActivity) startActivitySync(new Intent(context, MainActivity.class)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-            check(activity.coreInstallPending(), "fresh Activity recovers the persistent pause");
-        } finally {
-            CoreInstallState.cancel(context, operation, id, "Test cleanup");
-            if (activity != null) {
-                MainActivity active = activity;
-                runOnMainSync(active::finish);
-            }
-        }
-        check(!CoreInstallState.pending(context), "pending session is safely cancelled after recovery");
-    }
-
     @Override public void onCreate(Bundle arguments) {
         super.onCreate(arguments);
-        phase = arguments == null ? "" : arguments.getString("phase", "");
+        fixtures = new File(arguments.getString("fixture_dir", ""));
         start();
     }
     @Override public void onStart() {
         Bundle result = new Bundle();
         try {
-            if ("prepare_process".equals(phase)) prepareProcessDeath();
-            else if ("recover_process".equals(phase)) recoverProcessDeath();
-            else { catalogs(); identities(); archiveProbe(result); installationLifecycle(); }
-            result.putString("stream", "PASS " + checks + " Android core catalog/storage/archive checks"
-                    + " phase=" + phase + " pid=" + android.os.Process.myPid() + "\n");
+            catalogs(); store(); downloader();
+            result.putString("stream", "PASS " + checks + " native core catalog/store/downloader checks\n");
             finish(Activity.RESULT_OK, result);
         } catch (Throwable failure) {
-            result.putString("stream", "FAIL " + failure.toString() + "\n");
+            result.putString("stream", "FAIL " + failure + "\n");
             finish(Activity.RESULT_CANCELED, result);
         }
     }

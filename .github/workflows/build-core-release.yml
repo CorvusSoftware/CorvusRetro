@@ -1,7 +1,7 @@
 # CorvusRetro - CorvusSoftware
 # Copyright (C) 2026 CorvusSoftware
 # SPDX-License-Identifier: AGPL-3.0-only
-name: Build signed individual Corvus cores
+name: Build signed base and native Corvus cores
 
 on:
   workflow_run:
@@ -149,7 +149,7 @@ jobs:
       - name: Stage signed artifacts and provenance
         run: |
           mkdir -p build/signed-preview
-          cp app/build/outputs/apk/release/app-release.apk build/signed-preview/CorvusRetro-0.11-base-release.apk
+          cp app/build/outputs/apk/release/app-release.apk build/signed-preview/CorvusRetro-0.12-base-release.apk
           cp features/coregb/build/outputs/apk/release/coregb-release.apk build/signed-preview/CorvusGB.apk
           cp features/coregbc/build/outputs/apk/release/coregbc-release.apk build/signed-preview/CorvusGBC.apk
           cp features/coregba/build/outputs/apk/release/coregba-release.apk build/signed-preview/CorvusGBA.apk
@@ -169,7 +169,7 @@ jobs:
       - name: Upload the signed qualification build
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: CorvusRetro-0.11-signed-${{ env.SOURCE_SHA }}
+          name: CorvusRetro-0.12-signed-${{ env.SOURCE_SHA }}
           path: |
             build/signed-preview/*.apk
             build/signed-preview/source.json

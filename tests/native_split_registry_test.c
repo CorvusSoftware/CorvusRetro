@@ -112,7 +112,27 @@ int main(int argc, char **argv) {
     check(ui.game_count == 3 && ui.games[0].system == 1 && ui.games[1].system == 2 &&
               ui.games[2].system == 0 && strcmp(ui.engine.id, id) == 0,
           "library identity remains stable after other modules are installed");
+    char replacement[4096];
+    snprintf(replacement, sizeof(replacement), "%s/replacement-gba.so", root);
+    FILE *source = fopen(argv[1], "rb"), *destination = fopen(replacement, "wb");
+    check(source && destination, "open a new immutable version of the GBA module");
+    uint8_t buffer[65536];
+    size_t bytes;
+    while ((bytes = fread(buffer, 1, sizeof(buffer), source)) != 0)
+        check(fwrite(buffer, 1, bytes, destination) == bytes, "copy replacement module");
+    check(!ferror(source) && fclose(source) == 0 && fclose(destination) == 0,
+          "finish replacement module");
+    const char *replacement_path = replacement;
+    cr_registry_add_installed_modules(&replacement_path, 1);
+    const cr_core_descriptor *updated = cr_registry_get(0);
+    check(cr_registry_count() == 3 && updated && strcmp(updated->module, replacement) == 0 &&
+              strcmp(updated->system_id, "nintendo.game_boy_advance") == 0 &&
+              updated->state_support && updated->battery_support && updated->max_players > 0,
+          "replacement preserves stable index, system identity and core capabilities");
+    check(ui.engine.handle == handle && cr_engine_step(&ui.engine, 0),
+          "a running game keeps its valid previous module while a replacement is registered");
     cr_ui_destroy(&ui);
+    check(unlink(replacement) == 0, "remove replacement module");
     check(unlink(path) == 0 && rmdir(directory) == 0, "remove original test ROM");
     snprintf(path, sizeof(path), "%s/saves/%s.sav", root, id);
     check(access(path, F_OK) == 0 && unlink(path) == 0, "historical GBA battery was persisted");

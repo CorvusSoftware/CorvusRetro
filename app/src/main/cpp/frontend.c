@@ -272,7 +272,7 @@ void cr_ui_catalog(cr_ui *u, const cr_core_catalog *catalog) {
     if (count > 0 && u->focus >= count) u->focus = count - 1;
     clamp_scroll(u);
     if (catalog->error[0]) cr_ui_message(u, catalog->error);
-    else if (!catalog->count) cr_ui_message(u, "Aucun cœur publié pour cette version de CorvusRetro");
+    else if (!catalog->count) cr_ui_message(u, "Aucun cœur publié pour cet appareil");
 }
 void cr_ui_install_status(cr_ui *u, const char *message, bool finished) {
     if (finished) u->installing = false;
@@ -403,7 +403,7 @@ static void activate(cr_ui *u, row r) {
     if (u->installing && (r.action == ACT_INSTALL_CORE_PACK || r.action == ACT_GAME ||
                           r.action == ACT_SELECT || r.action == ACT_PICK ||
                           r.action == ACT_UNLOAD)) {
-        cr_ui_message(u, "Installation du cœur en cours");
+        cr_ui_message(u, "Téléchargement du cœur en cours");
         return;
     }
     switch (r.action) {
@@ -580,7 +580,7 @@ static void quick_action(cr_ui *u, int row) {
     int i = quick_action_at(u, row);
     if (i < 0) return;
     if (u->installing && i != 0 && i != 4) {
-        cr_ui_message(u, "Installation du cœur en cours");
+        cr_ui_message(u, "Téléchargement du cœur en cours");
         return;
     }
     if (i == 0)
@@ -1033,7 +1033,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         if (u->page == CR_ABOUT)
             u->text_height = paragraphs(
                 p,
-                "CorvusRetro 0.11.0\n\nFrontend original en C, rendu OpenGL ES et audio "
+                "CorvusRetro 0.12.0\n\nFrontend original en C, rendu OpenGL ES et audio "
                 "AAudio.\n\nCorvusSoftware\nCœurs officiels CorvusCore 0.14.0 : Game Boy, Game "
                 "Boy Color, Game Boy Advance (expérimental).\n\nNavigation inspirée de "
                 "MaterialUI. Thèmes CorvusRetro, ASUS et NVIDIA Shield.\n\nCopyright (C) 2026 "

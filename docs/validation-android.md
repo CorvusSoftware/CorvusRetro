@@ -1,3 +1,27 @@
+# Qualification 0.12 : archives natives individuelles
+
+Vérification du26octobre2026, cible Android35 conservée.
+
+- Six tests CTest normaux et six sous ASan/UBSan réussis, y compris remplacement
+  d'un module à chemin différent pendant un jeu actif et conservation des capacités.
+- Zéro cœur au départ : test natif séparé réussi. Dix-neuf tests Python réussis
+  pour catalogues historiques, archives et contrôles de publication.
+- Gradle assembleDebug, assembleDebugAndroidTest et lintDebug réussis. Base et
+  trois builders vérifiés : identités, signatures, architectures et alignement16Ko.
+- Android15 x86_64 :39contrôles réels catalogue/stockage/service réussis, avec les
+  véritables bibliothèques compilées. Extraction vers files/cores, lecture seule,
+  chargement natif, ajout cumulatif, reprise après recréation pendant transfert,
+  refus de hash/ABI/traversal, téléchargement tronqué sans perte des modules.
+- La liste native puis le chargement d'un cœur ont été capturés dans la même
+  activité après téléchargement, sans redémarrage et sans session PackageInstaller.
+
+Le transport HTTPS est une fixture déterministe dans l'instrumentation, afin
+que les défauts de CA du proxy de laboratoire ne conditionnent pas ces tests.
+La validation TLS publique de production reste stricte. Ces preuves ne sont
+pas une qualification de téléphone physique ni d'exécution ARM64.
+
+## Qualifications historiques
+
 # Validation Android
 
 ## Version 0.11 : cœurs Android individuels

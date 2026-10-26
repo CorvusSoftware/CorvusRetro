@@ -234,8 +234,8 @@ int main(void) {
     u.importing = false;
     row(&u, 1);
     check(core_installs == 1 && strcmp(selected_pack, "corvus.gb") == 0,
-          "frontend requests verified pack installation by catalog ID only");
-    check(u.installing, "installer owns a barrier until a terminal Android status");
+          "frontend requests one verified native core by catalog ID only");
+    check(u.installing, "download keeps a barrier until its terminal status");
     row(&u, 1);
     check(core_installs == 1, "a second install cannot start while one is pending");
     cr_ui_install_status(&u, "Installation annulée", true);

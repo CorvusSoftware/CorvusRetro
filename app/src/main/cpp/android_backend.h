@@ -42,6 +42,7 @@ float cr_android_density(cr_android *);
 void cr_android_root(cr_android *, char *, size_t);
 bool cr_android_import(cr_import *);
 bool cr_android_core_catalog(cr_core_catalog *);
+bool cr_android_update_modules(void);
 bool cr_android_core_status(char *, size_t, bool *);
 bool cr_gl_init(cr_gl *, cr_android *);
 void cr_gl_destroy(cr_gl *);

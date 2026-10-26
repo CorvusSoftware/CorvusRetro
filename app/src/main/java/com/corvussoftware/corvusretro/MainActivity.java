@@ -55,6 +55,7 @@ public final class MainActivity extends NativeActivity {
 
     private static native void imported(String id, String title, int system, String path, String error);
     static native void coreCatalogUpdated(String[] packages, String error);
+    static native void coreModulesUpdated(String[] paths);
     static native void coreInstallStatus(String message, boolean finished);
 
     @Override public void onCreate(Bundle state) {
@@ -112,43 +113,34 @@ public final class MainActivity extends NativeActivity {
         state.putBoolean("picker", pickerOpen); state.putInt("picker_system", pickerSystem);
         super.onSaveInstanceState(state);
     }
-    @Override protected void onResume() {
-        super.onResume();
-        CoreInstallState.resumed(this);
-    }
-    @Override protected void onPause() {
-        CoreInstallState.paused(this);
-        super.onPause();
-    }
-    @Override public void onWindowFocusChanged(boolean focused) {
-        super.onWindowFocusChanged(focused);
-        if (focused) CoreInstallState.showConfirmation(this);
-    }
     @Override protected void onDestroy() {
         synchronized (importLock) {
             destroyed = true;
             if (pending != null) { pending.discard(); pending = null; }
         }
-        CoreInstallState.paused(this);
         io.shutdown();
         super.onDestroy();
     }
     boolean isAlive() { return !destroyed; }
     public void refreshCoreCatalog() { coreRepository.refresh(); }
     public void installCorePack(String packId) { coreRepository.install(packId); }
-    public boolean coreInstallPending() { return CoreInstallState.pending(this); }
+    public boolean coreInstallPending() { return CoreRepository.downloading(); }
     public String[] installedCoreModules() {
-        ArrayList<String> modules = new ArrayList<>();
+        ArrayList<String> modules = new ArrayList<>(Arrays.asList(coreRepository.installedModules()));
         try {
             PackageInfo installed = getPackageManager().getPackageInfo(getPackageName(), 0);
             ApplicationInfo app = installed.applicationInfo;
             if (app == null || app.nativeLibraryDir == null || installed.splitNames == null)
-                return new String[0];
+                return modules.toArray(new String[0]);
             List<String> splits = Arrays.asList(installed.splitNames);
             File directory = new File(app.nativeLibraryDir).getCanonicalFile();
             String[] ids = {"gb", "gbc", "gba"};
             for (String id : ids) {
                 if (!splits.contains("core" + id)) continue;
+                boolean downloaded = false;
+                for (String path : modules)
+                    if (new File(path).getName().startsWith("libcorvus_" + id + "-")) downloaded = true;
+                if (downloaded) continue;
                 File library = new File(directory, "libcorvus_" + id + ".so").getCanonicalFile();
                 if (directory.equals(library.getParentFile()) && library.isFile() && !library.canWrite())
                     modules.add(library.getAbsolutePath());

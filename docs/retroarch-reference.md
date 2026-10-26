@@ -33,8 +33,8 @@ Dans [command.c](https://github.com/libretro/RetroArch/blob/ca3f823755762005b393
 CorvusRetro adapte ce contrat : charger crée un véritable handle du SDK, décharger
 le détruit et publie Aucun cœur. La fermeture du contenu persiste la batterie avant
 libération. Le gestionnaire reste disponible pour un prochain chargement ; aucun
-moteur fictif n'est nécessaire au menu Android. Les cœurs sont intégrés à l'APK,
-le chargement concerne leur instance native et non l'installation d'un fichier externe.
+moteur fictif n'est nécessaire au menu Android. Depuis0.12, les modules sont téléchargés en archives natives individuelles puis
+chargés via CorvusAPI. Voir [les références du téléchargeur](individual-cores.md).
 
 ## Palette NVIDIA Shield
 

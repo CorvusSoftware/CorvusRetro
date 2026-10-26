@@ -49,7 +49,7 @@ class WorkflowGates(unittest.TestCase):
             "PATH": os.environ.get("PATH", ""), "RUNNER_TEMP": str(self.temp),
             "GITHUB_ENV": str(self.env_file), "GITHUB_SHA": SHA,
             "SOURCE_SHA": SHA, "GITHUB_REPOSITORY": REPOSITORY,
-            "REQUESTED_SOURCE_RUN": "", "CORVUS_TAG": "v0.11.0",
+            "REQUESTED_SOURCE_RUN": "", "CORVUS_TAG": "v0.12.0",
         }
 
     def run_gate(self, workflow, step):
@@ -75,7 +75,7 @@ class WorkflowGates(unittest.TestCase):
         path = self.temp / "signed-runs.json"
         path.write_text(json.dumps({"workflow_runs": [signed_run(), signed_run(id=42),
                                                      signed_run(id=99, conclusion="failure")]}))
-        result = self.run_gate("publish-core-splits.yml", step)
+        result = self.run_gate("publish-core-archives.yml", step)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.env_file.read_text(), "SOURCE_RUN_ID=42\n")
         for field, value in (
@@ -86,37 +86,37 @@ class WorkflowGates(unittest.TestCase):
                 ("id", True), ("id", "41")):
             path.write_text(json.dumps({"workflow_runs": [signed_run(**{field: value})]}))
             with self.subTest(field=field, value=value):
-                self.assertNotEqual(self.run_gate("publish-core-splits.yml", step).returncode, 0)
+                self.assertNotEqual(self.run_gate("publish-core-archives.yml", step).returncode, 0)
 
     def test_explicit_run_does_not_fall_back_to_another_build(self):
         step = "Select a successful signed build for the exact release commit"
         self.env["REQUESTED_SOURCE_RUN"] = "41"
         path = self.temp / "signed-run.json"
         path.write_text(json.dumps(signed_run()))
-        self.assertEqual(self.run_gate("publish-core-splits.yml", step).returncode, 0)
+        self.assertEqual(self.run_gate("publish-core-archives.yml", step).returncode, 0)
         for changed in (signed_run(id=42), signed_run(conclusion="failure")):
             path.write_text(json.dumps(changed))
-            self.assertNotEqual(self.run_gate("publish-core-splits.yml", step).returncode, 0)
+            self.assertNotEqual(self.run_gate("publish-core-archives.yml", step).returncode, 0)
 
     def test_tag_must_resolve_to_the_qualified_commit(self):
         step = "Verify the existing tag points to the qualified source revision"
         path = self.temp / "release-tag.txt"
-        for data in (SHA + "\trefs/tags/v0.11.0\n",
-                     "b" * 40 + "\trefs/tags/v0.11.0\n" +
-                     SHA + "\trefs/tags/v0.11.0^{}\n"):
+        for data in (SHA + "\trefs/tags/v0.12.0\n",
+                     "b" * 40 + "\trefs/tags/v0.12.0\n" +
+                     SHA + "\trefs/tags/v0.12.0^{}\n"):
             path.write_text(data)
-            self.assertEqual(self.run_gate("publish-core-splits.yml", step).returncode, 0)
-        for data in ("", "b" * 40 + "\trefs/tags/v0.11.0\n",
-                     SHA + "\trefs/tags/v0.11.0\n" +
-                     "b" * 40 + "\trefs/tags/v0.11.0^{}\n"):
+            self.assertEqual(self.run_gate("publish-core-archives.yml", step).returncode, 0)
+        for data in ("", "b" * 40 + "\trefs/tags/v0.12.0\n",
+                     SHA + "\trefs/tags/v0.12.0\n" +
+                     "b" * 40 + "\trefs/tags/v0.12.0^{}\n"):
             path.write_text(data)
-            self.assertNotEqual(self.run_gate("publish-core-splits.yml", step).returncode, 0)
+            self.assertNotEqual(self.run_gate("publish-core-archives.yml", step).returncode, 0)
 
     def test_artifact_bytes_and_source_provenance_are_checked(self):
         step = "Download only the matching signed artifact"
         folder = self.temp / "signed-core-apks"
         folder.mkdir()
-        for name in ("CorvusRetro-0.11-base-release.apk", "CorvusGB.apk", "CorvusGBC.apk", "CorvusGBA.apk"):
+        for name in ("CorvusRetro-0.12-base-release.apk", "CorvusGB.apk", "CorvusGBC.apk", "CorvusGBA.apk"):
             (folder / name).write_bytes(b"original test fixture")
         def revision(path):
             return subprocess.check_output(["git", "-C", str(ROOT / path), "rev-parse", "HEAD"],
@@ -133,22 +133,22 @@ class WorkflowGates(unittest.TestCase):
             (folder / "source.json").write_text(json.dumps(data))
             checksums()
         provenance(source)
-        self.assertEqual(self.run_gate("publish-core-splits.yml", step).returncode, 0)
+        self.assertEqual(self.run_gate("publish-core-archives.yml", step).returncode, 0)
         original = (folder / "CorvusGB.apk").read_bytes()
         (folder / "CorvusGB.apk").write_bytes(b"modified fixture")
-        self.assertNotEqual(self.run_gate("publish-core-splits.yml", step).returncode, 0)
+        self.assertNotEqual(self.run_gate("publish-core-archives.yml", step).returncode, 0)
         (folder / "CorvusGB.apk").write_bytes(original)
         for key in source:
             provenance(dict(source, **{key: "b" * 40}))
             with self.subTest(key=key):
-                self.assertNotEqual(self.run_gate("publish-core-splits.yml", step).returncode, 0)
+                self.assertNotEqual(self.run_gate("publish-core-archives.yml", step).returncode, 0)
         provenance(source)
         checksum_file = folder / "SHA256SUMS"
         valid_checksums = checksum_file.read_text()
         for invalid in (valid_checksums + valid_checksums.splitlines()[0] + "\n",
                         "a" * 64 + "  ../../unrelated\n", ""):
             checksum_file.write_text(invalid)
-            self.assertNotEqual(self.run_gate("publish-core-splits.yml", step).returncode, 0)
+            self.assertNotEqual(self.run_gate("publish-core-archives.yml", step).returncode, 0)
 
 
 if __name__ == "__main__":
