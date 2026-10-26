@@ -1,5 +1,38 @@
 # Validation Android
 
+## Reprise 0.10 : ligne unique et migration CorvusAPI
+
+Reprise sur main `54cb1b7`, sans modifier les nouveaux modules, le téléchargeur,
+les identités de contenu ou les sous-modules. La ligne « Charger un cœur » devient
+« Décharger le cœur » dès qu'une instance existe, même sans jeu. Un contenu actif
+ajoute le menu rapide avant cette ligne. Un échec batterie garde le jeu et l'action
+Décharger ; une nouvelle tentative après correction du stockage fonctionne.
+
+Preuves exécutées sur cette modification :
+
+- Cinq suites CTest normales et ASan/UBSan, avec les modules officiels explicites.
+- Test natif zéro cœur et cinq tests du catalogue officiel.
+- Régression menu avec ROM GBA originale écrivant en SRAM, obstruction du dossier
+  de sauvegarde, conservation de la session puis déchargement avec sauvegarde réussie.
+- `:app:assembleDebug :app:lintDebug` pour la base ; `-PcorvusCores=gb,gbc,gba
+  :app:assembleDebug` pour le pack. Les deux APK passent signature et alignement16Ko.
+- Inspection ZIP : base limitée à libcorvusretro.so ; pack avec les trois modules
+  officiels ; présence vérifiée pour ARM64 et x86_64.
+- Revue indépendante du comportement et du contrat proposé : aucun finding concret.
+
+Android15 x86_64, données existantes conservées : base sans cœur, accès au
+téléchargeur depuis les deux actions de chargement et retour arrière ; pack avec
+chargement/déchargement des trois cœurs, informations du cœur GB, ligne unique en
+portrait et paysage. Un GB déjà présent est ouvert depuis sa liste, puis déchargé
+depuis le menu principal après le menu rapide. Les captures restent hors git selon
+les nouvelles conventions. Le lanceur Quickstep puis SystemUI ont présenté des
+boîtes ANR avant stabilisation ; les essais valides ont été repris ensuite.
+
+Le câble link n'est pas activé : CorvusAPI0 ne fournit aucune déclaration de
+sous-systèmes ou liaison. Le [contrat proposé](subsystems-corvusapi-proposal.md)
+doit d'abord être traité dans CorvusAPI, puis dans l'adaptateur CorvusCore.
+Aucun essai sur téléphone physique ou d'exécution ARM64 n'est revendiqué.
+
 ## Version 0.9 : feedback et catégories
 
 Cinq suites CTest passent normalement et sous ASan/UBSan. `native_menu` couvre :

@@ -64,7 +64,7 @@ int main(void) {
     cr_ui_confirm(&u);
     check(u.page == CR_MAIN && u.engine.system == 1 && u.engine.handle,
           "controller selects real idle GBC");
-    tap(&u, 100, 170);
+    tap(&u, 100, 100);
     check(!u.engine.handle, "native unload releases engine");
     cr_ui_touch(&u, 0, CR_TOUCH_DOWN, 100, 100);
     cr_ui_touch(&u, 0, CR_TOUCH_MOVE, 100, 150);

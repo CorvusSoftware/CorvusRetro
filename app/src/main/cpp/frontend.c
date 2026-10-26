@@ -67,7 +67,7 @@ static float body_bottom(const cr_ui *u) {
 }
 static int rows(const cr_ui *u) {
     if (u->page == CR_MAIN)
-        return 3 + (u->engine.handle ? 1 : 0) + (u->engine.loaded ? 1 : 0);
+        return 3 + (u->engine.loaded ? 1 : 0);
     if (u->page == CR_LISTS)
         return 1 + (int)cr_registry_count();
     if (u->page == CR_CORES)
@@ -109,12 +109,10 @@ static row get_row(const cr_ui *u, int index) {
                 fill(&r, "Menu rapide", u->title, CR_ICON_MENU, ACT_QUICK, 0);
         }
         if (index == n++)
-            fill(&r, "Charger un cœur", u->engine.handle ? core_name(u->engine.system) : "Aucun cœur",
-                 CR_ICON_CORE, ACT_CORES, 0);
-        if (u->engine.handle) {
-            if (index == n++)
-                fill(&r, "Décharger le cœur", "Libérer le moteur", CR_ICON_UNLOAD, ACT_UNLOAD, 0);
-        }
+            fill(&r, u->engine.handle ? "Décharger le cœur" : "Charger un cœur",
+                 u->engine.handle ? core_name(u->engine.system) : "Aucun cœur",
+                 u->engine.handle ? CR_ICON_UNLOAD : CR_ICON_CORE,
+                 u->engine.handle ? ACT_UNLOAD : ACT_CORES, 0);
         if (index == n++)
             fill(&r, "Charger du contenu",
                  u->importing ? "Import du contenu…" :

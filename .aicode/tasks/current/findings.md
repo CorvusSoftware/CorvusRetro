@@ -1,4 +1,19 @@
-Références RetroArch : MaterialUI touch_feedback et pointer_up, menu_input.h seuils200ms/1s, input_overlay_alpha alpha_mod, menu_displaylist catégories et informations.
-Corvus : UI/Vidéo/Audio/OSD fonctionnels, historique dans listes, InfoMain->About/Core(si chargé)/Licences. Pile8vues restaure page/focus/filtre/scroll, onglet dérivé de page. IDs publics existants préservés, nouvelles pages9..15.
-Appuis jeu : opacité, couleurs et cibles constantes, feedback_pulses indépendant du moteur pour premier flash puis fondu100ms. Menus : une touche, fondu200ms, tap au relâchement, maintien sélection et long>=1s remet Audio/Awake/ShowInput au défaut activé. Timestamps MotionEvent en ns vers secondes pour éviter dépendance aux frames.
-Ancienne mention du thème sombre dans À propos retirée. show_input persisté comme int par service Java générique. Aucun changement SDK/moteurs/données.
+Le refspec cloud ne met à jour que origin/HEAD. Pour contrôler main explicitement :
+git fetch origin refs/heads/main:refs/remotes/origin/main.
+Un simple git fetch origin main laisse origin/main potentiellement obsolète.
+
+main54cb1b7 conserve les évolutions0.9 et migre vers CorvusAPI0 :
+registry dynamique, identités stables, base sans modules et pack explicite.
+Le prototype interrompu est sauvegardé dans un stash nommé
+resume backup: native subsystem work before CorvusAPI migration.
+Ne pas réappliquer engine.c ou les tests directs de ce prototype.
+
+CorvusCore8433980 inclut CorvusAPI188a1a5. corvus_core_api expose load_game,
+un seul callback vidéo et aucun sous-système. Les adaptateurs officiels annoncent
+max_players1 et ignorent player!=0. Le SDK interne sait relier les consoles, mais
+son usage direct dans le frontend violerait la frontière publique actuelle.
+
+La ligne cœur suit engine.handle, et non engine.loaded : le chargement sans jeu
+doit aussi afficher Décharger. Un jeu ajoute seulement Menu rapide avant la ligne.
+Test ROM GBA originale : vraie écriture SRAM, obstruction saves, échec de
+déchargement sans perdre la session, suppression de l’obstruction et nouvelle tentative.

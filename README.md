@@ -114,6 +114,11 @@ Autres captures : [réglages](docs/screenshots/settings.png),
 
 L'application démarre avec **Aucun cœur**. **Charger un cœur** prépare une instance
 native ; **Décharger le cœur** enregistre la batterie puis libère cette instance.
+Ces deux actions occupent la même ligne : son libellé et son icône changent
+avec le cœur actif. Un échec de sauvegarde conserve le cœur et permet de réessayer.
+Le câble link à deux joueurs nécessite encore une extension publique de
+CorvusAPI ; le [contrat proposé](docs/subsystems-corvusapi-proposal.md) décrit
+ce préalable sans contourner l'API actuelle.
 **Charger du contenu** ouvre le sélecteur système pour un fichier décompressé de
 32 Mio au maximum. Le frontend C associe `.gbc` à GBC et `.gba` à GBA ; `.gb`
 utilise GB/GBC selon le choix courant, ou GB si GBA était sélectionné.

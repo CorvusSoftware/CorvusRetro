@@ -102,6 +102,53 @@ static void row(cr_ui *u, int i) {
 static void tab(cr_ui *u, int i) {
     tap(u, 64 + i * 128, 660);
 }
+static void loaded_core_lifecycle(cr_ui *u, const char *root) {
+    /* Original ARM program writes SRAM once, then loops. No external ROM. */
+    uint8_t rom[512] = {0};
+    const uint32_t words[] = {0xe59f0008, 0xe3a0105a, 0xe5c01000, 0xeafffffe, 0x0e000000};
+    for (size_t i = 0; i < sizeof(words) / sizeof(words[0]); i++)
+        for (unsigned b = 0; b < 4; b++)
+            rom[i * 4 + b] = (uint8_t)(words[i] >> (b * 8));
+    rom[0xb2] = 0x96;
+    memcpy(rom + 0x100, "SRAM_V", 6);
+    char path[4096], saves[4096];
+    snprintf(path, sizeof(path), "%s/test.gba", root);
+    FILE *file = fopen(path, "wb");
+    check(file && fwrite(rom, 1, sizeof(rom), file) == sizeof(rom), "write original GBA fixture");
+    check(fclose(file) == 0, "close original GBA fixture");
+    const char *id = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-2";
+    check(cr_engine_open(&u->engine, 2, id, path) && cr_engine_step(&u->engine, 0),
+          "load real game and generate battery data through CorvusAPI");
+    check(u->engine.api.battery_dirty(u->engine.handle), "test game has unsaved SRAM");
+    snprintf(u->title, sizeof(u->title), "Original GBA test");
+    capture c = draw(u);
+    check(strstr(c.text, "Menu rapide") && strstr(c.text, "Décharger le cœur") &&
+              !strstr(c.text, "Charger un cœur"),
+          "loaded content keeps one core action after the quick menu row");
+    snprintf(saves, sizeof(saves), "%s/saves", root);
+    check(rmdir(saves) == 0, "replace empty battery directory with an obstruction");
+    file = fopen(saves, "wb");
+    check(file && fclose(file) == 0, "block battery directory to reproduce disk failure");
+    void *handle = u->engine.handle;
+    row(u, 1);
+    c = draw(u);
+    check(u->page == CR_MAIN && u->engine.handle == handle && u->engine.loaded &&
+              strcmp(u->title, "Original GBA test") == 0 && u->message[0] &&
+              strstr(c.text, "Décharger le cœur") && !strstr(c.text, "Charger un cœur"),
+          "failed battery persistence keeps the game and unload action available for retry");
+    check(unlink(saves) == 0, "remove battery directory obstruction");
+    row(u, 1);
+    c = draw(u);
+    check(!u->engine.handle && !u->engine.loaded && !u->title[0] &&
+              strstr(c.text, "Charger un cœur") && !strstr(c.text, "Décharger le cœur") &&
+              !strstr(c.text, "Menu rapide"),
+          "retry persists the game and restores the single load action");
+    snprintf(path, sizeof(path), "%s/saves/%s.sav", root, id);
+    check(access(path, F_OK) == 0 && unlink(path) == 0, "battery survived successful unload");
+    check(rmdir(saves) == 0, "remove test saves directory");
+    snprintf(path, sizeof(path), "%s/test.gba", root);
+    check(unlink(path) == 0, "remove original ROM fixture");
+}
 int main(void) {
     char root[] = "/tmp/corvus-menu-XXXXXX";
     check(mkdtemp(root) != NULL, "temporary storage");
@@ -112,7 +159,7 @@ int main(void) {
     cr_ui_size(&u, 384, 700);
     capture c = draw(&u);
     check(strstr(c.text, "Charger un cœur") && strstr(c.text, "Informations") &&
-              !strstr(c.text, "Historique"),
+              !strstr(c.text, "Historique") && !strstr(c.text, "Décharger le cœur"),
           "main contains loading and information, history lives in playlists");
     row(&u, 0);
     check(u.page == CR_CORES, "core menu opens before downloader");
@@ -159,15 +206,22 @@ int main(void) {
     row(&u, 0);
     row(&u, 0);
     check(u.engine.handle && u.engine.system == 0, "real idle GB core");
-    row(&u, 3);
+    c = draw(&u);
+    check(strstr(c.text, "Décharger le cœur") && !strstr(c.text, "Charger un cœur"),
+          "the same core row changes from load to unload");
+    row(&u, 2);
     row(&u, 1);
     c = draw(&u);
     check(u.page == CR_CORE_INFO && strstr(c.text, "CorvusGB") && strstr(c.text, "0.14.0"),
           "real core information is reachable");
     cr_ui_back(&u);
     cr_ui_back(&u);
-    row(&u, 1);
+    row(&u, 0);
     check(!u.engine.handle, "core unloaded");
+    c = draw(&u);
+    check(strstr(c.text, "Charger un cœur") && !strstr(c.text, "Décharger le cœur"),
+          "successful unload restores the load action");
+    loaded_core_lifecycle(&u, root);
     tab(&u, 1);
     c = draw(&u);
     check(u.page == CR_LISTS && strstr(c.text, "Historique") && strstr(c.text, "Game Boy Advance"),

@@ -1,4 +1,14 @@
-Résultat : PASS local
-Cinq suites CTest normales et ASan/UBSan, build APK/lint, signature/alignement16Ko, revue indépendante sans finding bloquant. Tests de régression couvrent catégories, retour, gestes, frame lente, feedback séparé du moteur, option réelle et reset idempotent.
-Émulateur Android15 : nouvelles catégories, données/préférences conservées, vrai GB, pixels appui/repos comparés, menu contextuel et rotation ; APK final vérifie appui long audio et retour. Aucun crash applicatif fatal observé.
-Limites : pas de téléphone physique ; simultanéité multitouch testée dans modèle C. SystemUI de l’émulateur a bloqué au démarrage avant essais valides. CI à contrôler après publication.
+Status: BLOCKED pour la demande complète ; PASS local pour la ligne unique.
+Risk: STANDARD pour le diff exécutable ; contrat link à traiter séparément.
+
+Critères PASS : action cœur unique selon handle, conservation après échec batterie,
+retour Charger après succès, indices avec contenu et sans contenu, téléchargeur zéro cœur.
+Preuves : cinq CTest normaux et ASan/UBSan, zéro cœur, catalogue5/5,
+APK base/lint et pack explicite, composition/signature/alignement16Ko des deux APK,
+Android15 base/pack/rotation/jeu existant, revue indépendante sans finding concret.
+Aucune dépendance ou clé de signature changée. Publication et CI exacte à contrôler.
+
+Critère FAIL : sous-système Deux joueurs non implémenté dans l’ABI actuelle.
+Le SDK privé de CorvusCore ne peut pas remplacer un contrat CorvusAPI public.
+Prochaine action : proposition CorvusAPI, adaptateur CorvusCore, puis intégration du menu.
+Ne pas marquer la tâche complète DONE. Aucun téléphone physique testé.
