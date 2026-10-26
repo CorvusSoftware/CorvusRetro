@@ -191,7 +191,7 @@ jobs:
         run: |
           set -euo pipefail
           # One-time release promotion. Future versions require an explicit new gate.
-          grep -Eq "^[[:space:]]*: '0\.14\.0'[[:space:]]*$" pkg/android/app/build.gradle || {
+          grep -Fq "versionName project.findProperty('corvusVersionName') ?: '0.14.0'" pkg/android/app/build.gradle || {
             echo "Not the v0.14.0 source version; no release promotion."
             exit 0
           }
