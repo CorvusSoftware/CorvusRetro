@@ -119,7 +119,7 @@ JNIEXPORT void JNICALL Java_com_corvussoftware_corvusretro_MainActivity_coreInst
     char message[256];
     string_copy(env, value, message, sizeof(message));
     pthread_mutex_lock(&core_mutex);
-    memcpy(core_status, message, sizeof(core_status));
+    snprintf(core_status, sizeof(core_status), "%s", message);
     core_status_ready = true;
     pthread_mutex_unlock(&core_mutex);
     wake_frontend();
