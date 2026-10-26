@@ -18,6 +18,18 @@ static pthread_mutex_t import_mutex = PTHREAD_MUTEX_INITIALIZER;
 static cr_import import_value;
 static bool import_ready;
 static ALooper *import_looper;
+static pthread_mutex_t core_mutex = PTHREAD_MUTEX_INITIALIZER;
+static cr_core_catalog pending_catalog;
+static bool catalog_ready;
+static char core_status[256];
+static bool core_status_ready;
+
+static void wake_frontend(void) {
+    pthread_mutex_lock(&import_mutex);
+    if (import_looper) ALooper_wake(import_looper);
+    pthread_mutex_unlock(&import_mutex);
+}
+
 static bool clear_error(cr_android *p) {
     if (!(*p->env)->ExceptionCheck(p->env))
         return false;
@@ -66,6 +78,71 @@ static void string_copy(JNIEnv *env, jstring value, char *out, size_t cap) {
     }
     out[at] = 0;
     (*env)->ReleaseStringChars(env, value, src);
+}
+JNIEXPORT void JNICALL Java_com_corvussoftware_corvusretro_MainActivity_coreCatalogUpdated(
+    JNIEnv *env, jclass cls, jobjectArray rows, jstring error) {
+    (void)cls;
+    cr_core_catalog next = {0};
+    string_copy(env, error, next.error, sizeof(next.error));
+    jsize size = rows ? (*env)->GetArrayLength(env, rows) : 0;
+    if (size < 0 || size > CR_MAX_CORE_PACKS * 5 || size % 5 != 0) {
+        snprintf(next.error, sizeof(next.error), "Catalogue incompatible");
+    } else {
+        for (jsize i = 0; i < size; i += 5) {
+            cr_core_pack *pack = &next.packs[next.count];
+            for (int f = 0; f < 5; ++f) {
+                jstring field = (*env)->GetObjectArrayElement(env, rows, i + f);
+                if (f == 0) string_copy(env, field, pack->id, sizeof(pack->id));
+                if (f == 1) string_copy(env, field, pack->name, sizeof(pack->name));
+                if (f == 2) string_copy(env, field, pack->version, sizeof(pack->version));
+                if (f == 3) string_copy(env, field, pack->core_id, sizeof(pack->core_id));
+                if (f == 4) string_copy(env, field, pack->abi, sizeof(pack->abi));
+                if (field) (*env)->DeleteLocalRef(env, field);
+            }
+            if (!pack->id[0] || !pack->name[0] || !pack->version[0] || !pack->core_id[0]) {
+                next.count = 0;
+                snprintf(next.error, sizeof(next.error), "Metadonnees du catalogue invalides");
+                break;
+            }
+            next.count++;
+        }
+    }
+    pthread_mutex_lock(&core_mutex);
+    pending_catalog = next;
+    catalog_ready = true;
+    pthread_mutex_unlock(&core_mutex);
+    wake_frontend();
+}
+JNIEXPORT void JNICALL Java_com_corvussoftware_corvusretro_MainActivity_coreInstallStatus(
+    JNIEnv *env, jclass cls, jstring value) {
+    (void)cls;
+    char message[256];
+    string_copy(env, value, message, sizeof(message));
+    pthread_mutex_lock(&core_mutex);
+    memcpy(core_status, message, sizeof(core_status));
+    core_status_ready = true;
+    pthread_mutex_unlock(&core_mutex);
+    wake_frontend();
+}
+bool cr_android_core_catalog(cr_core_catalog *out) {
+    pthread_mutex_lock(&core_mutex);
+    bool ready = catalog_ready;
+    if (ready) {
+        *out = pending_catalog;
+        catalog_ready = false;
+    }
+    pthread_mutex_unlock(&core_mutex);
+    return ready;
+}
+bool cr_android_core_status(char *out, size_t cap) {
+    pthread_mutex_lock(&core_mutex);
+    bool ready = core_status_ready;
+    if (ready) {
+        snprintf(out, cap, "%s", core_status);
+        core_status_ready = false;
+    }
+    pthread_mutex_unlock(&core_mutex);
+    return ready;
 }
 JNIEXPORT void JNICALL Java_com_corvussoftware_corvusretro_MainActivity_imported(
     JNIEnv *env, jclass cls, jstring id, jstring title, jint system, jstring path, jstring error) {
@@ -126,6 +203,8 @@ bool cr_android_init(cr_android *p, struct android_app *app) {
     METHOD(touch, "touchGame", "(Ljava/lang/String;)V");
     METHOD(appearance, "appearance", "(IZ)V");
     METHOD(quit, "quit", "()V");
+    METHOD(refresh_catalog, "refreshCoreCatalog", "()V");
+    METHOD(install_pack, "installCorePack", "(Ljava/lang/String;)V");
 #undef METHOD
     pthread_mutex_lock(&import_mutex);
     import_looper = app->looper;
@@ -279,8 +358,22 @@ static void quit(void *ctx) {
     (*p->env)->CallVoidMethod(p->env, p->app->activity->clazz, p->quit);
     clear_error(p);
 }
+static void refresh_catalog(void *ctx) {
+    cr_android *p = ctx;
+    (*p->env)->CallVoidMethod(p->env, p->app->activity->clazz, p->refresh_catalog);
+    clear_error(p);
+}
+static void install_pack(void *ctx, const char *pack_id) {
+    cr_android *p = ctx;
+    jstring id = (*p->env)->NewStringUTF(p->env, pack_id);
+    if (!id) { clear_error(p); return; }
+    (*p->env)->CallVoidMethod(p->env, p->app->activity->clazz, p->install_pack, id);
+    (*p->env)->DeleteLocalRef(p->env, id);
+    clear_error(p);
+}
 cr_platform cr_android_services(cr_android *p) {
-    return (cr_platform){p, pref, set_pref, pick, finish, games, touch, credits, appearance, quit};
+    return (cr_platform){p, pref, set_pref, pick, finish, games, touch, credits,
+                         appearance, quit, refresh_catalog, install_pack};
 }
 
 static GLuint shader(GLenum type, const char *source) {
