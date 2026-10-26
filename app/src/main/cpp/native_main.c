@@ -226,6 +226,12 @@ void android_main(struct android_app *app) {
         cr_import item;
         if (cr_android_import(&item))
             cr_ui_import(&a->ui, &item);
+        cr_core_catalog core_catalog;
+        if (cr_android_core_catalog(&core_catalog))
+            cr_ui_catalog(&a->ui, &core_catalog);
+        char install_status[256];
+        if (cr_android_core_status(install_status, sizeof(install_status)))
+            cr_ui_message(&a->ui, install_status);
         active = a->window && a->resumed && a->focused;
         running = active && cr_ui_running(&a->ui);
         time = now();
