@@ -44,19 +44,35 @@ final class CoreStore {
     String[] modules() {
         synchronized (LOCK) {
             ArrayList<String> paths = new ArrayList<>();
-            for (String id : new String[] {"gb", "gbc", "gba"}) {
+            java.util.Map<String, ?> all = preferences.getAll();
+            ArrayList<String> ids = new ArrayList<>();
+            for (String legacy : new String[] {"corvus.gb", "corvus.gbc", "corvus.gba"})
+                if (all.containsKey(legacy)) ids.add(legacy);
+            java.util.TreeSet<String> others = new java.util.TreeSet<>(all.keySet());
+            others.removeAll(ids);
+            ids.addAll(others);
+            for (String id : ids) {
+                if (!id.matches("[a-z][a-z0-9_-]{0,39}(\\.[a-z0-9_-]{1,39})+") ||
+                        paths.size() >= 32) continue;
                 try {
-                    JSONObject record = new JSONObject(preferences.getString("corvus." + id, "{}"));
+                    Object value = all.get(id);
+                    if (!(value instanceof String)) continue;
+                    JSONObject record = new JSONObject((String) value);
                     String digest = record.getString("sha256");
                     String name = record.getString("file");
-                    if (!digest.matches("[0-9a-f]{64}") ||
-                            !name.equals("libcorvus_" + id + "-" + digest + ".so")) continue;
+                    String library = record.optString("library_name", "");
+                    if (library.isEmpty() && id.matches("corvus\\.(gb|gbc|gba)"))
+                        library = "libcorvus_" + id.substring("corvus.".length()) + ".so";
+                    if (!library.matches("lib[a-z0-9_]{1,60}\\.so") ||
+                            !digest.matches("[0-9a-f]{64}") ||
+                            !name.equals(library.substring(0, library.length() - 3) +
+                                    "-" + digest + ".so")) continue;
                     File file = new File(directory, name);
                     if (!directory.getCanonicalFile().equals(file.getCanonicalFile().getParentFile()) ||
                             !file.isFile() || file.canWrite() || !digest.equals(hash(file))) continue;
                     paths.add(file.getAbsolutePath());
                 } catch (Exception invalid) {
-                    // An interrupted or altered module remains unavailable; saved games are retained.
+                    // Invalid metadata never becomes an executable module.
                 }
             }
             return paths.toArray(new String[0]);
@@ -104,7 +120,8 @@ final class CoreStore {
                 } else if (!staged.renameTo(destination)) {
                     throw new IOException("Enregistrement du cœur impossible");
                 }
-                JSONObject record = new JSONObject().put("file", destination.getName()).put("sha256", digest);
+                JSONObject record = new JSONObject().put("file", destination.getName())
+                        .put("sha256", digest).put("library_name", core.libraryName());
                 if (!preferences.edit().putString(core.id, record.toString()).commit())
                     throw new IOException("Enregistrement du catalogue local impossible");
             } finally {

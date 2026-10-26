@@ -27,8 +27,7 @@ import org.json.JSONObject;
 
 /** HTTPS services for the integrated native core downloader. */
 final class CoreRepository {
-    private static final String INDEX =
-            "https://raw.githubusercontent.com/CorvusSoftware/CorvusRepository/main/catalog/corvuscore.json";
+    private static final String INDEX = CoreCatalogDiscovery.DIRECTORY;
     private static final String RELEASE =
             "https://github.com/CorvusSoftware/CorvusRetro/releases/download/";
     private static final long MAX_ARCHIVE = 32L * 1024 * 1024;
@@ -41,9 +40,14 @@ final class CoreRepository {
     private volatile Map<String, Core> cores = new HashMap<>();
 
     static final class Core {
-        final String id, name, version, abi, sha256, url;
+        final String id, name, version, abi, sha256, url, library;
         final long size;
         Core(JSONObject json) throws JSONException, IOException {
+            this(json, "corvuscore.json");
+        }
+        Core(JSONObject json, String provider) throws JSONException, IOException {
+            if (!provider.matches("[a-z][a-z0-9_-]{0,39}\\.json"))
+                throw new IOException("Fournisseur invalide");
             if (json.length() != 10) throw new IOException("Champs de catalogue invalides");
             id = symbol(string(json, "id"));
             name = text(string(json, "name"));
@@ -60,14 +64,26 @@ final class CoreRepository {
             if (size <= 0 || size > MAX_ARCHIVE) throw new IOException("Taille du module invalide");
             if (integer(json, "api_version") != 0)
                 throw new IOException("Version CorvusAPI incompatible");
-            if (!id.matches("corvus\\.(gb|gbc|gba)") ||
-                    !libraryName().equals(string(json, "library_name")))
+            if (id.length() > 95 ||
+                    !id.matches("[a-z][a-z0-9_-]{0,39}(\\.[a-z0-9_-]{1,39})+") ||
+                    (!"corvuscore.json".equals(provider) &&
+                     !id.startsWith(provider.substring(0, provider.length() - 5) + ".")) ||
+                    ("corvuscore.json".equals(provider) &&
+                     !id.matches("corvus\\.(gb|gbc|gba)")))
                 throw new IOException("Identité du cœur invalide");
+            library = string(json, "library_name");
+            if (!library.matches("lib[a-z0-9_]{1,60}\\.so"))
+                throw new IOException("Nom de bibliothèque invalide");
+            if ("corvuscore.json".equals(provider)) {
+                String expected = "libcorvus_" + id.substring("corvus.".length()) + ".so";
+                if (!library.equals(expected) ||
+                        !name.equals("Corvus" + id.substring("corvus.".length()).toUpperCase(java.util.Locale.ROOT)))
+                    throw new IOException("Moteur officiel non reconnu");
+            }
             url = string(json, "archive_url");
-            if (url.length() > 256 || !url.startsWith(RELEASE) || !url.endsWith(".zip") ||
-                    url.contains("?") || url.contains("#") || url.contains("\\") ||
-                    url.contains("%") || url.contains("/../") || url.contains("/./") ||
-                    url.substring(RELEASE.length()).contains("//"))
+            if (url.length() > 256 ||
+                    !url.matches("https://github\\.com/CorvusSoftware/(CorvusRetro|CorvusRepository)/releases/download/v[0-9]+\\.[0-9]+\\.[0-9]+/[A-Za-z0-9][A-Za-z0-9._-]*\\.zip") ||
+                    ("corvuscore.json".equals(provider) && !url.startsWith(RELEASE)))
                 throw new IOException("Origine du module non autorisée");
             for (int i = 0; i < url.length(); i++)
                 if (url.charAt(i) <= 32 || Character.isISOControl(url.charAt(i)))
@@ -96,7 +112,7 @@ final class CoreRepository {
                     throw new IOException("Caractère de contrôle invalide");
             return value;
         }
-        String libraryName() { return "libcorvus_" + id.substring("corvus.".length()) + ".so"; }
+        String libraryName() { return library; }
     }
 
     CoreRepository(MainActivity activity, ExecutorService executor) {
@@ -140,6 +156,11 @@ final class CoreRepository {
 
     static Catalog parseCatalog(String payload, String deviceAbi)
             throws JSONException, IOException {
+        return parseCatalog(payload, deviceAbi, "corvuscore.json");
+    }
+
+    static Catalog parseCatalog(String payload, String deviceAbi, String provider)
+            throws JSONException, IOException {
         JSONObject json = new JSONObject(payload);
         if (json.length() != 2 || Core.integer(json, "format") != 3)
             throw new IOException("Version de catalogue incompatible");
@@ -150,7 +171,7 @@ final class CoreRepository {
         String[] names = new String[array.length() * 5];
         int entries = 0;
         for (int i = 0; i < array.length(); i++) {
-            Core core = new Core(array.getJSONObject(i));
+            Core core = new Core(array.getJSONObject(i), provider);
             if (!identities.add(core.id + "/" + core.abi))
                 throw new IOException("Cœur dupliqué");
             if (!core.abi.equals(deviceAbi)) continue;
@@ -165,26 +186,49 @@ final class CoreRepository {
         return new Catalog(next, Arrays.copyOf(names, entries * 5), "");
     }
 
+    private static String readCatalog(String url) throws IOException {
+        HttpsURLConnection connection = connection(url);
+        try {
+            if (connection.getResponseCode() != 200)
+                throw new IOException("Catalogue HTTP " + connection.getResponseCode());
+            try (InputStream input = connection.getInputStream()) {
+                return new String(readSmall(input), StandardCharsets.UTF_8);
+            }
+        } finally {
+            connection.disconnect();
+        }
+    }
+
     void refresh() {
         if (!activity.isAlive()) return;
         executor.execute(() -> {
             try {
-                HttpsURLConnection conn = connection(INDEX);
+                java.util.List<String> sources;
                 try {
-                    if (conn.getResponseCode() != 200)
-                        throw new IOException("Catalogue HTTP " + conn.getResponseCode());
-                    byte[] bytes;
-                    try (InputStream in = conn.getInputStream()) { bytes = readSmall(in); }
-                    Catalog catalog = parseCatalog(new String(bytes, StandardCharsets.UTF_8),
-                            Build.SUPPORTED_ABIS[0]);
-                    cores = catalog.cores;
-                    if (activity.isAlive()) MainActivity.coreCatalogUpdated(catalog.records, catalog.error);
-                } finally {
-                    conn.disconnect();
+                    sources = CoreCatalogDiscovery.sources(readCatalog(INDEX));
+                } catch (Exception discoveryError) {
+                    Log.w("CorvusRetro", "Core discovery unavailable; using official feed");
+                    sources = java.util.Collections.singletonList(CoreCatalogDiscovery.FALLBACK);
                 }
+                CoreCatalogDiscovery.Collector collector = new CoreCatalogDiscovery.Collector();
+                boolean officialLoaded = false;
+                for (String source : sources) {
+                    try {
+                        String provider = source.substring(CoreCatalogDiscovery.RAW.length());
+                        Catalog feed = parseCatalog(readCatalog(source), Build.SUPPORTED_ABIS[0], provider);
+                        collector.add(feed);
+                        if ("corvuscore.json".equals(provider)) officialLoaded = true;
+                    } catch (Exception invalid) {
+                        Log.w("CorvusRetro", "Ignoring invalid provider catalog");
+                    }
+                }
+                if (!officialLoaded) throw new IOException("Catalogue officiel indisponible");
+                Catalog catalog = collector.result();
+                cores = catalog.cores;
+                if (activity.isAlive()) MainActivity.coreCatalogUpdated(catalog.records, catalog.error);
             } catch (Exception error) {
                 cores = new HashMap<>();
-                Log.w("CorvusRetro", "Core catalog fetch failed (" + error.getClass().getSimpleName() + ")");
+                Log.w("CorvusRetro", "Core catalog refresh failed (" + error.getClass().getSimpleName() + ")");
                 if (activity.isAlive())
                     MainActivity.coreCatalogUpdated(new String[0], "Catalogue indisponible");
             }
