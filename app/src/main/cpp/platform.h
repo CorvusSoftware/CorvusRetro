@@ -16,6 +16,16 @@ typedef struct {
     char id[96], title[512], path[4096], error[512];
     int system;
 } cr_import;
+#define CR_MAX_CORE_PACKS 32
+typedef struct {
+    char id[96], name[128], version[64], core_id[96], abi[24];
+} cr_core_pack;
+typedef struct {
+    cr_core_pack packs[CR_MAX_CORE_PACKS];
+    size_t count;
+    char error[256];
+} cr_core_catalog;
+
 typedef struct {
     void *context;
     int (*preference)(void *, const char *, int);
@@ -27,5 +37,7 @@ typedef struct {
     char *(*credits)(void *);
     void (*appearance)(void *, int, bool);
     void (*quit)(void *);
+    void (*refresh_core_catalog)(void *);
+    void (*install_core_pack)(void *, const char *);
 } cr_platform;
 #endif
