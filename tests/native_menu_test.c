@@ -73,6 +73,17 @@ static capture draw(cr_ui *u) {
     return c;
 }
 static int saved_show = -1, saved_audio = -1, writes;
+static int core_refreshes, core_installs;
+static char selected_pack[96];
+static void refresh_core_catalog(void *ctx) {
+    (void)ctx;
+    core_refreshes++;
+}
+static void install_core_pack(void *ctx, const char *pack_id) {
+    (void)ctx;
+    core_installs++;
+    snprintf(selected_pack, sizeof(selected_pack), "%s", pack_id);
+}
 static void set(void *ctx, const char *key, int value) {
     (void)ctx;
     writes++;
@@ -95,12 +106,45 @@ int main(void) {
     char root[] = "/tmp/corvus-menu-XXXXXX";
     check(mkdtemp(root) != NULL, "temporary storage");
     cr_ui u;
-    cr_ui_init(&u, (cr_platform){.set_preference = set}, root);
+    cr_ui_init(&u, (cr_platform){.set_preference = set,
+                                .refresh_core_catalog = refresh_core_catalog,
+                                .install_core_pack = install_core_pack}, root);
     cr_ui_size(&u, 384, 700);
     capture c = draw(&u);
     check(strstr(c.text, "Charger un cœur") && strstr(c.text, "Informations") &&
               !strstr(c.text, "Historique"),
           "main contains loading and information, history lives in playlists");
+    row(&u, 0);
+    check(u.page == CR_CORES, "core menu opens before downloader");
+    c = draw(&u);
+    check(strstr(c.text, "Téléchargeur de cœurs"), "core menu exposes online updater");
+    row(&u, 3);
+    check(u.page == CR_CORE_DOWNLOADS && core_refreshes == 1 &&
+          u.catalog_loading, "downloader starts catalog request on entry");
+    cr_core_catalog catalog = {0};
+    catalog.count = 1;
+    snprintf(catalog.packs[0].id, sizeof(catalog.packs[0].id), "pack-gb");
+    snprintf(catalog.packs[0].name, sizeof(catalog.packs[0].name), "Corvus Pack GB");
+    snprintf(catalog.packs[0].version, sizeof(catalog.packs[0].version), "1.0");
+    snprintf(catalog.packs[0].abi, sizeof(catalog.packs[0].abi), "arm64-v8a");
+    snprintf(catalog.packs[0].core_id, sizeof(catalog.packs[0].core_id), "corvus.gb");
+    cr_ui_catalog(&u, &catalog);
+    c = draw(&u);
+    check(!u.catalog_loading && strstr(c.text, "Corvus Pack GB"),
+          "remote packs are rendered in native UI");
+    row(&u, 1);
+    check(core_installs == 1 && strcmp(selected_pack, "pack-gb") == 0,
+          "frontend requests verified pack installation by catalog ID only");
+    row(&u, 0);
+    check(core_refreshes == 2 && u.catalog_loading,
+          "catalog can be refreshed without leaving menu");
+    cr_core_catalog empty = {0};
+    cr_ui_catalog(&u, &empty);
+    check(u.core_catalog.count == 0 && !u.catalog_loading,
+          "empty official catalog is a valid state");
+    cr_ui_back(&u);
+    cr_ui_back(&u);
+    check(u.page == CR_MAIN, "downloader returns to main menu without touching a core");
     row(&u, 2);
     check(u.page == CR_INFORMATION && u.depth == 1 && u.tab == 0, "information category");
     c = draw(&u);
