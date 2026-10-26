@@ -38,9 +38,10 @@ Read docs/core-downloader.md and docs/stable-content-identities.md when touching
 - gfx/drivers/gl2.c: EGL/OpenGL ES2 rendering.
 - audio/drivers/aaudio.c: real-time audio output and pacing.
 - pkg/android/app/src/main/java/com/corvussoftware/corvusretro/: Android-only services.
-- core-repository/cores-v3.json: native core archives, matched to CorvusAPI ABI and device architecture.
-- core-repository/cores-v2.json: historical 0.11 APK splits; preserve compatibility.
-- core-repository/index.json: legacy 0.10 full-APK pack metadata; keep backward compatibility.
+- CorvusRepository/catalog/cores-v3.json: active external catalog for new clients.
+- core-repository/cores-v3.json: frozen JSON feed used by previously released 0.12/0.13 APKs.
+- core-repository/cores-v2.json: frozen feed for historical 0.11 APK splits.
+- core-repository/index.json: frozen 0.10 pack feed. Do not remove or republish these paths.
 - tools/: offline validators and release tooling.
 - deps/CorvusCore/: pinned third-party git submodule. Never edit it in this repo.
 - cheevos/: original RetroAchievements client integration using official MIT rcheevos.
@@ -81,11 +82,13 @@ Keep a change spanning UI, Java, C ABI or persistence consistent across all affe
   mailbox; only the frontend thread may negotiate CorvusAPI or mutate the registry.
 - Download completion refreshes the core list and game library without restarting
   or launching Android PackageInstaller. Unloading destroys the engine, not its file.
-- Preserve installed legacy split discovery and both previous catalogs for old clients.
+- Preserve legacy split discovery and all three historic catalog URLs for old clients.
   A base update may remove old splits, but must retain all games and saves.
 - Release-sign the base with the existing durable signer. Verify native ELF layouts
-  and six archive inputs. Publish actual immutable assets before
-  promoting their real metadata. Never invent URLs, hashes or certificates.
+  and six archive inputs. Generate new catalog metadata in a temporary workflow
+  artifact for CorvusRepository; never rewrite historic core-repository JSON files.
+  Publish actual immutable assets before promoting their real metadata. Never
+  invent URLs, hashes or certificates.
 
 ## RetroAchievements
 
@@ -152,10 +155,11 @@ Native archive installation:
 - Check immediate native list refresh and replacement while an old module is loaded.
 
 Catalog validation:
-- python3 tools/validate_core_archives.py
-- python3 tools/test_core_archives.py
-- python3 tools/validate_core_catalog.py
-- python3 tools/validate_core_splits.py
+- python3 tools/validate_core_archives.py (frozen legacy v3 snapshot)
+- python3 tools/test_core_archives.py (archive builder and schema regressions)
+- python3 tools/validate_core_catalog.py (legacy v1)
+- python3 tools/validate_core_splits.py (legacy v2)
+- The active catalog and publication tests belong to CorvusRepository.
 
 Always inspect GitHub Actions results for the exact commit before merging.
 Differentiate host tests, compiled APK checks, emulator tests and physical-device tests.

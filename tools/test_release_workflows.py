@@ -112,6 +112,18 @@ class WorkflowGates(unittest.TestCase):
             path.write_text(data)
             self.assertNotEqual(self.run_gate("publish-core-archives.yml", step).returncode, 0)
 
+    def test_publisher_does_not_rewrite_historical_catalogs(self):
+        source = (ROOT / ".github/workflows/publish-core-archives.yml").read_text(
+            encoding="utf-8")
+        self.assertIn('--catalog "$RUNNER_TEMP/core-catalog/cores-v3.json"', source)
+        self.assertIn(
+            'python3 tools/validate_core_archives.py "$RUNNER_TEMP/core-catalog/cores-v3.json"',
+            source)
+        self.assertIn('path: ${{ runner.temp }}/core-catalog/cores-v3.json', source)
+        self.assertNotIn('--catalog core-repository/cores-v3.json', source)
+        self.assertNotIn('git add core-repository/cores-v3.json', source)
+        self.assertNotIn('git push origin "HEAD:refs/heads/$branch"', source)
+
     def test_artifact_bytes_and_source_provenance_are_checked(self):
         step = "Download only the matching signed artifact"
         folder = self.temp / "signed-core-apks"

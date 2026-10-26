@@ -193,8 +193,8 @@ jobs:
       - name: Generate and validate the six native core archives
         run: |
           python3 tools/build_core_archives.py --variant release --tag "$CORVUS_TAG" \
-            --output "$RUNNER_TEMP/native-cores" --catalog core-repository/cores-v3.json
-          python3 tools/validate_core_archives.py
+            --output "$RUNNER_TEMP/native-cores" --catalog "$RUNNER_TEMP/core-catalog/cores-v3.json"
+          python3 tools/validate_core_archives.py "$RUNNER_TEMP/core-catalog/cores-v3.json"
           python3 tools/test_core_archives.py
           python3 tools/validate_core_splits.py
           python3 tools/validate_core_catalog.py
@@ -212,24 +212,18 @@ jobs:
             --title "CorvusRetro $CORVUS_TAG - RetroAchievements" \
             --notes "Release-signed native Android frontend with RetroAchievements in normal mode, encrypted account sessions and durable pending awards. Includes six individual native CorvusCore archives for ARM64 and x86_64; download cores inside the app."
 
-      - name: Upload catalog metadata for review
+      - name: Upload catalog metadata for CorvusRepository review
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: CorvusRetro-individual-core-catalog-${{ github.sha }}
-          path: core-repository/cores-v3.json
+          name: CorvusRepository-catalog-${{ github.sha }}
+          path: ${{ runner.temp }}/core-catalog/cores-v3.json
           if-no-files-found: error
           retention-days: 30
 
-      - name: Stage the verified catalog on a review branch
+      - name: Explain catalog promotion
         run: |
-          set -euo pipefail
-          branch="automation/core-catalog-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-          git switch -c "$branch"
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add core-repository/cores-v3.json
-          git commit -m "Register released native Corvus cores"
-          git push origin "HEAD:refs/heads/$branch"
-          echo "Catalog review branch: $branch" >> "$GITHUB_STEP_SUMMARY"
-          echo "Review core-repository/cores-v3.json before merging it into main." >> "$GITHUB_STEP_SUMMARY"
+          echo "New native archives are published; the generated catalog is a workflow artifact." >> "$GITHUB_STEP_SUMMARY"
+          echo "Verify release asset sizes and hashes before proposing catalog/cores-v3.json" >> "$GITHUB_STEP_SUMMARY"
+          echo "in CorvusSoftware/CorvusRepository. Historical JSON feeds in CorvusRetro" >> "$GITHUB_STEP_SUMMARY"
+          echo "must remain unchanged for already released Android clients." >> "$GITHUB_STEP_SUMMARY"
 

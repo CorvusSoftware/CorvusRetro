@@ -10,6 +10,9 @@ télécharge un ZIP pour le cœur et l'architecture choisis.
 Les six entrées initiales sont **identiques** à celles du catalogue historique
 de CorvusRetro, et leurs archives ZIP restent sur les releases officielles de
 CorvusRetro. Les tailles et empreintes SHA-256 correspondent aux assets publiés.
+Les prochaines métadonnées sont préparées comme **artefact temporaire** par
+le workflow de publication de CorvusRetro, puis validées et proposées dans
+CorvusRepository. Elles ne doivent pas être ajoutées aux anciens JSON de CorvusRetro.
 Le client contrôle toujours les origines autorisées, les tailles et le SHA-256,
 puis installe un module natif dans le stockage privé sans PackageInstaller.
 
@@ -22,8 +25,9 @@ puis installe un module natif dans le stockage privé sans PackageInstaller.
 | 0.11 | CorvusRetro / `core-repository/cores-v2.json` | Split APK signé lié à la base |
 | 0.10 | CorvusRetro / `core-repository/index.json` | Ancien pack APK complet |
 
-**Ne jamais supprimer ou rediriger les anciens catalogues.** Une installation
-existante continue d'utiliser l'URL qui était intégrée à son APK. Les archives
+**Ne jamais supprimer ou rediriger les anciens catalogues.** Les trois fichiers
+JSON dans `core-repository/` sont figés pour les APK historiques.
+Une installation existante continue d'utiliser l'URL qui était intégrée à son APK. Les archives
 publiées restent immuables, et les identifiants des jeux et des sauvegardes ne
 changent pas avec le déplacement des métadonnées.
 
