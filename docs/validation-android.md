@@ -34,9 +34,23 @@ Preuves locales avant publication :
   aucun finding concret restant. Le défaut initial de perte de barrière lors
   d'une recréation Activity a été corrigé avant publication.
 
-Les captures et journaux restent hors git. La seconde AVD Android10 reçoit la
-release officielle0.10 signée pour vérifier ensuite une vraie mise à niveau vers
-les APK0.11 publiés. Cette preuve de migration sera ajoutée après exécution.
+Les captures et journaux restent hors git. Après publication de la préversion
+v0.11.0, les quatre APK réels ont été téléchargés et leurs certificats comparés
+à celui de l'ancienne release0.10 déjà installée. Les six entrées du catalogue
+ont été reproduites indépendamment depuis ces APK : mêmes URL, tailles et SHA-256.
+
+Android10 x86_64 : mise à niveau de la vraie release11 vers la base12, historique
+GBA et thème ASUS conservés, aucun moteur dans la base. Ajout GBA seul, reprise
+du jeu existant, ajout GB puis GBC sans retirer les autres modules ; reprise du
+même GBA après changement d'indice. Android refuse un module debug dont le
+certificat est différent et refuse la réinstallation de la base11 plus ancienne,
+sans altérer les trois modules présents.
+
+L'installation de modules a été exercée avec les API système et avec une session
+créée par l'UID de l'application. Le transport HTTPS est vérifié depuis le
+workspace ; le proxy TLS privé de l'environnement empêche de qualifier ce
+transport depuis les émulateurs sans installer sa CA système. Aucun contrôle
+TLS de l'application n'a été désactivé ou modifié pour contourner cette limite.
 Aucune qualification sur téléphone physique ou d'exécution ARM64 n'est revendiquée.
 
 ## Reprise 0.10 : ligne unique et migration CorvusAPI

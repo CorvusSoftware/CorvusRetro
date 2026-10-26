@@ -1,4 +1,77 @@
 {
   "format": 2,
-  "cores": []
+  "cores": [
+    {
+      "id": "corvus.gb",
+      "name": "CorvusGB",
+      "description": "Cœur officiel CorvusGB pour CorvusRetro",
+      "version": "0.14.0",
+      "abi": "arm64-v8a",
+      "sha256": "e0cb754fe2338ed85560650eb25d544ec410cabd6696e0de2688ea60b0fa5df5",
+      "size": 697047,
+      "apk_url": "https://github.com/CorvusSoftware/CorvusRetro/releases/download/v0.11.0/CorvusGB.apk",
+      "split_name": "coregb",
+      "base_version_code": 12
+    },
+    {
+      "id": "corvus.gb",
+      "name": "CorvusGB",
+      "description": "Cœur officiel CorvusGB pour CorvusRetro",
+      "version": "0.14.0",
+      "abi": "x86_64",
+      "sha256": "e0cb754fe2338ed85560650eb25d544ec410cabd6696e0de2688ea60b0fa5df5",
+      "size": 697047,
+      "apk_url": "https://github.com/CorvusSoftware/CorvusRetro/releases/download/v0.11.0/CorvusGB.apk",
+      "split_name": "coregb",
+      "base_version_code": 12
+    },
+    {
+      "id": "corvus.gba",
+      "name": "CorvusGBA",
+      "description": "Cœur officiel CorvusGBA pour CorvusRetro",
+      "version": "0.14.0",
+      "abi": "arm64-v8a",
+      "sha256": "b1de740fb25d9d96e0bfa6b26d7d8b757268648d984b4bd34a831a7570e3b2f3",
+      "size": 697041,
+      "apk_url": "https://github.com/CorvusSoftware/CorvusRetro/releases/download/v0.11.0/CorvusGBA.apk",
+      "split_name": "coregba",
+      "base_version_code": 12
+    },
+    {
+      "id": "corvus.gba",
+      "name": "CorvusGBA",
+      "description": "Cœur officiel CorvusGBA pour CorvusRetro",
+      "version": "0.14.0",
+      "abi": "x86_64",
+      "sha256": "b1de740fb25d9d96e0bfa6b26d7d8b757268648d984b4bd34a831a7570e3b2f3",
+      "size": 697041,
+      "apk_url": "https://github.com/CorvusSoftware/CorvusRetro/releases/download/v0.11.0/CorvusGBA.apk",
+      "split_name": "coregba",
+      "base_version_code": 12
+    },
+    {
+      "id": "corvus.gbc",
+      "name": "CorvusGBC",
+      "description": "Cœur officiel CorvusGBC pour CorvusRetro",
+      "version": "0.14.0",
+      "abi": "arm64-v8a",
+      "sha256": "0563ab3b7908ba3a5ce84bbf5ed6bdcd5d0db5a6ab39ce5722b849d2afe46672",
+      "size": 697021,
+      "apk_url": "https://github.com/CorvusSoftware/CorvusRetro/releases/download/v0.11.0/CorvusGBC.apk",
+      "split_name": "coregbc",
+      "base_version_code": 12
+    },
+    {
+      "id": "corvus.gbc",
+      "name": "CorvusGBC",
+      "description": "Cœur officiel CorvusGBC pour CorvusRetro",
+      "version": "0.14.0",
+      "abi": "x86_64",
+      "sha256": "0563ab3b7908ba3a5ce84bbf5ed6bdcd5d0db5a6ab39ce5722b849d2afe46672",
+      "size": 697021,
+      "apk_url": "https://github.com/CorvusSoftware/CorvusRetro/releases/download/v0.11.0/CorvusGBC.apk",
+      "split_name": "coregbc",
+      "base_version_code": 12
+    }
+  ]
 }

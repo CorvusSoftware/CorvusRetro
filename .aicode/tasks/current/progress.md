@@ -1,15 +1,18 @@
-État : IN_PROGRESS, implémentation0.11 vérifiée localement, publication et catalogue en cours.
+État : READY_FOR_REVIEW, catalogue vérifié prêt à publier sur main.
 
-L’utilisateur a explicitement confirmé Cœur par cœur comme RetroArch. Sourceeb34629.
-Base0.11.0/code12 sans moteur, trois featureAPKs coregb/coregbc/coregba même certificat/version.
-Installation cumulative Android15 prouvée : GBA seul puisGB, ancienne batterieSHA-2inchangée et jeux GB existants conservés.
-SixCTestsnormaux+ASan et zéro cœur passent ;15testsPython passent ; build base/features/androidTest et lint passent.
-Instrumentation37contrôles, recréationActivity en attente et mortprocess avecsession persistante validées.
-Revue indépendante : P1barrière recréation corrigée parCoreInstallState+getterJNI+syncresume ; aucunfindingrestant.
-ConfirmationOSdifféréeaprèsbackgroundcorrigée; testUIDapp appliqué avecsuccès et état réconciliéauprochainlaunch (callbackpeutêtreperdulorsselfupdate).
+Code0.11 : 53f997bcf0c3ca670b7fa687a770d65df1eb35cf, base versionCode12.
+CI Android40333426498, preview signé40333850326 et publisher40334541602 réussis.
+Tag/préversion v0.11.0 publiés : base et trois APK individuels CorvusGB/GBC/GBA.
+Branche candidate automation/core-catalog-40334541602-1 (cf275130), seul fichier cores-v2.json.
+Six entrées reproduites à l'identique depuis les quatre assets téléchargés, signatures vérifiées contre l'ancienne release installée, alignement16Ko et base12 vérifiés.
 
-Nouveaufeedformat2 cores-v2.json vide jusqu’aux vraisAPK signés et publiés. Legacyindex.json0.10conservé.
-Preview signé automatique aprèsCIAndroid mainpush, publisher par tag v0.11.* réutilise mêmes APK et crée branchecatalogue candidate, pas d’autopromotionmain.
-Prochainesétapes : commit/push source, CIexacte+previewsigné, tagprereleasev0.11.0, télécharger4assets réels, migrationrelease0.10→base0.11+cores sursecondeAVD29, revuecatalogue puispublicationmain.
-AVD35TCP5557 agentAndroid ; secondeAVD29TCP5559 contientancienneAPKrelease11 déjàsignée, jeuGBAoriginal/historique/thèmeASUS préparés. CertificatpublicancrédepuisAPKinstallée:/workspace/setup/trusted-installed-release-cert.sha256 ; aucunecléprivéelue.
-Câblelinktoujoursindépendant : propositionCorvusAPIavantadaptateur, pasimplémentédanscetâche.
+Android15 : GBA seul puis ajout GB, batteries SHA-2 identiques, anciens jeux GB conservés.
+Android10 : vraie release11 → base12 avec historique et ASUS conservés ; GBA seul puis GB/GBC cumulés ; même GBA repris ; mauvais signer et downgrade refusés sans perte.
+Six CTest normaux/ASan, zéro cœur,15testsPython, Gradle/lint et37contrôlesAndroid passent.
+Confirmation différée background et restauration après process death validées ; session UIDapp appliquée et réconciliation après relaunch.
+Limite de preuve : pas de téléphone physique ni runtimeARM64 ; HTTPS des émulateurs limité par la CA privée du proxy, aucune vérification TLS désactivée.
+
+Prochaine action : commit/push catalogue + preuves, vérifier endpoint raw retourne six entrées puis CI exacte.
+AVD35TCP5557 debug ; nouvelle AVD29CorvusRelease011TCP5561 release avec trois modules installés. AncienneAVD29TCP5559 préservée mais non bootable après remount ; ne pas effacer ses données.
+Ancrage certificat public : /workspace/setup/trusted-installed-release-cert.sha256. APK publiés : /workspace/artifacts/CorvusRetro-0.11-release/.
+Câble link indépendant : proposition CorvusAPI, pas implémenté dans cette tâche.

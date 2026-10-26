@@ -1,12 +1,14 @@
-Status: PASS local pour le code, IN_PROGRESS pour la disponibilité des téléchargements.
+Status: PASS pour code et distribution ; CI du catalogue à contrôler après push.
 Risk: DEEP.
 
-PASS : APKbase0moteur et3modulesindépendants même identité/signature/version/ABIs/alignment,
-installationOSGBAseul puisajoutGBpréserveGBAetbatteries -2, registreparcoreIDstable,
-6CTestnormaux/ASan, zéro cœur,15testsPython, build/lint,36contrôlesAndroid et mortprocess,
-revuesindépendantessansfindingaprèsfixP1cyclevie.
+PASS : base zéro moteur, trois splits indépendants, même package/version/signer durable,
+installation cumulative Android10/15, historique/préférences/batteries stables,
+restauration de la pause et de la confirmation après recréation ou mortprocess,
+rejet des versions et signatures incompatibles, six CTest normaux/ASan,
+quinze tests Python,37contrôlesAndroid, compilation/lint et revues sans finding restant.
+CI source40333426498, preview signé40333850326, publisher40334541602 réussis.
+Vrais assets v0.11.0 téléchargés ; six entrées reproduites depuis leurs octets et un certificat de confiance indépendant.
 
-UNVERIFIED : CIducommitfinal, signaturedurablerelease0.11, tag/4assetsréels,
-transitiondepuisrelease0.10signée et promotiondes6métadonnéesvalidées.
-Ne pas marquer DONE tantquebase et3cœursne sontpasréellementdisponiblesdansfeedv2.
-Téléphonephysique/ARM64runtime non qualifiés ; preuveémulateurdoitêtreprésentéecomme telle.
+Limites déclarées : pas de téléphone physique ni exécution ARM64 ; transport HTTPS
+sur émulateur non qualifié à cause de la CA privée du proxy, TLS conservé strict.
+Ne pas prétendre que le catalogue est en ligne avant vérification raw après push.
