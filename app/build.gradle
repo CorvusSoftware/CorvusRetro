@@ -16,9 +16,17 @@ android {
         applicationId 'com.corvussoftware.corvusretro'
         minSdk 26
         targetSdk 35
-        versionCode 9
-        versionName '0.9.0'
+        versionCode project.hasProperty('corvusCores') && project.property('corvusCores').toString().trim() ? 11 : 10
+        versionName '0.10.0'
         ndk { abiFilters 'arm64-v8a', 'x86_64' }
+        externalNativeBuild {
+            cmake {
+                // Build only the frontend for the base APK. Core modules become
+                // dependencies solely when explicitly selected for a pack.
+                targets 'corvusretro'
+                arguments "-DCORVUS_OFFICIAL_CORES=${project.findProperty('corvusCores') ?: ''}"
+            }
+        }
     }
     externalNativeBuild {
         cmake {
