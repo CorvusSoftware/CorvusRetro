@@ -53,6 +53,19 @@ public final class CoreRepositoryInstrumentation extends Instrumentation {
                 .put("archive_url", "https://github.com/CorvusSoftware/CorvusRetro/releases/download/v0.13.0/" + file.getName())
                 .put("library_name", "libcorvus_" + id + ".so").put("api_version", 0);
     }
+    private JSONObject item(String name) throws Exception {
+        return new JSONObject().put("type", "file").put("name", name)
+                .put("path", "catalog/" + name).put("size", 4096)
+                .put("download_url", CoreCatalogDiscovery.RAW + name);
+    }
+    private String listing() throws Exception {
+        return new JSONArray().put(item("corvuscore.json")).put(item("demo.json")).toString();
+    }
+    private JSONObject community() throws Exception {
+        return new JSONObject(core("gb").toString())
+                .put("id", "demo.handheld").put("name", "Demo")
+                .put("library_name", "libdemo_handheld.so");
+    }
     private String feed(JSONObject... entries) throws Exception {
         JSONArray array = new JSONArray();
         for (JSONObject entry : entries) array.put(entry);
@@ -81,6 +94,49 @@ public final class CoreRepositoryInstrumentation extends Instrumentation {
         reject(core("gb").put("library_name", "../libcorvus_gb.so"));
         reject(core("gb").put("archive_url", "https://example.com/core.zip"));
         reject(core("gb").put("base_version_code", 13));
+    }
+    private void discovery() throws Exception {
+        java.util.List<String> list = CoreCatalogDiscovery.sources(listing());
+        check(list.size() == 2 && list.get(0).endsWith("/corvuscore.json") &&
+                list.get(1).endsWith("/demo.json"), "automatic sorted discovery");
+        CoreRepository.Catalog extra =
+                CoreRepository.parseCatalog(feed(community()), "x86_64", "demo.json");
+        check(extra.cores.containsKey("demo.handheld"), "namespaced provider");
+        CoreCatalogDiscovery.Collector joined = new CoreCatalogDiscovery.Collector();
+        joined.add(CoreRepository.parseCatalog(feed(core("gb")), "x86_64"));
+        joined.add(extra);
+        check(joined.result().cores.size() == 2, "multiple provider feeds combined");
+        try {
+            joined.add(CoreRepository.parseCatalog(feed(core("gb")), "x86_64"));
+            throw new AssertionError("duplicate core accepted across feeds");
+        } catch (IOException expected) { checks++; }
+        try {
+            CoreRepository.parseCatalog(feed(community().put("id", "corvus.gb")),
+                    "x86_64", "demo.json");
+            throw new AssertionError("provider ID spoofing accepted");
+        } catch (IOException expected) { checks++; }
+        try {
+            CoreRepository.parseCatalog(feed(community().put("library_name", "../evil.so")),
+                    "x86_64", "demo.json");
+            throw new AssertionError("unsafe module name accepted");
+        } catch (IOException expected) { checks++; }
+        try {
+            CoreRepository.parseCatalog(feed(community().put("archive_url",
+                    "https://github.com/OtherOrg/Bad/releases/download/v1.0.0/bad.zip")),
+                    "x86_64", "demo.json");
+            throw new AssertionError("untrusted archive source accepted");
+        } catch (IOException expected) { checks++; }
+        try {
+            CoreCatalogDiscovery.sources(new JSONArray().put(item("corvuscore.json"))
+                    .put(item("../evil.json")).toString());
+            throw new AssertionError("traversal in catalog file accepted");
+        } catch (IOException expected) { checks++; }
+        try {
+            CoreCatalogDiscovery.sources(new JSONArray().put(item("corvuscore.json"))
+                    .put(item("demo.json").put("download_url", "https://evil.example/demo.json"))
+                    .toString());
+            throw new AssertionError("malicious catalog URL accepted");
+        } catch (IOException expected) { checks++; }
     }
     private void store() throws Exception {
         Context target = getTargetContext();
@@ -127,6 +183,28 @@ public final class CoreRepositoryInstrumentation extends Instrumentation {
         check(altered.setWritable(true), "create altered fixture");
         check(store.modules().length == 1, "writable executable rejected on discovery");
         check(altered.setReadOnly(), "restore fixture permissions");
+        // A second provider persists without modifying official CorvusCore identities.
+        File customZip = new File(root, "community.zip");
+        try (java.util.zip.ZipFile source = new java.util.zip.ZipFile(archive("gb"));
+             ZipOutputStream output = new ZipOutputStream(new FileOutputStream(customZip))) {
+            ZipEntry original = source.entries().nextElement();
+            output.putNextEntry(new ZipEntry("libdemo_handheld.so"));
+            try (InputStream input = source.getInputStream(original)) {
+                byte[] buffer = new byte[8192];
+                int count;
+                while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+            }
+            output.closeEntry();
+        }
+        JSONObject custom = community().put("sha256", CoreStore.hash(customZip))
+                .put("size", customZip.length());
+        store.install(new CoreRepository.Core(custom, "demo.json"), customZip);
+        String[] persisted = store.modules();
+        check(persisted.length == 3, "community core persisted alongside official cores");
+        check(Arrays.stream(persisted).anyMatch(file -> file.contains("libdemo_handheld-")),
+                "community module rediscovered by its own library name");
+        check(new CoreStore(context).modules().length == 3,
+                "community provider survives store recreation");
     }
     private void transport() {
         URL.setURLStreamHandlerFactory(protocol -> "https".equals(protocol) ? new URLStreamHandler() {
@@ -135,6 +213,10 @@ public final class CoreRepositoryInstrumentation extends Instrumentation {
                     @Override public int getResponseCode() { return 200; }
                     @Override public InputStream getInputStream() throws IOException {
                         try {
+                            if ("api.github.com".equals(url.getHost()))
+                                return new ByteArrayInputStream(listing().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                            if (url.toString().endsWith("/demo.json"))
+                                return new ByteArrayInputStream(feed(community()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
                             if (url.toString().endsWith("/corvuscore.json"))
                                 return new ByteArrayInputStream(feed(core("gb"), core("gbc"), core("gba")).getBytes(java.nio.charset.StandardCharsets.UTF_8));
                             requestedCore = new File(url.getPath()).getName();
@@ -238,7 +320,7 @@ public final class CoreRepositoryInstrumentation extends Instrumentation {
     @Override public void onStart() {
         Bundle result = new Bundle();
         try {
-            catalogs(); store(); downloader();
+            catalogs(); discovery(); store(); downloader();
             result.putString("stream", "PASS " + checks + " native core catalog/store/downloader checks\n");
             finish(Activity.RESULT_OK, result);
         } catch (Throwable failure) {

@@ -120,7 +120,7 @@ Ces commandes couvrent les tests natifs, les vérifications mémoire et le proje
 | [Architecture](docs/repository-structure.md) | Organisation des composants |
 | [Validation Android](docs/validation-android.md) | Compilation, tests et contrôles |
 
-Le catalogue actif est géré par **[CorvusRepository/catalog/corvuscore.json](https://github.com/CorvusSoftware/CorvusRepository/blob/main/catalog/corvuscore.json)**. Le dépôt CorvusRetro ne contient plus de catalogue JSON.
+Les catalogues sont maintenus dans **[CorvusRepository/catalog](https://github.com/CorvusSoftware/CorvusRepository/tree/main/catalog)**. CorvusRetro découvre automatiquement chaque JSON publié dans ce dossier et affiche ses cœurs compatibles, après validation stricte. Aucune liste de fichiers n'est intégrée dans le frontend.
 
 > **Compatibilité :** les anciens catalogues ont été supprimés. Les APK déjà publiés qui utilisaient leurs anciennes URL, notamment v0.13.0, ne pourront plus rafraîchir la liste des cœurs. Une nouvelle release de CorvusRetro est nécessaire pour utiliser le nouveau catalogue.
 
