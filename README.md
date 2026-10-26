@@ -120,7 +120,7 @@ Ces commandes couvrent les tests natifs, les vérifications mémoire et le proje
 | [Architecture](docs/repository-structure.md) | Organisation des composants |
 | [Validation Android](docs/validation-android.md) | Compilation, tests et contrôles |
 
-Le catalogue actuel des modules officiels est [`core-repository/cores-v3.json`](core-repository/cores-v3.json). Les anciens catalogues restent disponibles pour les versions précédemment publiées.
+Le catalogue officiel des modules est maintenu dans **[CorvusRepository](https://github.com/CorvusSoftware/CorvusRepository)**. Les catalogues conservés dans ce dépôt restent accessibles aux anciennes versions de l'application.
 
 ---
 
