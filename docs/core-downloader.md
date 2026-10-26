@@ -1,39 +1,40 @@
 # Téléchargeur de cœurs CorvusRetro
 
-Le téléchargeur récupère un catalogue natif (format 3) depuis
-[CorvusRepository](https://github.com/CorvusSoftware/CorvusRepository), puis
-télécharge un ZIP pour le cœur et l'architecture choisis.
+CorvusRetro consulte le catalogue officiel **[CorvusCore/CorvusCore.json](https://github.com/CorvusSoftware/CorvusRepository/blob/main/CorvusCore/CorvusCore.json)**,
+hébergé par CorvusRepository :
 
-**Catalogue actuel :**
-`https://raw.githubusercontent.com/CorvusSoftware/CorvusRepository/main/catalog/cores-v3.json`
+```text
+https://raw.githubusercontent.com/CorvusSoftware/CorvusRepository/main/CorvusCore/CorvusCore.json
+```
 
-Les six entrées initiales sont **identiques** à celles du catalogue historique
-de CorvusRetro, et leurs archives ZIP restent sur les releases officielles de
-CorvusRetro. Les tailles et empreintes SHA-256 correspondent aux assets publiés.
-Les prochaines métadonnées sont préparées comme **artefact temporaire** par
-le workflow de publication de CorvusRetro, puis validées et proposées dans
-CorvusRepository. Elles ne doivent pas être ajoutées aux anciens JSON de CorvusRetro.
-Le client contrôle toujours les origines autorisées, les tailles et le SHA-256,
-puis installe un module natif dans le stockage privé sans PackageInstaller.
+Le catalogue contient les trois moteurs officiels CorvusCore (GB, GBC, GBA)
+pour `arm64-v8a` et `x86_64`, dans le format 3 de CorvusAPI 0.
+Les ZIP restent publiés par les releases CorvusRetro. Avant le chargement,
+l'application contrôle l'origine de téléchargement, la taille, le SHA-256,
+le contenu de l'archive et l'architecture ELF.
 
-## Compatibilité des anciens clients
+## Distribution
 
-| Client | Catalogue | Distribution |
-| --- | --- | --- |
-| Nouvelles versions | CorvusRepository / `cores-v3.json` | ZIP natif par cœur et ABI, CorvusAPI 0 |
-| 0.12-0.13 | CorvusRetro / `core-repository/cores-v3.json` | ZIP natif par cœur et ABI |
-| 0.11 | CorvusRetro / `core-repository/cores-v2.json` | Split APK signé lié à la base |
-| 0.10 | CorvusRetro / `core-repository/index.json` | Ancien pack APK complet |
+Le workflow de CorvusRetro construit et vérifie les six archives, puis produit
+un fichier temporaire `CorvusCore/CorvusCore.json` comme artefact de revue.
+Les données du catalogue doivent être publiées et validées dans CorvusRepository,
+sans versionner de JSON dans CorvusRetro.
 
-**Ne jamais supprimer ou rediriger les anciens catalogues.** Les trois fichiers
-JSON dans `core-repository/` sont figés pour les APK historiques.
-Une installation existante continue d'utiliser l'URL qui était intégrée à son APK. Les archives
-publiées restent immuables, et les identifiants des jeux et des sauvegardes ne
-changent pas avec le déplacement des métadonnées.
+## Rupture volontaire avec les anciens APK
 
-Le code actuel n'accepte encore que les archives de releases CorvusRetro.
-Héberger les ZIP dans CorvusRepository demandera une migration séparée de
-la liste des origines autorisées, des tests et du processus de publication.
+Le mainteneur a demandé la suppression des trois anciens catalogues du dépôt.
+Les versions de CorvusRetro qui utilisaient les URL historiques (notamment
+v0.13.0) ne peuvent plus rafraîchir les cœurs. Il faut publier un nouvel APK
+pour activer le catalogue externe. Ce nettoyage ne supprime pas les jeux,
+les sauvegardes ni les modules déjà installés chez les utilisateurs.
 
-Voir [les modules natifs](individual-cores.md) et la
-[procédure de publication du nouveau dépôt](https://github.com/CorvusSoftware/CorvusRepository/blob/main/docs/PUBLISHING.md).
+## Autres fournisseurs
+
+Pour éviter les confusions, CorvusRepository réserve un dossier et un fichier
+nommés selon le fournisseur : `CorvusCore/CorvusCore.json`. Les nouveaux
+fournisseurs ne seront **pas chargés automatiquement** : CorvusRetro ne prend
+en charge que les trois identifiants officiels jusqu'à une évolution du
+registre, de la validation et des tests de sécurité.
+
+[Archives natives](individual-cores.md) ·
+[Publication des catalogues](https://github.com/CorvusSoftware/CorvusRepository#publier-une-mise-à-jour)

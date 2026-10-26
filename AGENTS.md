@@ -38,10 +38,8 @@ Read docs/core-downloader.md and docs/stable-content-identities.md when touching
 - gfx/drivers/gl2.c: EGL/OpenGL ES2 rendering.
 - audio/drivers/aaudio.c: real-time audio output and pacing.
 - pkg/android/app/src/main/java/com/corvussoftware/corvusretro/: Android-only services.
-- CorvusRepository/catalog/cores-v3.json: active external catalog for new clients.
-- core-repository/cores-v3.json: frozen JSON feed used by previously released 0.12/0.13 APKs.
-- core-repository/cores-v2.json: frozen feed for historical 0.11 APK splits.
-- core-repository/index.json: frozen 0.10 pack feed. Do not remove or republish these paths.
+- CorvusRepository/CorvusCore/CorvusCore.json: official external catalog for new clients.
+- No JSON catalog lives here. Former catalog endpoints are deliberately retired; old APKs may fail to refresh their download lists.
 - tools/: offline validators and release tooling.
 - deps/CorvusCore/: pinned third-party git submodule. Never edit it in this repo.
 - cheevos/: original RetroAchievements client integration using official MIT rcheevos.
@@ -66,7 +64,7 @@ Keep a change spanning UI, Java, C ABI or persistence consistent across all affe
 - The base APK contains zero emulation modules. NDK builds six native libraries
   directly (three engines, two ABIs); Gradle excludes them from the base package.
 - The current downloader fetches single-core, single-ABI ZIP archives from official
-  HTTPS releases. Format3 cores-v3.json describes archive size/hash, native library
+  HTTPS releases. CorvusCore.json (format 3) describes archive size/hash, native library
   name, permanent core ID, architecture and CorvusAPI version0. No base version lock.
 - Verify origin, exact archive length and SHA-256, one exact ZIP entry, bounded
   extraction and ELF architecture. Write into private files/cores using a temporary
@@ -82,11 +80,11 @@ Keep a change spanning UI, Java, C ABI or persistence consistent across all affe
   mailbox; only the frontend thread may negotiate CorvusAPI or mutate the registry.
 - Download completion refreshes the core list and game library without restarting
   or launching Android PackageInstaller. Unloading destroys the engine, not its file.
-- Preserve legacy split discovery and all three historic catalog URLs for old clients.
-  A base update may remove old splits, but must retain all games and saves.
+- Preserve legacy OS-installed split discovery when relevant, and all games and saves.
+  The old JSON catalog URLs have been retired by maintainer decision.
 - Release-sign the base with the existing durable signer. Verify native ELF layouts
   and six archive inputs. Generate new catalog metadata in a temporary workflow
-  artifact for CorvusRepository; never rewrite historic core-repository JSON files.
+  artifact for CorvusRepository/CorvusCore, not a JSON under the frontend tree.
   Publish actual immutable assets before promoting their real metadata. Never
   invent URLs, hashes or certificates.
 
@@ -155,11 +153,9 @@ Native archive installation:
 - Check immediate native list refresh and replacement while an old module is loaded.
 
 Catalog validation:
-- python3 tools/validate_core_archives.py (frozen legacy v3 snapshot)
-- python3 tools/test_core_archives.py (archive builder and schema regressions)
-- python3 tools/validate_core_catalog.py (legacy v1)
-- python3 tools/validate_core_splits.py (legacy v2)
-- The active catalog and publication tests belong to CorvusRepository.
+- python3 tools/test_core_archives.py (builder and schema regression tests)
+- python3 tools/validate_core_archives.py build/release-core-check.json (generated catalog)
+- The public catalog CI runs in CorvusRepository/CorvusCore.
 
 Always inspect GitHub Actions results for the exact commit before merging.
 Differentiate host tests, compiled APK checks, emulator tests and physical-device tests.

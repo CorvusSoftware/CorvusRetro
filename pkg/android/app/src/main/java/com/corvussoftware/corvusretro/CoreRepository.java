@@ -28,7 +28,7 @@ import org.json.JSONObject;
 /** HTTPS services for the integrated native core downloader. */
 final class CoreRepository {
     private static final String INDEX =
-            "https://raw.githubusercontent.com/CorvusSoftware/CorvusRepository/main/catalog/cores-v3.json";
+            "https://raw.githubusercontent.com/CorvusSoftware/CorvusRepository/main/CorvusCore/CorvusCore.json";
     private static final String RELEASE =
             "https://github.com/CorvusSoftware/CorvusRetro/releases/download/";
     private static final long MAX_ARCHIVE = 32L * 1024 * 1024;

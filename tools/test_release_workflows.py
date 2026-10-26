@@ -112,15 +112,15 @@ class WorkflowGates(unittest.TestCase):
             path.write_text(data)
             self.assertNotEqual(self.run_gate("publish-core-archives.yml", step).returncode, 0)
 
-    def test_publisher_does_not_rewrite_historical_catalogs(self):
+    def test_publisher_exports_corvuscore_metadata_only(self):
         source = (ROOT / ".github/workflows/publish-core-archives.yml").read_text(
             encoding="utf-8")
-        self.assertIn('--catalog "$RUNNER_TEMP/core-catalog/cores-v3.json"', source)
+        self.assertIn('--catalog "$RUNNER_TEMP/CorvusCore/CorvusCore.json"', source)
         self.assertIn(
-            'python3 tools/validate_core_archives.py "$RUNNER_TEMP/core-catalog/cores-v3.json"',
+            'python3 tools/validate_core_archives.py "$RUNNER_TEMP/CorvusCore/CorvusCore.json"',
             source)
-        self.assertIn('path: ${{ runner.temp }}/core-catalog/cores-v3.json', source)
-        self.assertNotIn('--catalog core-repository/cores-v3.json', source)
+        self.assertIn('path: ${{ runner.temp }}/CorvusCore/CorvusCore.json', source)
+        self.assertNotIn('--catalog core-repository/', source)
         self.assertNotIn('git add core-repository/cores-v3.json', source)
         self.assertNotIn('git push origin "HEAD:refs/heads/$branch"', source)
 

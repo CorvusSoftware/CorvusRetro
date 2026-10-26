@@ -69,6 +69,8 @@ def valid_cores(raw):
 
 
 if __name__ == "__main__":
-    path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("core-repository/cores-v3.json")
+    if len(sys.argv) != 2:
+        raise SystemExit("Usage: python3 tools/validate_core_archives.py <generated-catalog.json>")
+    path = Path(sys.argv[1])
     entries = valid_cores(json.loads(path.read_text(encoding="utf-8")))
     print(f"PASS individual core repository: {len(entries)} core/ABI entries")

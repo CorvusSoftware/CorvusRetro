@@ -193,11 +193,9 @@ jobs:
       - name: Generate and validate the six native core archives
         run: |
           python3 tools/build_core_archives.py --variant release --tag "$CORVUS_TAG" \
-            --output "$RUNNER_TEMP/native-cores" --catalog "$RUNNER_TEMP/core-catalog/cores-v3.json"
-          python3 tools/validate_core_archives.py "$RUNNER_TEMP/core-catalog/cores-v3.json"
+            --output "$RUNNER_TEMP/native-cores" --catalog "$RUNNER_TEMP/CorvusCore/CorvusCore.json"
+          python3 tools/validate_core_archives.py "$RUNNER_TEMP/CorvusCore/CorvusCore.json"
           python3 tools/test_core_archives.py
-          python3 tools/validate_core_splits.py
-          python3 tools/validate_core_catalog.py
 
       - name: Publish the exact qualified base and six immutable native archives
         env:
@@ -215,15 +213,14 @@ jobs:
       - name: Upload catalog metadata for CorvusRepository review
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: CorvusRepository-catalog-${{ github.sha }}
-          path: ${{ runner.temp }}/core-catalog/cores-v3.json
+          name: CorvusRepository-CorvusCore-${{ github.sha }}
+          path: ${{ runner.temp }}/CorvusCore/CorvusCore.json
           if-no-files-found: error
           retention-days: 30
 
       - name: Explain catalog promotion
         run: |
           echo "New native archives are published; the generated catalog is a workflow artifact." >> "$GITHUB_STEP_SUMMARY"
-          echo "Verify release asset sizes and hashes before proposing catalog/cores-v3.json" >> "$GITHUB_STEP_SUMMARY"
-          echo "in CorvusSoftware/CorvusRepository. Historical JSON feeds in CorvusRetro" >> "$GITHUB_STEP_SUMMARY"
-          echo "must remain unchanged for already released Android clients." >> "$GITHUB_STEP_SUMMARY"
+          echo "Verify release asset sizes and hashes before proposing CorvusCore/CorvusCore.json" >> "$GITHUB_STEP_SUMMARY"
+          echo "in CorvusSoftware/CorvusRepository. No catalog is kept in CorvusRetro." >> "$GITHUB_STEP_SUMMARY"
 

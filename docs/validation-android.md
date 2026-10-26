@@ -12,8 +12,9 @@ make test SANITIZE=ON
 cmake -S . -B build/corefree -DCORVUS_OFFICIAL_CORES=
 cmake --build build/corefree --target native_nocore_test
 (cd build/corefree && ./native_nocore_test)
-python3 tools/validate_core_archives.py
 python3 tools/test_core_archives.py
+# Pour un catalogue produit localement :
+# python3 tools/validate_core_archives.py build/release-core-check.json
 python3 tools/test_release_workflows.py
 ```
 

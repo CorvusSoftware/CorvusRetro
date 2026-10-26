@@ -59,5 +59,5 @@ Gradle exclut ces bibliothèques de l'APK de base. Les modules sont disponibles 
 `tools/build_core_archives.py` vérifie les ELF et crée six ZIP déterministes.
 La CI signe uniquement la base Android et conserve la provenance et les empreintes
 des six bibliothèques. Le publisher réutilise ces fichiers qualifiés sans reconstruire
-les moteurs, puis génère le catalogue sur une branche de revue.
-Les anciens cores-v2.json et index.json restent servis pour leurs clients publiés.
+les moteurs, puis génère un catalogue temporaire pour revue dans CorvusRepository.
+Les anciens catalogues ont été supprimés ; les APK historiques ne peuvent plus mettre à jour leurs listes de cœurs. Le catalogue actif est CorvusRepository/CorvusCore/CorvusCore.json.

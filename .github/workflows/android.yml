@@ -77,11 +77,8 @@ jobs:
           print('PASS repository text policy')
           PYCODE
 
-      - name: Validate legacy catalogs and archive tooling
+      - name: Validate archive tooling and publication gates
         run: |
-          python3 tools/validate_core_catalog.py
-          python3 tools/validate_core_splits.py
-          python3 tools/validate_core_archives.py
           python3 tools/test_core_archives.py
           python3 tools/test_release_workflows.py
 
@@ -106,6 +103,7 @@ jobs:
         run: |
           python3 tools/build_core_archives.py --variant release --tag v0.13.0 \
             --output build/release-core-check --catalog build/release-core-check.json
+          python3 tools/validate_core_archives.py build/release-core-check.json
 
       - name: Verify base APK contains no emulator cores
         run: |
