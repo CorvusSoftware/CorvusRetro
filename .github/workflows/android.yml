@@ -77,7 +77,7 @@ jobs:
           print('PASS repository text policy')
           PYCODE
 
-      - name: Validate official Corvus Core Repository metadata
+      - name: Validate legacy catalogs and archive tooling
         run: |
           python3 tools/validate_core_catalog.py
           python3 tools/validate_core_splits.py

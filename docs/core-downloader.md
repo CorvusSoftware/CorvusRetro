@@ -1,19 +1,39 @@
 # Téléchargeur de cœurs CorvusRetro
 
-Le parcours actuel0.12 utilise des archives natives individuelles : consulter
-[la référence RetroArch, le parcours et la publication](individual-cores.md).
-Le service Android ne lance plus PackageInstaller et ne demande plus la permission
-REQUEST_INSTALL_PACKAGES. Les cœurs apparaissent immédiatement après téléchargement.
+Le téléchargeur récupère un catalogue natif (format 3) depuis
+[CorvusRepository](https://github.com/CorvusSoftware/CorvusRepository), puis
+télécharge un ZIP pour le cœur et l'architecture choisis.
 
-## Catalogues conservés
+**Catalogue actuel :**
+`https://raw.githubusercontent.com/CorvusSoftware/CorvusRepository/main/catalog/cores-v3.json`
+
+Les six entrées initiales sont **identiques** à celles du catalogue historique
+de CorvusRetro, et leurs archives ZIP restent sur les releases officielles de
+CorvusRetro. Les tailles et empreintes SHA-256 correspondent aux assets publiés.
+Les prochaines métadonnées sont préparées comme **artefact temporaire** par
+le workflow de publication de CorvusRetro, puis validées et proposées dans
+CorvusRepository. Elles ne doivent pas être ajoutées aux anciens JSON de CorvusRetro.
+Le client contrôle toujours les origines autorisées, les tailles et le SHA-256,
+puis installe un module natif dans le stockage privé sans PackageInstaller.
+
+## Compatibilité des anciens clients
 
 | Client | Catalogue | Distribution |
 | --- | --- | --- |
-| 0.12 | cores-v3.json, format3 | ZIP natif par cœur et ABI, CorvusAPI0 |
-| 0.11 | cores-v2.json, format2 | Split APK signé lié à une base Android |
-| 0.10 | index.json, format1 | Ancien pack APK complet |
+| Nouvelles versions | CorvusRepository / `cores-v3.json` | ZIP natif par cœur et ABI, CorvusAPI 0 |
+| 0.12-0.13 | CorvusRetro / `core-repository/cores-v3.json` | ZIP natif par cœur et ABI |
+| 0.11 | CorvusRetro / `core-repository/cores-v2.json` | Split APK signé lié à la base |
+| 0.10 | CorvusRetro / `core-repository/index.json` | Ancien pack APK complet |
 
-Ne pas réinterpréter les anciens formats ni modifier leurs URLs immuables.
-Les validateurs historiques restent utiles aux anciens clients ; les nouveaux
-contrôles sont tools/validate_core_archives.py et tools/test_core_archives.py.
-La signature durable de la base Android reste inchangée.
+**Ne jamais supprimer ou rediriger les anciens catalogues.** Les trois fichiers
+JSON dans `core-repository/` sont figés pour les APK historiques.
+Une installation existante continue d'utiliser l'URL qui était intégrée à son APK. Les archives
+publiées restent immuables, et les identifiants des jeux et des sauvegardes ne
+changent pas avec le déplacement des métadonnées.
+
+Le code actuel n'accepte encore que les archives de releases CorvusRetro.
+Héberger les ZIP dans CorvusRepository demandera une migration séparée de
+la liste des origines autorisées, des tests et du processus de publication.
+
+Voir [les modules natifs](individual-cores.md) et la
+[procédure de publication du nouveau dépôt](https://github.com/CorvusSoftware/CorvusRepository/blob/main/docs/PUBLISHING.md).
