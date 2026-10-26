@@ -1,17 +1,20 @@
 # Qualification 0.12 : archives natives individuelles
 
-Vérification du26octobre2026, cible Android35 conservée.
+Vérification du 26 octobre 2026, cible API 35 conservée.
 
 - Six tests CTest normaux et six sous ASan/UBSan réussis, y compris remplacement
   d'un module à chemin différent pendant un jeu actif et conservation des capacités.
 - Zéro cœur au départ : test natif séparé réussi. Dix-neuf tests Python réussis
   pour catalogues historiques, archives et contrôles de publication.
 - Gradle assembleDebug, assembleDebugAndroidTest et lintDebug réussis. Base et
-  trois builders vérifiés : identités, signatures, architectures et alignement16Ko.
-- Android15 x86_64 :39contrôles réels catalogue/stockage/service réussis, avec les
+  trois builders vérifiés : identités, signatures, architectures et alignement 16 Ko.
+- Android 15 x86_64 :39 contrôles réels catalogue/stockage/service réussis, avec les
   véritables bibliothèques compilées. Extraction vers files/cores, lecture seule,
   chargement natif, ajout cumulatif, reprise après recréation pendant transfert,
   refus de hash/ABI/traversal, téléchargement tronqué sans perte des modules.
+- Android 15 : anciens jeux GB et GBA réellement joués depuis files/cores, puis
+  déchargés/rechargés. La batterie GBA historique suffixe-2 est identique par SHA-256
+  à la version précédente. Aucun crash natif et seule permission INTERNET demandée.
 - La liste native puis le chargement d'un cœur ont été capturés dans la même
   activité après téléchargement, sans redémarrage et sans session PackageInstaller.
 
@@ -19,6 +22,16 @@ Le transport HTTPS est une fixture déterministe dans l'instrumentation, afin
 que les défauts de CA du proxy de laboratoire ne conditionnent pas ces tests.
 La validation TLS publique de production reste stricte. Ces preuves ne sont
 pas une qualification de téléphone physique ni d'exécution ARM64.
+
+Publication : source1c50916, CI Android40342714444, build signé40343296103 et
+publisher40343898470 réussis. Les sept fichiers de v0.12.0 ont été téléchargés :
+la base0.12/code13 utilise le certificat de confiance indépendant des versions
+précédentes ; les six ZIP contiennent le bon module et respectent les architectures
+et segments 16 Ko. Le catalogue a été reproduit à l'identique depuis leurs vrais octets.
+
+Les39contrôles d'instrumentation ont aussi été repassés avec les véritables ZIP
+publiés, avec succès. Sur Android10, le véritable APK signé0.12 a remplacé la
+version0.11 en place ; les captures confirment le thème ASUS et l'historique conservés.
 
 ## Qualifications historiques
 
@@ -28,7 +41,7 @@ pas une qualification de téléphone physique ni d'exécution ARM64.
 
 La base et trois APK de fonctionnalité distincts sont construits ensemble :
 package commun, versionCode12/versionName0.11.0, signatures identiques, ARM64 et
-x86_64, contrôle d'alignement16Ko. La base contient seulement libcorvusretro.so ;
+x86_64, contrôle d'alignement 16 Ko. La base contient seulement libcorvusretro.so ;
 chaque module contient uniquement son propre module CorvusAPI.
 
 Preuves locales avant publication :
@@ -40,7 +53,7 @@ Preuves locales avant publication :
   portes réelles des workflows de signature/publication (source, fork, SHA, tag,
   hash et provenance).
 - Compilation de la base, des trois modules et des tests Android ; lintDebug passe.
-- Android15 x86_64 : GBA seul installé par Android, puis ajout GB avec
+- Android 15 x86_64 : GBA seul installé par Android, puis ajout GB avec
   MODE_INHERIT_EXISTING ; GBA reste présent et chargé. Les bibliothèques sont
   extraites dans le répertoire système du package, non modifiable par l'application.
 - Vrai programme GBA original exécuté avec ses commandes L/R. Son fichier batterie
@@ -92,12 +105,12 @@ Preuves exécutées sur cette modification :
 - Régression menu avec ROM GBA originale écrivant en SRAM, obstruction du dossier
   de sauvegarde, conservation de la session puis déchargement avec sauvegarde réussie.
 - `:app:assembleDebug :app:lintDebug` pour la base ; `-PcorvusCores=gb,gbc,gba
-  :app:assembleDebug` pour le pack. Les deux APK passent signature et alignement16Ko.
+  :app:assembleDebug` pour le pack. Les deux APK passent signature et alignement 16 Ko.
 - Inspection ZIP : base limitée à libcorvusretro.so ; pack avec les trois modules
   officiels ; présence vérifiée pour ARM64 et x86_64.
 - Revue indépendante du comportement et du contrat proposé : aucun finding concret.
 
-Android15 x86_64, données existantes conservées : base sans cœur, accès au
+Android 15 x86_64, données existantes conservées : base sans cœur, accès au
 téléchargeur depuis les deux actions de chargement et retour arrière ; pack avec
 chargement/déchargement des trois cœurs, informations du cœur GB, ligne unique en
 portrait et paysage. Un GB déjà présent est ouvert depuis sa liste, puis déchargé
@@ -121,7 +134,7 @@ sans entrée coincée, et la désactivation du feedback sans perte d'entrée.
 Revue indépendante et compléments latch visuel/reset : aucun problème bloquant.
 APK ARM64/x86_64 et lint sans erreur ; signature et alignement 16Ko vérifiés.
 
-Sur Android15 x86_64 (480x960, densité200, sans KVM), données 0.8 conservées :
+Sur Android 15 x86_64 (480x960, densité200, sans KVM), données 0.8 conservées :
 
 - Nouveaux réglages et retour dans les parents ; maintien d'une catégorie sans ouverture, puis tap pour l'ouvrir.
 - Réglage audio : maintien court sans modification, tap modifie la valeur sauvegardée, restauration de la valeur initiale.
