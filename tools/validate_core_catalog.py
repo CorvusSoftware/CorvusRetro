@@ -33,6 +33,8 @@ def valid_catalog(raw):
                     raise ValueError("invalid APK size")
             elif not isinstance(value, str) or not value or len(value) > 256:
                 raise ValueError(f"invalid {key}")
+            elif key in ("name", "description") and len(value) > 128:
+                raise ValueError(f"too long {key}")
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,94}", p["id"]):
             raise ValueError("invalid pack ID")
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,94}", p["core_id"]):
