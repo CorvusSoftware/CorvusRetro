@@ -58,6 +58,16 @@ dans une GitHub Release. Il fournit ensuite un fichier de catalogue
 prêt à être **soumis et relu**, mais ne l'enregistre pas automatiquement
 sur `main`.
 
+La génération et les tests du catalogue ont lieu avant la création de la
+Release, pour éviter de publier un APK si ces contrôles échouent. Les tests
+du catalogue vide utilisent une fixture indépendante : le catalogue de travail
+peut déjà contenir les entrées ARM64 et x86_64 du pack.
+
+L'exécution de publication #3 a publié `v0.10.0-cores.1` avant d'échouer sur
+l'ancien test qui imposait un catalogue vide. Cette Release existe : une
+relance avec le même tag est refusée pour préserver son APK immuable.
+Le rouge de cette exécution ne signifie donc pas que son APK est absent.
+
 La mise à jour du catalogue n'est publique qu'une fois l'APK
 réellement téléchargeable. Ne jamais ajouter de fausse URL de
 release ni de faux SHA-256 pour simuler des cœurs disponibles.

@@ -28,9 +28,8 @@ def valid_pack():
 
 
 class CatalogTests(unittest.TestCase):
-    def test_empty_official_catalog(self):
-        with open("core-repository/index.json", encoding="utf-8") as f:
-            self.assertEqual(valid_catalog(json.load(f)), [])
+    def test_empty_catalog(self):
+        self.assertEqual(valid_catalog({"format": 1, "packs": []}), [])
 
     def test_valid_release(self):
         self.assertEqual(len(valid_catalog({"format": 1, "packs": [valid_pack()]})), 1)
@@ -59,8 +58,9 @@ class CatalogTests(unittest.TestCase):
             apk = root / "pack.apk"
             with zipfile.ZipFile(apk, "w") as archive:
                 archive.writestr("AndroidManifest.xml", "test")
-                archive.writestr("lib/arm64-v8a/libcorvusretro.so", "app")
-                archive.writestr("lib/arm64-v8a/libcorvus_gb.so", "core")
+                for abi in ("arm64-v8a", "x86_64"):
+                    archive.writestr(f"lib/{abi}/libcorvusretro.so", "app")
+                    archive.writestr(f"lib/{abi}/libcorvus_gb.so", "core")
             catalog = root / "index.json"
             catalog.write_text('{"format":1,"packs":[]}', encoding="utf-8")
             trusted = "f" * 64
@@ -75,13 +75,17 @@ class CatalogTests(unittest.TestCase):
             fake = Mock(returncode=0,
                         stdout="Signer #1 certificate SHA-256 digest: " + trusted,
                         stderr="")
-            with patch.object(sys, "argv", args), patch.object(
-                    register_core_pack.subprocess, "run", return_value=fake):
-                register_core_pack.main()
+            for abi in ("arm64-v8a", "x86_64"):
+                abi_args = args.copy()
+                abi_args[abi_args.index("--abi") + 1] = abi
+                with patch.object(sys, "argv", abi_args), patch.object(
+                        register_core_pack.subprocess, "run", return_value=fake):
+                    register_core_pack.main()
             entries = valid_catalog(json.loads(catalog.read_text(encoding="utf-8")))
-            self.assertEqual(len(entries), 1)
-            self.assertEqual(entries[0]["size"], apk.stat().st_size)
-            self.assertEqual(entries[0]["core_id"], "corvus.gb")
+            self.assertEqual([entry["abi"] for entry in entries], ["arm64-v8a", "x86_64"])
+            for entry in entries:
+                self.assertEqual(entry["size"], apk.stat().st_size)
+                self.assertEqual(entry["core_id"], "corvus.gb")
             with patch.object(sys, "argv", args), patch.object(
                     register_core_pack.subprocess, "run",
                     return_value=Mock(returncode=0,
@@ -89,8 +93,8 @@ class CatalogTests(unittest.TestCase):
                                       stderr="")):
                 with self.assertRaises(SystemExit):
                     register_core_pack.main()
-            self.assertEqual(len(valid_catalog(json.loads(
-                catalog.read_text(encoding="utf-8")))), 1)
+            self.assertEqual(valid_catalog(json.loads(
+                catalog.read_text(encoding="utf-8"))), entries)
 
     def test_reject_duplicate_and_schema(self):
         with self.assertRaises(ValueError):

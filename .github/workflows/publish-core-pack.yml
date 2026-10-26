@@ -143,22 +143,6 @@ jobs:
             done
           done
 
-      - name: Publish immutable signed APK to GitHub Releases
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          tag="$CORVUS_TAG"
-          apk=app/build/outputs/apk/release/app-release.apk
-          if gh release view "$tag" >/dev/null 2>&1; then
-            echo "Release already exists: refusing to overwrite an immutable core pack"
-            exit 1
-          fi
-          cp "$apk" "$RUNNER_TEMP/CorvusRetro-0.10-official-corepack.apk"
-          gh release create "$tag" "$RUNNER_TEMP/CorvusRetro-0.10-official-corepack.apk" \
-            --target "$GITHUB_SHA" --title "CorvusRetro official core pack $tag" \
-            --notes "Release-signed CorvusRetro APK with CorvusGB, CorvusGBC and CorvusGBA (CorvusAPI ABI 0). Installs as a full application update, not as loose .so modules."
-
       - name: Generate reviewed catalog metadata (not published until reviewed)
         env:
           RELEASE_CERT: ${{ secrets.CORVUS_RELEASE_CERT_SHA256 }}
@@ -178,6 +162,22 @@ jobs:
           done
           python3 tools/validate_core_catalog.py
           python3 tools/test_core_catalog.py
+
+      - name: Publish immutable signed APK to GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="$CORVUS_TAG"
+          apk=app/build/outputs/apk/release/app-release.apk
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release already exists: refusing to overwrite an immutable core pack"
+            exit 1
+          fi
+          cp "$apk" "$RUNNER_TEMP/CorvusRetro-0.10-official-corepack.apk"
+          gh release create "$tag" "$RUNNER_TEMP/CorvusRetro-0.10-official-corepack.apk" \
+            --target "$GITHUB_SHA" --title "CorvusRetro official core pack $tag" \
+            --notes "Release-signed CorvusRetro APK with CorvusGB, CorvusGBC and CorvusGBA (CorvusAPI ABI 0). Installs as a full application update, not as loose .so modules."
 
       - name: Upload catalog update for review before publication
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
