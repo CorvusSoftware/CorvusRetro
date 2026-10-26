@@ -9,3 +9,6 @@ Revue indépendante corrigée ; aucun finding bloquant ouvert connu.
 
 Limites : transport de protocole synthétique, pas de compte réel, téléphone physique ou exécutionARM64.
 La source doit encore passer la CI distante exacte, puis les assets signés publics et leur catalogue doivent être vérifiés.
+
+CI source2248329 verte. Construction signée bloquée par un chemin de sortie RelWithDebInfo/Release incohérent.
+Problème reproduit localement, correction validée par les vrais builds Debug/Release et leurs six archives ; nouveau passage CI requis.

@@ -78,9 +78,14 @@ file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/generated/cr_bundled_cores.h"
 option(CORVUS_SANITIZE "Instrument the original portable C code" OFF)
 if(ANDROID)
     set(CORVUS_CORE_OUTPUT_DIR "${CMAKE_BINARY_DIR}/native-cores" CACHE PATH "Native archive build outputs")
+    # Android release builds use RelWithDebInfo while archive consumers use Release.
+    set(_corvus_archive_build_type "${CMAKE_BUILD_TYPE}")
+    if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo" OR CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
+        set(_corvus_archive_build_type "Release")
+    endif()
     foreach(core gb gbc gba)
         set_target_properties(corvus_${core} PROPERTIES LIBRARY_OUTPUT_DIRECTORY
-            "${CORVUS_CORE_OUTPUT_DIR}/${CMAKE_BUILD_TYPE}/${ANDROID_ABI}")
+            "${CORVUS_CORE_OUTPUT_DIR}/${_corvus_archive_build_type}/${ANDROID_ABI}")
         target_link_options(corvus_${core} PRIVATE "-Wl,-z,max-page-size=16384")
     endforeach()
 endif()

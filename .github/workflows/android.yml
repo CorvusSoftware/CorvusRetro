@@ -100,7 +100,12 @@ jobs:
 
       - name: Build APK and run Android lint
         run: |
-          ./gradlew --no-daemon :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest
+          ./gradlew --no-daemon :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest :app:assembleRelease
+
+      - name: Verify production native archive inputs
+        run: |
+          python3 tools/build_core_archives.py --variant release --tag v0.13.0 \
+            --output build/release-core-check --catalog build/release-core-check.json
 
       - name: Verify base APK contains no emulator cores
         run: |

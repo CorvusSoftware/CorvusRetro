@@ -22,3 +22,9 @@ Transport réseau de test synthétique ; aucun compte réel ou jeu commercial. P
 Prochain : recontrôler amont, consolider les commits locaux, pousser main et observer la CI exacte.
 Après CI et preview signé verts : tagv0.13.0, vérifier les sept assets publics et promouvoir uniquement leur catalogue réel.
 Ne pas redemander les autorisations déjà accordées ; ne pas publier de métadonnées fictives.
+
+CI source2248329 réussie40392940891. Preview signé40393518093 échoué à la validation des modules.
+Cause reproduite : AGP utilise RelWithDebInfo mais les consommateurs attendent native-cores/Release.
+Correction : normaliser le répertoire des variantes optimisées sans changer les options de compilation.
+La CI principale construit maintenant aussi Release et empaquette ses six archives pour éviter la régression.
+Builds Debug et Release corrigés réussis ; six archives réelles de chaque variante validées, ABIs/16Ko/export CorvusAPI. Aucun changement de code runtime après les tests Android finaux.
