@@ -11,8 +11,8 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  actions: write
+  contents: read
+  actions: read
 
 jobs:
   build:
@@ -184,38 +184,3 @@ jobs:
         if: always()
         run: rm -f "$RUNNER_TEMP/corvus-release.jks" "$RUNNER_TEMP/corvus-release-cert.der"
 
-      - name: Publish signed CorvusRetro v0.14.0
-        if: github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'main'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          # One-time release promotion. Future versions require an explicit new gate.
-          grep -Fq "versionName project.findProperty('corvusVersionName') ?: '0.14.0'" pkg/android/app/build.gradle || {
-            echo "Not the v0.14.0 source version; no release promotion."
-            exit 0
-          }
-          grep -Eq "^[[:space:]]*: 15[[:space:]]*$" pkg/android/app/build.gradle || {
-            echo "Not the expected versionCode 15"
-            exit 1
-          }
-          if gh release view v0.14.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "v0.14.0 is already published. Its assets remain immutable."
-            exit 0
-          fi
-          existing=$(git ls-remote origin "refs/tags/v0.14.0" | awk '{print $1}')
-          if test -n "$existing"; then
-            test "$existing" = "$SOURCE_SHA" || {
-              echo "v0.14.0 tag points to a different revision"
-              exit 1
-            }
-          else
-            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
-              -f ref="refs/tags/v0.14.0" -f sha="$SOURCE_SHA" >/dev/null
-          fi
-          # workflow_dispatch is explicitly allowed when called with GITHUB_TOKEN.
-          gh api --method POST \
-            "repos/$GITHUB_REPOSITORY/actions/workflows/publish-core-archives.yml/dispatches" \
-            -f ref="main" -f "inputs[tag]=v0.14.0" \
-            -f "inputs[source_run_id]=$GITHUB_RUN_ID"
-          echo "Dispatched verified v0.14.0 release from signing run $GITHUB_RUN_ID" >> "$GITHUB_STEP_SUMMARY"
