@@ -4,8 +4,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """Offline core catalog acceptance and tampering cases."""
 import json
+import sys
 import unittest
+import zipfile
 from copy import deepcopy
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch, Mock
+
+import register_core_pack
 
 from validate_core_catalog import valid_catalog
 
@@ -45,6 +52,45 @@ class CatalogTests(unittest.TestCase):
             case[field] = replacement
             with self.subTest(field=field, value=replacement), self.assertRaises(ValueError):
                 valid_catalog({"format": 1, "packs": [case]})
+
+    def test_signed_apk_publication(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            apk = root / "pack.apk"
+            with zipfile.ZipFile(apk, "w") as archive:
+                archive.writestr("AndroidManifest.xml", "test")
+                archive.writestr("lib/arm64-v8a/libcorvusretro.so", "app")
+                archive.writestr("lib/arm64-v8a/libcorvus_gb.so", "core")
+            catalog = root / "index.json"
+            catalog.write_text('{"format":1,"packs":[]}', encoding="utf-8")
+            trusted = "f" * 64
+            args = [
+                "register_core_pack.py", "--apk", str(apk), "--abi", "arm64-v8a",
+                "--id", "corvus-core-pack", "--name", "Corvus Game Boy",
+                "--description", "Official", "--version", "1.0",
+                "--core-id", "corvus.gb", "--core-library", "libcorvus_gb.so",
+                "--url", valid_pack()["apk_url"], "--catalog", str(catalog),
+                "--expected-cert-sha256", trusted,
+            ]
+            fake = Mock(returncode=0,
+                        stdout="Signer #1 certificate SHA-256 digest: " + trusted,
+                        stderr="")
+            with patch.object(sys, "argv", args), patch.object(
+                    register_core_pack.subprocess, "run", return_value=fake):
+                register_core_pack.main()
+            entries = valid_catalog(json.loads(catalog.read_text(encoding="utf-8")))
+            self.assertEqual(len(entries), 1)
+            self.assertEqual(entries[0]["size"], apk.stat().st_size)
+            self.assertEqual(entries[0]["core_id"], "corvus.gb")
+            with patch.object(sys, "argv", args), patch.object(
+                    register_core_pack.subprocess, "run",
+                    return_value=Mock(returncode=0,
+                                      stdout="Signer #1 certificate SHA-256 digest: " + "a" * 64,
+                                      stderr="")):
+                with self.assertRaises(SystemExit):
+                    register_core_pack.main()
+            self.assertEqual(len(valid_catalog(json.loads(
+                catalog.read_text(encoding="utf-8")))), 1)
 
     def test_reject_duplicate_and_schema(self):
         with self.assertRaises(ValueError):
