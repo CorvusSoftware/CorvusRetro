@@ -95,6 +95,10 @@ jobs:
           echo "CORVUS_RELEASE_KEYSTORE=$RUNNER_TEMP/corvus-release.jks" >> "$GITHUB_ENV"
 
       - name: Build the complete official core pack APK
+        env:
+          CORVUS_RELEASE_STORE_PASSWORD: ${{ secrets.CORVUS_RELEASE_STORE_PASSWORD }}
+          CORVUS_RELEASE_KEY_ALIAS: ${{ secrets.CORVUS_RELEASE_KEY_ALIAS }}
+          CORVUS_RELEASE_KEY_PASSWORD: ${{ secrets.CORVUS_RELEASE_KEY_PASSWORD }}
         run: |
           ./gradlew --no-daemon -PcorvusCores=gb,gbc,gba \
             -PcorvusVersionCode=$CORVUS_VERSION_CODE \
