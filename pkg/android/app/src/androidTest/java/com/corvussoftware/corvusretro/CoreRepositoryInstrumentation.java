@@ -135,7 +135,7 @@ public final class CoreRepositoryInstrumentation extends Instrumentation {
                     @Override public int getResponseCode() { return 200; }
                     @Override public InputStream getInputStream() throws IOException {
                         try {
-                            if (url.toString().endsWith("/CorvusCore.json"))
+                            if (url.toString().endsWith("/corvuscore.json"))
                                 return new ByteArrayInputStream(feed(core("gb"), core("gbc"), core("gba")).getBytes(java.nio.charset.StandardCharsets.UTF_8));
                             requestedCore = new File(url.getPath()).getName();
                             if (requestedCore.startsWith("CorvusGB-") && transferStarted != null) {
