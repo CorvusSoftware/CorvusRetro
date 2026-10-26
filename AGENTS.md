@@ -38,7 +38,7 @@ Read docs/core-downloader.md and docs/stable-content-identities.md when touching
 - gfx/drivers/gl2.c: EGL/OpenGL ES2 rendering.
 - audio/drivers/aaudio.c: real-time audio output and pacing.
 - pkg/android/app/src/main/java/com/corvussoftware/corvusretro/: Android-only services.
-- CorvusRepository/CorvusCore/CorvusCore.json: official external catalog for new clients.
+- CorvusRepository/catalog/corvuscore.json: official external catalog for new clients.
 - No JSON catalog lives here. Former catalog endpoints are deliberately retired; old APKs may fail to refresh their download lists.
 - tools/: offline validators and release tooling.
 - deps/CorvusCore/: pinned third-party git submodule. Never edit it in this repo.

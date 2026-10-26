@@ -193,8 +193,8 @@ jobs:
       - name: Generate and validate the six native core archives
         run: |
           python3 tools/build_core_archives.py --variant release --tag "$CORVUS_TAG" \
-            --output "$RUNNER_TEMP/native-cores" --catalog "$RUNNER_TEMP/CorvusCore/CorvusCore.json"
-          python3 tools/validate_core_archives.py "$RUNNER_TEMP/CorvusCore/CorvusCore.json"
+            --output "$RUNNER_TEMP/native-cores" --catalog "$RUNNER_TEMP/catalog/corvuscore.json"
+          python3 tools/validate_core_archives.py "$RUNNER_TEMP/catalog/corvuscore.json"
           python3 tools/test_core_archives.py
 
       - name: Publish the exact qualified base and six immutable native archives
@@ -214,13 +214,13 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: CorvusRepository-CorvusCore-${{ github.sha }}
-          path: ${{ runner.temp }}/CorvusCore/CorvusCore.json
+          path: ${{ runner.temp }}/catalog/corvuscore.json
           if-no-files-found: error
           retention-days: 30
 
       - name: Explain catalog promotion
         run: |
           echo "New native archives are published; the generated catalog is a workflow artifact." >> "$GITHUB_STEP_SUMMARY"
-          echo "Verify release asset sizes and hashes before proposing CorvusCore/CorvusCore.json" >> "$GITHUB_STEP_SUMMARY"
+          echo "Verify release asset sizes and hashes before proposing catalog/corvuscore.json" >> "$GITHUB_STEP_SUMMARY"
           echo "in CorvusSoftware/CorvusRepository. No catalog is kept in CorvusRetro." >> "$GITHUB_STEP_SUMMARY"
 

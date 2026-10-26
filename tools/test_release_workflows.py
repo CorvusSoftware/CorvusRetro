@@ -115,11 +115,11 @@ class WorkflowGates(unittest.TestCase):
     def test_publisher_exports_corvuscore_metadata_only(self):
         source = (ROOT / ".github/workflows/publish-core-archives.yml").read_text(
             encoding="utf-8")
-        self.assertIn('--catalog "$RUNNER_TEMP/CorvusCore/CorvusCore.json"', source)
+        self.assertIn('--catalog "$RUNNER_TEMP/catalog/corvuscore.json"', source)
         self.assertIn(
-            'python3 tools/validate_core_archives.py "$RUNNER_TEMP/CorvusCore/CorvusCore.json"',
+            'python3 tools/validate_core_archives.py "$RUNNER_TEMP/catalog/corvuscore.json"',
             source)
-        self.assertIn('path: ${{ runner.temp }}/CorvusCore/CorvusCore.json', source)
+        self.assertIn('path: ${{ runner.temp }}/catalog/corvuscore.json', source)
         self.assertNotIn('--catalog core-repository/', source)
         self.assertNotIn('git add core-repository/cores-v3.json', source)
         self.assertNotIn('git push origin "HEAD:refs/heads/$branch"', source)

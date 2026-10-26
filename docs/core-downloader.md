@@ -1,10 +1,10 @@
 # Téléchargeur de cœurs CorvusRetro
 
-CorvusRetro consulte le catalogue officiel **[CorvusCore/CorvusCore.json](https://github.com/CorvusSoftware/CorvusRepository/blob/main/CorvusCore/CorvusCore.json)**,
+CorvusRetro consulte le catalogue officiel **[catalog/corvuscore.json](https://github.com/CorvusSoftware/CorvusRepository/blob/main/catalog/corvuscore.json)**,
 hébergé par CorvusRepository :
 
 ```text
-https://raw.githubusercontent.com/CorvusSoftware/CorvusRepository/main/CorvusCore/CorvusCore.json
+https://raw.githubusercontent.com/CorvusSoftware/CorvusRepository/main/catalog/corvuscore.json
 ```
 
 Le catalogue contient les trois moteurs officiels CorvusCore (GB, GBC, GBA)
@@ -16,7 +16,7 @@ le contenu de l'archive et l'architecture ELF.
 ## Distribution
 
 Le workflow de CorvusRetro construit et vérifie les six archives, puis produit
-un fichier temporaire `CorvusCore/CorvusCore.json` comme artefact de revue.
+un fichier temporaire `catalog/corvuscore.json` comme artefact de revue.
 Les données du catalogue doivent être publiées et validées dans CorvusRepository,
 sans versionner de JSON dans CorvusRetro.
 
@@ -31,7 +31,7 @@ les sauvegardes ni les modules déjà installés chez les utilisateurs.
 ## Autres fournisseurs
 
 Pour éviter les confusions, CorvusRepository réserve un dossier et un fichier
-nommés selon le fournisseur : `CorvusCore/CorvusCore.json`. Les nouveaux
+nommés selon le fournisseur : `catalog/corvuscore.json`. Les nouveaux
 fournisseurs ne seront **pas chargés automatiquement** : CorvusRetro ne prend
 en charge que les trois identifiants officiels jusqu'à une évolution du
 registre, de la validation et des tests de sécurité.

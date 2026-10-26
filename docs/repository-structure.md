@@ -26,7 +26,7 @@ Le build Android produit directement des `.so` pour les archives. Il ne construi
 plus d'APK de cœur. La base exclut tous les moteurs et conserve uniquement son
 frontend. Le catalogue des moteurs est désormais hébergé dans
 [CorvusRepository](https://github.com/CorvusSoftware/CorvusRepository),
-à l'emplacement `CorvusCore/CorvusCore.json`. Les anciens JSON ont été
+à l'emplacement `catalog/corvuscore.json`. Les anciens JSON ont été
 supprimés de CorvusRetro. Les anciens scripts de packs et projets
 dynamic-feature ont également été retirés.
 
