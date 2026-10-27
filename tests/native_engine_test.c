@@ -131,6 +131,8 @@ int main(void) {
     cr_engine engine;
     cr_engine_init(&engine, root);
     check(!engine.handle && engine.system == -1, "start unloaded", &engine);
+    check(cr_engine_unload_game(&engine) && !engine.handle && engine.system == -1,
+          "closing absent content does not select a core", &engine);
     check(!cr_engine_step(&engine, 0) && !cr_engine_save_state(&engine), "idle operations rejected",
           &engine);
     check(!cr_engine_select(&engine, 3) && !engine.handle, "unknown core rejected", &engine);
@@ -138,6 +140,9 @@ int main(void) {
         check(cr_engine_select(&engine, system), "load idle core", &engine);
         check(engine.handle && engine.system == system && !engine.loaded, "real idle handle",
               &engine);
+        void *idle_handle = engine.handle;
+        check(cr_engine_unload_game(&engine) && engine.handle == idle_handle,
+              "closing absent content preserves an idle selected core", &engine);
         corvus_core_info info = {.struct_size = sizeof(info)};
         check(engine.api.get_info(&info) && info.version &&
                   strcmp(info.version, CR_CORE_VERSION) == 0,
@@ -225,12 +230,20 @@ int main(void) {
             check(mkdir(new_path, 0700) == 0, "inject atomic writer failure", &engine);
             check(engine.api.battery_dirty(engine.handle), "GBA battery dirty", &engine);
             current = engine.handle;
+            uint32_t *current_pixels = engine.pixels;
+            size_t failed_state_size;
+            uint8_t *failed_state = machine_state(&engine, &failed_state_size);
             check(!cr_engine_select(&engine, 0), "failed save prevents replacement", &engine);
             check(!cr_engine_open(&engine, 0, ids[0], roms[0]),
                   "failed save prevents content replacement", &engine);
+            check(!cr_engine_unload_game(&engine), "failed save prevents closing content", &engine);
             check(!cr_engine_close(&engine), "failed save prevents unload", &engine);
-            check(engine.handle == current && engine.loaded && engine.system == 2,
+            check(engine.handle == current && engine.loaded && engine.system == 2 &&
+                      engine.pixels == current_pixels && strcmp(engine.id, ids[system]) == 0,
                   "failure retains current owner", &engine);
+            assert_state(&engine, failed_state, failed_state_size,
+                         "failed content close retains exact machine state");
+            free(failed_state);
             check(engine.api.battery_dirty(engine.handle), "failed save not acknowledged", &engine);
             check(rmdir(new_path) == 0 && cr_engine_save_battery(&engine), "retry battery write",
                   &engine);
@@ -243,6 +256,35 @@ int main(void) {
             check(battery_size > 0 && battery[0] == 0x5a, "real GBA SRAM persisted", &engine);
             free(battery);
         }
+        current = engine.handle;
+        void *module = engine.module;
+        void *output = engine.output;
+        corvus_core_api selected_api = engine.api;
+        corvus_achievements_api selected_achievements = engine.achievements;
+        check(cr_engine_unload_game(&engine), "close content without unloading core", &engine);
+        check(engine.handle == current && engine.module == module && engine.output == output &&
+                  engine.system == system && engine.api.load_game == selected_api.load_game &&
+                  engine.api.destroy == selected_api.destroy &&
+                  engine.achievements.read_memory == selected_achievements.read_memory,
+              "content close preserves selected module, API, handle and callback context", &engine);
+        check(!engine.loaded && !engine.id[0] && !engine.pixels && !engine.width &&
+                  !engine.height && !engine.rate && !engine.fps && !engine.audio_count,
+              "content close clears game identity, frame and playback buffers", &engine);
+        for (size_t sample = 0; sample < sizeof(engine.audio) / sizeof(engine.audio[0]); ++sample)
+            check(engine.audio[sample] == 0, "content close clears stale PCM samples", &engine);
+        corvus_av_info empty_av = {.struct_size = sizeof(empty_av)};
+        check(!engine.api.get_av_info(engine.handle, &empty_av) &&
+                  !engine.api.serialize_size(engine.handle),
+              "provider content is actually unloaded while its instance remains alive", &engine);
+        check(!cr_engine_step(&engine, 0) && !cr_engine_save_state(&engine) &&
+                  cr_engine_read_achievement_memory(&engine, 0, &achievement_byte, 1) == 0,
+              "closed content cannot frame, serialize or expose achievement memory", &engine);
+        check(cr_engine_unload_game(&engine) && cr_engine_select(&engine, system) &&
+                  engine.handle == current && engine.module == module && engine.output == output,
+              "repeated content close and same-core selection preserve the idle instance", &engine);
+        check(cr_engine_open(&engine, system, ids[system], roms[system]) &&
+                  cr_engine_step(&engine, 0),
+              "load content again after closing it with the core selected", &engine);
         check(cr_engine_close(&engine), "unload", &engine);
         check(!engine.handle && !engine.loaded && engine.system == -1 && !engine.pixels,
               "native resources released", &engine);
@@ -264,7 +306,7 @@ int main(void) {
         unlink(state_path);
         unlink(invalid_path);
         printf("PASS native engine %d: idle, frames, PCM, input, state, atomic backup, invalid "
-               "data, persistence, unload/reload\n",
+               "data, persistence, content close, unload/reload\n",
                system);
     }
     cr_engine_destroy(&engine);

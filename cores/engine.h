@@ -39,6 +39,8 @@ bool cr_engine_reset(cr_engine *engine);
 bool cr_engine_save_state(cr_engine *engine);
 bool cr_engine_load_state(cr_engine *engine);
 bool cr_engine_save_battery(cr_engine *engine);
+/* Close only the content; the selected core and its callback context stay loaded. */
+bool cr_engine_unload_game(cr_engine *engine);
 /* Failed persistence leaves the current engine alive so the caller can retry. */
 bool cr_engine_close(cr_engine *engine);
 /* Shutdown attempts persistence, then always releases native resources. */

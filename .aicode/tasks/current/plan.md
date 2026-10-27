@@ -1,4 +1,4 @@
-Objectif : supprimer le corbeau provisoire avant l'icône réelle au lancement d'un jeu.
-Périmètre STANDARD : menu/open_game, notifications C et disponibilité de la texture GL ; aucun changement réseau, ABI CorvusAPI, cœur ou sauvegarde.
-Contrat : une seule carte après identification ; descente seulement après préparation de l'image ; visuel stable pendant toute l'animation. Échec image après3s : fallback unique figé. Progression indépendante et animation5.32s conservées.
-Plan : reproduire sur0.15.1 avec réponse image bloquée ; enlever la carte générique ; différer l'animation jusqu'à image prête ; tests attente/timeout/pause/queue/unload ; Android avec identification/image retardées ; build/lint/ASan ; main/CI et APK0.15.2/code18 signé.
+Objectif : logo APK fourni, lancement interdit sans cœur chargé, historique seul, fermeture du jeu conservant cœur, interrupteurs propres, navigation maison/roue.
+Périmètre DEEP ciblé : cores/engine pour unload_game distinct de close ; menu_driver pour gardes et navigation ; ressources et atlas Android pour logo/icônes.
+Contrats : batterie sauvegardée avant mutation et refus sans perte ; cœur compatible sélectionné requis par import/historique ; handle/module conservés quand on ferme le jeu ; RA et notifications invalidés après fermeture réussie ; IDs et sauvegardes historiques conservés.
+Preuves : tests moteur GB/GBC/GBA, menu sans cœur/compatible/incompatible et import tardif, historique seul, switches géométrie/clics, zéro cœur ; native normal/ASan, Android/lint, émulateur portrait/paysage, revue indépendante, CI exacte et APK signé.

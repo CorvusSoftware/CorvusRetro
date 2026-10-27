@@ -544,6 +544,27 @@ bool cr_engine_load_state(cr_engine *engine) {
     success(engine);
     return true;
 }
+bool cr_engine_unload_game(cr_engine *engine) {
+    if (!engine->loaded) {
+        success(engine);
+        return true;
+    }
+    if (!cr_engine_save_battery(engine))
+        return false;
+    engine->api.unload_game(engine->handle);
+    free(engine->pixels);
+    engine->pixels = NULL;
+    /* The core still owns a host callback pointing at this heap context. */
+    memset(engine->output, 0, sizeof(*engine->output));
+    engine->loaded = false;
+    engine->width = engine->height = engine->rate = 0;
+    engine->fps = 0;
+    engine->audio_count = 0;
+    memset(engine->audio, 0, sizeof(engine->audio));
+    engine->id[0] = '\0';
+    success(engine);
+    return true;
+}
 bool cr_engine_close(cr_engine *engine) {
     if (!cr_engine_save_battery(engine))
         return false;

@@ -1,9 +1,15 @@
-Status: PASS, correction reproduite puis vérifiée, tests locaux, CI exacte, signature et actifs publics validés.
-Risk: STANDARD, état et chronologie des cartes sur thread frontend ; pas de contrat public CorvusAPI modifié.
-Reproduction0.15.1 : FAIL waiting-image shows no preliminary crow popup ; capture du corbeau obtenue.
-Tests :9/9 normal et9/9 ASan/UBSan,5260 contrôles notifications. Régression attente image, timeout figé, retour de pause, changement tardif et annulation.
-Limites : protocole et PNG synthétiques, vrai cœurGB sur Android15 x86_64 ; aucun compte personnel ou téléphone physique revendiqué.
-Android15 x86_64 :26 contrôles portrait et26 paysage PASS, avec retard contrôlé des métadonnées et du PNG ; même test échoue sur0.15.1.
-Gradle Debug/Release/testAPK/lint PASS ; base sans moteurs, six modules/16KB et catalogue temporaire vérifiés ; tests archives4 et workflows6 PASS. Revue ciblée sans défaut P1/P2 identifié.
-CI40521807336, signé40522298624 et publication40522728518 SUCCESS pour sourcee31dd9e. APK0.15.2/code18 signé durable vérifié, zéro moteur, six ZIPs publics qualifiés et identiques.
-Mise à jour signée Android10 acceptée sans réinstallation ; ASUS et historique préservés visuellement, aucun crash applicatif journalisé.
+AICode+ Quality Gate
+Status: PARTIAL
+Risk: DEEP ciblé, cycle du contenu et sauvegardes.
+Criteria:
+- PASS : logo adaptatif, historique seul, maison/engrenage et switches trois thèmes inspectés sur Android.
+- PASS : aucun lancement sans cœur compatible sélectionné ; import tardif refusé sans commit.
+- PASS : fermer le contenu garde le cœur ; échec batterie conserve contenu et cœur ; réouverture et unload explicite.
+- PASS : RA/notifications nettoyés après fermeture, succès réel du programme original validé.
+Evidence:
+- make test et SANITIZE=ON :9/9 chacun ; corefree PASS.
+- Gradle Debug/Release/testAPK/lint PASS ; base sans moteur et six modules16KB ; archives4/workflows6 PASS.
+- Android15 x86_64 : navigation78 portrait+78 paysage ; succès/images37 contrôles avec transport synthétique, vrai cœurGB et programme original.
+Review: indépendante finale, aucun finding P1/P2.
+Open risks: CI exacte et actifs publics signés en attente ; aucun appareil physique, runtimeARM64 ou compte personnel qualifié.
+Decision: vérification locale complète ; publication autorisée à compléter avant DONE.

@@ -1,5 +1,6 @@
-Cause1 : open_game poussait immédiatement une carte sans URL avant CR_CHEEVOS_GAME_READY.
-Cause2 : badge dessinait le corbeau chaque frame tant que image() ne disposait pas de texture, puis le remplaçait à la fin du téléchargement.
-Reproduction : APK debug0.15.1 avec nouveau runner et cache froid, réseau synthétique contrôlé ; FAIL waiting-image shows no preliminary crow popup. Capture montre titre identifié et corbeau avant réception PNG.
-Correction : carte créée uniquement par GAME_READY ; image_ready prépare la texture sans dessin, IO ou attente réseau ; horloge visuelle ne démarre qu'après disponibilité. Délai image3s depuis premier prepare, choix de fallback seulement après vérification de disponibilité ; image déjà prête au retour d'une pause prioritaire sur le timeout.
-Une carte animée conserve son artwork, même lors d'une texture temporairement absente ou de métadonnées tardives. Progression et file8 restent indépendantes ; fermeture efface toutes les attentes.
+Fermer un jeu doit garder le cœur selon demande utilisateur, même si RetroArch ferme ensuite parfois son instance : ne pas revendiquer une identité exacte de ce détail amont.
+cr_engine_close reste le déchargement complet ; nouveau cr_engine_unload_game préserve handle/module/output/API/system et refuse sans mutation si sauvegarde impossible.
+Les gardes sont dans le frontend, pas un changement du contrat bas niveau cr_engine_open : import SAF tardif doit être refusé via finish_import(false) si cœur absent ou incompatible, sans commit du contenu.
+Le logo inline n'a pas de fichier original local accessible : préparation via imagegen. Détourage refusé après rendu dégradé ; version propre sur fond noir conservée pour launcher adaptatif.
+
+Instrumentation Android : attendre hasWindowFocus et état natif active=1 après rotation ; préférences thème sont des String et audio des Boolean, utiliser activity.preference pour assertions. Attendre une vraie frame GB avant de chercher un popup afin de ne pas analyser une capture encore sur Historique.

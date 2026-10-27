@@ -20,7 +20,8 @@ enum {
     CR_ICON_MENU,
     CR_ICON_NEXT,
     CR_ICON_BACK,
-    CR_ICON_FILE
+    CR_ICON_FILE,
+    CR_ICON_HOME
 };
 typedef struct {
     void *context;

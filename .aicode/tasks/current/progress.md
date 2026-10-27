@@ -1,13 +1,9 @@
-État : DONE,0.15.2/code18 publiée et vérifiée. Amont21044d8 propre et synchronisé avant modification.
-Demande : aucun corbeau provisoire avant l'icône du jeu.
-Bug reproduit sur APK0.15.1 avec image retardée et screenshot ; test échoue sur absence du popup provisoire.
-Correction native et GL implémentée ; carte générique de lancement supprimée, attente image sans bloquer l'émulation, fallback3s figé et annulation au déchargement.
-Preuves locales :9/9 CTest normal et9/9 ASan/UBSan ;5260 contrôles notifications ; Gradle Debug/Release/testAPK/lint PASS ; base sans moteurs, six modules/16KB et catalogue temporaire vérifiés ; tests archives4 et workflows6 PASS. Android15 x86_64 :26 contrôles portrait et26 paysage PASS, identification puis image bloquées, cache froid.
-Revue ciblée du diff final : cohérence des horloges et de la queue, choix image avant timeout, stabilité des visuels, aucune attente réseau dans le rendu ; aucun défaut P1/P2 identifié.
-Source e31dd9e66c11839358c12df29ef0e5426cc737fc publiée sur main et tag immuablev0.15.2. Actifs0.15.1 conservés.
-CI40521807336 SUCCESS ; build signé40522298624 SUCCESS ; publication40522728518 SUCCESS.
-APK public CorvusRetro-0.15.2-base-release.apk SHA2564751e8bf9e7d0a261f3a4d9d1c5777801a3743070cd6c4cd43ece8d0bda086f9 ; certificat durable vérifié contre pin indépendant, version18, zéro moteur et noticeMIT conservée.
-Six ZIPs publics vérifiés : export mémoire, ABI,16KB, tailles/hash ; identiques aux actifs0.15.1, aucune modification de catalogue fournisseur nécessaire. Aucun JSON réintroduit dans le frontend.
-Android10 x86_64 : mise à jour signée0.15.1 vers0.15.2 acceptée sans réinstallation ; thèmeASUS et ligne historique corvus-preserved.gba conservés visuellement ; aucun crash applicatif journalisé.
-README pointe sur l'actif vérifié ; reçu local /workspace/setup/launch-artwork152-qualification.json.
-Limites : réponses compte et images synthétiques ; pas de compte personnel, téléphone physique ou runtimeARM64 qualifié.
+État : VERIFY, code0.16.0/code19 prêt pour CI et publication.
+Amontac4479f propre et synchronisé avant modifications.
+Livrable : logo corbeau blanc/fond noir pour launcher adaptatif ; cœur compatible chargé explicitement avant import/historique ; Historique seul ; Fermer contenu garde le même cœur ; switches arrondis et navbar maison/engrenage.
+cr_engine_unload_game sauvegarde avant mutation et conserve handle/module/output/API/system. cr_engine_close reste le déchargement complet. RA et notifications sont invalidés après fermeture réussie. Import SAF tardif refusé via finish_import(false) si cœur absent/incompatible.
+Preuves :9/9 CTest normal,9/9 ASan/UBSan, corefree PASS ; moteur réelGB/GBC/GBA fermeture/réouverture et refus sauvegarde ; gardes frontend/import/historique ; géométrie et action des switches.
+Gradle Debug/Release/testAPK/lint PASS ; base sans moteurs et six modules16KB PASS ; archives4/workflows6 et catalogue temporaire six entrées PASS ; texte/diff propres.
+Android15 x86_64 :78 contrôles navigation portrait et78 paysage PASS ; captures launcher, Historique seul, blocage sans cœur, fermeture gardant cœur, réouverture puis unload et ON/OFF dans trois thèmes inspectées. Succès/images37 contrôles PASS, dont fermeture conservant cœur après déblocage et nettoyage des notifications.
+Revue indépendante finale : aucun finding P1/P2. Simplification : ACT_SYSTEM et return_page retirés car devenus inutiles.
+Prochain : publication main, CI exacte, signature durable, tag immuablev0.16.0, vérification des fichiers publics et mise à jour README ; actifs0.15.2 conservés.

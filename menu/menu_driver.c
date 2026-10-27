@@ -29,7 +29,6 @@ enum {
     ACT_PICK,
     ACT_HISTORY,
     ACT_ABOUT,
-    ACT_SYSTEM,
     ACT_GAME,
     ACT_THEME,
     ACT_AUDIO,
@@ -51,7 +50,7 @@ enum {
 typedef struct {
     char label[512], hint[256];
     int icon, action, value;
-    bool toggle, checked;
+    bool toggle, checked, disabled;
 } row;
 static float quick_height(const cr_ui *u);
 static void quick_clamp(cr_ui *u);
@@ -73,7 +72,7 @@ static int rows(const cr_ui *u) {
     if (u->page == CR_MAIN)
         return 3 + (u->engine.loaded ? 1 : 0);
     if (u->page == CR_LISTS)
-        return 1 + (int)cr_registry_count();
+        return 1;
     if (u->page == CR_CORES)
         return 1 + (int)cr_registry_count();
     if (u->page == CR_CORE_DOWNLOADS)
@@ -124,25 +123,15 @@ static row get_row(const cr_ui *u, int index) {
         if (index == n++)
             fill(&r, "Charger du contenu",
                  u->importing ? "Import du contenu…" :
-                 (cr_registry_count() == 0 ? "Téléchargez un cœur pour jouer" :
+                 (!u->engine.handle ? "Chargez un cœur avant le contenu" :
                   "Ouvrir un fichier de jeu compatible"),
                  CR_ICON_CONTENT, ACT_PICK, 0);
+        if (index == n - 1) r.disabled = !u->engine.handle;
         if (index == n)
             fill(&r, "Informations", "Application, cœur et licences", CR_ICON_INFO, ACT_PAGE,
                  CR_INFORMATION);
     } else if (u->page == CR_LISTS) {
-        if (index == 0) {
-            fill(&r, "Historique", "Contenus récemment ouverts", CR_ICON_HISTORY, ACT_HISTORY, 0);
-            return r;
-        }
-        index--;
-        int n = 0;
-        for (size_t i = 0; i < u->game_count; i++)
-            if (u->games[i].system == index)
-                n++;
-        char hint[64];
-        snprintf(hint, sizeof(hint), "%d contenu(s)", n);
-        fill(&r, system_name(index), hint, CR_ICON_LIST, ACT_SYSTEM, index);
+        fill(&r, "Historique", "Contenus récemment ouverts", CR_ICON_HISTORY, ACT_HISTORY, 0);
     } else if (u->page == CR_CORES) {
         if (index == (int)cr_registry_count()) {
             fill(&r, "Téléchargeur de cœurs", "Catalogue officiel CorvusSoftware",
@@ -248,6 +237,11 @@ static row get_row(const cr_ui *u, int index) {
                 if (n++ == index) {
                     fill(&r, u->games[i].title, core_name(u->games[i].system), CR_ICON_FILE, ACT_GAME,
                          (int)i);
+                    r.disabled = !u->engine.handle || u->engine.system != u->games[i].system;
+                    if (!u->engine.handle)
+                        snprintf(r.hint, sizeof(r.hint), "Chargez un cœur avant de lancer ce jeu");
+                    else if (u->engine.system != u->games[i].system)
+                        snprintf(r.hint, sizeof(r.hint), "Chargez le cœur associé : %.180s", core_name(u->games[i].system));
                     break;
                 }
             }
@@ -525,12 +519,19 @@ static bool result(cr_ui *u, bool ok) {
     return ok;
 }
 static void open_game(cr_ui *u, int system, const char *id, const char *title, const char *path) {
+    if (!u->engine.handle) {
+        cr_ui_message(u, "Chargez un cœur avant de lancer un jeu");
+        return;
+    }
+    if (u->engine.system != system) {
+        cr_ui_message(u, "Chargez le cœur associé à ce contenu");
+        return;
+    }
     if (!result(u, cr_engine_open(&u->engine, system, id, path)))
         return;
     cr_notifications_clear(&u->notifications);
     achievement_sync(u, true);
     u->notifications_loaded = true;
-    u->return_page = u->page == CR_PLAY ? CR_MAIN : u->page;
     snprintf(u->title, sizeof(u->title), "%s", title);
     page(u, CR_PLAY);
     if (u->platform.touch)
@@ -624,13 +625,13 @@ static void activate(cr_ui *u, row r) {
         }
         break;
     case ACT_PICK:
-        if (cr_registry_count() == 0) {
-            show_core_downloader(u);
+        if (!u->engine.handle) {
+            cr_ui_message(u, "Chargez un cœur avant de charger du contenu");
             break;
         }
         if (!u->importing && u->platform.pick) {
             u->importing = true;
-            u->platform.pick(u->platform.context, u->engine.handle ? u->engine.system : 0);
+            u->platform.pick(u->platform.context, u->engine.system);
         }
         break;
     case ACT_HISTORY:
@@ -639,10 +640,6 @@ static void activate(cr_ui *u, row r) {
         break;
     case ACT_ABOUT:
         push_page(u, CR_ABOUT);
-        break;
-    case ACT_SYSTEM:
-        push_page(u, CR_GAMES);
-        u->filter = r.value;
         break;
     case ACT_GAME: {
         cr_game *g = &u->games[r.value];
@@ -726,9 +723,14 @@ void cr_ui_import(cr_ui *u, const cr_import *item) {
         hash[64] = '\0';
         id_ok = cr_registry_content_id(resolved.id, sizeof(resolved.id), hash, core->id);
     }
-    bool valid = id_ok && cr_engine_check(&u->engine, resolved.system, resolved.path);
     char error[512] = {0};
-    if (!valid)
+    bool selected = u->engine.handle && u->engine.system == resolved.system;
+    bool valid = selected && id_ok && cr_engine_check(&u->engine, resolved.system, resolved.path);
+    if (!u->engine.handle)
+        snprintf(error, sizeof(error), "Chargez un cœur avant de lancer un jeu");
+    else if (!selected)
+        snprintf(error, sizeof(error), "Chargez le cœur associé à ce contenu");
+    else if (!valid)
         snprintf(error, sizeof(error), "%s",
                  u->engine.error[0] ? u->engine.error : "Contenu incompatible");
     bool committed = u->platform.finish_import &&
@@ -784,9 +786,10 @@ static void quick_action(cr_ui *u, int row) {
     }
     if (i == 4)
         page(u, CR_MAIN);
-    if (i == 5 && result(u, cr_engine_close(&u->engine))) {
+    if (i == 5 && result(u, cr_engine_unload_game(&u->engine))) {
+        achievement_sync(u, false);
         u->title[0] = 0;
-        page(u, u->return_page == CR_PLAY ? CR_MAIN : u->return_page);
+        page(u, CR_MAIN);
     }
     if (i == 6) push_page(u, CR_ACHIEVEMENTS);
     cr_ui_clear_input(u);
@@ -1024,6 +1027,14 @@ static void rect(const cr_painter *p, float x, float y, float w, float h, uint32
     if (w > 0 && h > 0)
         p->rect(p->context, x, y, w, h, c);
 }
+static void toggle(const cr_painter *p, const cr_theme *theme, float x, float y, bool checked) {
+    uint32_t track = checked ? theme->accent : theme->divider;
+    p->circle(p->context, x + 14, y + 14, 14, track);
+    rect(p, x + 14, y, 20, 28, track);
+    p->circle(p->context, x + 34, y + 14, 14, track);
+    p->circle(p->context, x + (checked ? 34 : 14), y + 14, 10,
+              checked ? 0xffffffff : theme->muted);
+}
 static void text(const cr_painter *p, const char *s, float x, float y, float size, uint32_t c,
                  float max) {
     p->text(p->context, s, x, y, size, c, max);
@@ -1194,13 +1205,12 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
                 rect(p, 0, y, w, 76, focus);
             else if (u->feedback_target == i && u->feedback_alpha > 0)
                 rect(p, 0, y, w, 76, alpha_color(focus, u->feedback_alpha));
-            p->icon(p->context, r.icon, 20, y + 22, 32, theme->icon);
-            text(p, r.label, 66, y + 29, 16, fg, w - 110);
-            text(p, r.hint, 66, y + 53, 13, muted, w - 110);
+            p->icon(p->context, r.icon, 20, y + 22, 32, r.disabled ? muted : theme->icon);
+            float text_width = w - (r.toggle ? 150 : 110);
+            text(p, r.label, 66, y + 29, 16, r.disabled ? muted : fg, text_width);
+            text(p, r.hint, 66, y + 53, 13, muted, text_width);
             if (r.toggle) {
-                rect(p, w - 55, y + 31, 31, 14, r.checked ? accent : muted);
-                p->circle(p->context, w - (r.checked ? 26 : 48), y + 38, 10,
-                          r.checked ? accent : fg);
+                toggle(p, theme, w - 72, y + 24, r.checked);
             } else if (r.checked)
                 text(p, "✓", w - 36, y + 41, 20, accent, 28);
             else
@@ -1222,7 +1232,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         if (u->page == CR_ABOUT)
             u->text_height = paragraphs(
                 p,
-                "CorvusRetro 0.15.2\n\nFrontend original en C, rendu OpenGL ES et audio "
+                "CorvusRetro 0.16.0\n\nFrontend original en C, rendu OpenGL ES et audio "
                 "AAudio.\n\nCorvusSoftware\nCœurs officiels CorvusCore 0.14.1 : Game Boy, Game "
                 "Boy Color, Game Boy Advance (expérimental).\n\nNavigation inspirée de "
                 "MaterialUI. Thèmes CorvusRetro, ASUS et NVIDIA Shield.\n\nCopyright (C) 2026 "
@@ -1270,7 +1280,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         rect(p, 0, h - 72, w, 72, nav);
         rect(p, 0, h - 72, w, 1, line);
         const char *labels[] = {"Menu principal", "Listes de lecture", "Réglages"};
-        int icons[] = {CR_ICON_CROW, CR_ICON_LIST, CR_ICON_SETTINGS};
+        int icons[] = {CR_ICON_HOME, CR_ICON_LIST, CR_ICON_SETTINGS};
         int selected = u->tab;
         for (int i = 0; i < 3; i++) {
             float x = w * (i + .5f) / 3;

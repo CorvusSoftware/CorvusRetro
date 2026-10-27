@@ -51,6 +51,14 @@ Vérifier également portrait/paysage, marges système, commandes multitouch et
 menu central, reprise des jeux existants, historique, thèmes et batterie GBA
 historique suffixe-2. Un échec d'écriture de batterie conserve le moteur.
 
+La phase `navigation` de `RetroAchievementsInstrumentation` vérifie sur un vrai
+cœur GB le lancement refusé sans cœur, la fermeture du jeu gardant le cœur,
+la réouverture puis le déchargement explicite. Elle capture l'icône adaptative,
+l'historique seul et les interrupteurs ON/OFF dans les trois thèmes. Utiliser
+`-e orientation landscape` pour le paysage. Les tests attendent le focus de la
+fenêtre avant d'injecter une commande après une rotation et lisent les réglages
+via le service Android, qui conserve les types historiques des préférences.
+
 L'instrumentation utilise des programmes de test originaux et un transport
 HTTPS déterministe. Un passage de ces tests ne prouve pas une connexion au
 service public depuis un téléphone. Distinguer explicitement build, tests hôtes,

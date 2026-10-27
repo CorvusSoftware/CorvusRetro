@@ -14,6 +14,14 @@ static void check(bool value, const char *text) {
     }
 }
 static int picked = -1, theme = -1;
+static bool import_called, import_valid;
+static bool finish_import(void *context, bool valid, int system, const char *core_id,
+                          const char *system_id, char *error, size_t capacity) {
+    (void)context; (void)system; (void)core_id; (void)system_id; (void)error; (void)capacity;
+    import_called = true;
+    import_valid = valid;
+    return valid;
+}
 static void pick(void *ctx, int system) {
     (void)ctx;
     picked = system;
@@ -43,7 +51,7 @@ int main(void) {
           "GB selection compatibility");
     char root[] = "/tmp/corvus-frontend-XXXXXX";
     check(mkdtemp(root) != NULL, "temporary storage");
-    cr_platform p = {.pick = pick, .set_preference = set};
+    cr_platform p = {.pick = pick, .set_preference = set, .finish_import = finish_import};
     cr_ui u;
     cr_ui_init(&u, p, root);
     cr_ui_size(&u, 384, 700);
@@ -71,10 +79,41 @@ int main(void) {
     cr_ui_touch(&u, 0, CR_TOUCH_UP, 100, 150);
     check(u.page == CR_MAIN, "drag does not activate row");
     tap(&u, 100, 170);
+    check(picked == -1 && !u.importing && strstr(u.message, "Chargez un cœur"),
+          "installed modules alone cannot open the content picker");
+    cr_import late = {.system = 0, .title = "Original.gb", .path = "/missing/original.gb"};
+    snprintf(late.id, sizeof(late.id), "%064d-0", 0);
+    cr_ui_import(&u, &late);
+    check(import_called && !import_valid && !u.engine.handle,
+          "late picker completion is rejected without committing when the core was unloaded");
+    u.games = calloc(1, sizeof(*u.games));
+    check(u.games != NULL, "allocate historical game");
+    u.game_count = 1;
+    u.games[0].system = 0; u.games[0].played = 1;
+    u.page = CR_GAMES; u.filter = -1; u.focus = 0; u.message[0] = 0;
+    cr_ui_confirm(&u);
+    check(!u.engine.handle && !u.engine.loaded && strstr(u.message, "Chargez un cœur"),
+          "history cannot implicitly load a core");
+    check(cr_engine_select(&u.engine, 1), "select a real incompatible GBC core");
+    void *selected = u.engine.handle;
+    u.message[0] = 0;
+    cr_ui_confirm(&u);
+    check(u.engine.handle == selected && !u.engine.loaded && strstr(u.message, "associé"),
+          "history cannot silently replace the selected core");
+    import_called = false;
+    cr_ui_import(&u, &late);
+    check(import_called && !import_valid && u.engine.handle == selected && !u.engine.loaded,
+          "late incompatible picker completion keeps the selected core");
+    free(u.games); u.games = NULL; u.game_count = 0;
+    check(cr_engine_close(&u.engine), "release incompatible core");
+    u.page = CR_MAIN;
+    tap(&u, 100, 100); tap(&u, 100, 100);
+    tap(&u, 100, 170);
     check(picked == 0 && u.importing, "content picker dispatched to platform");
     cr_import cancel = {.system = -1};
     cr_ui_import(&u, &cancel);
     check(!u.importing, "cancel releases importer");
+    check(cr_engine_close(&u.engine), "release core before input-only fixtures");
     tap(&u, 330, 670);
     check(u.page == CR_SETTINGS, "native bottom tab");
     tap(&u, 100, 100);

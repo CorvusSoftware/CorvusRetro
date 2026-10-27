@@ -40,7 +40,7 @@ public final class MainActivity extends NativeActivity {
     private static final int[] ICONS = {R.drawable.ic_core, R.drawable.ic_corvus, R.drawable.ic_content,
             R.drawable.ic_library, R.drawable.ic_settings, R.drawable.ic_history, R.drawable.ic_info,
             R.drawable.ic_unload, R.drawable.ic_theme, R.drawable.ic_menu, R.drawable.ic_next,
-            R.drawable.ic_back, R.drawable.ic_file};
+            R.drawable.ic_back, R.drawable.ic_file, R.drawable.ic_home};
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final Object importLock = new Object();
     private GameLibrary library;

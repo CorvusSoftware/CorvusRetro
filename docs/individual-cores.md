@@ -10,6 +10,16 @@ cœur est immédiatement disponible. Android ne demande pas d'installer un APK.
 **Décharger le cœur** libère son instance en mémoire ; le fichier téléchargé reste
 installé pour la prochaine utilisation. Ajouter un cœur conserve les autres.
 
+Sélectionner explicitement un cœur avant **Charger du contenu** ou avant de
+lancer un jeu de **Listes de lecture > Historique**. Le cœur déjà chargé doit
+correspondre au jeu ; l'application ne change pas de cœur automatiquement.
+Les listes de lecture contiennent uniquement **Historique**.
+
+**Menu rapide > Fermer le contenu** sauvegarde le jeu et le ferme en conservant
+le cœur chargé. Le menu principal permet ensuite d'ouvrir un autre jeu avec ce
+cœur, ou de choisir **Décharger le cœur**. Une erreur de sauvegarde garde le jeu
+et le cœur actifs pour permettre une nouvelle tentative.
+
 Les jeux, l'historique, les réglages et sauvegardes sont conservés. Une base0.11
 mise à jour peut perdre ses anciens splits Android : retélécharger les moteurs
 souhaités suffit, les contenus restent présents. Les futurs modules natifs ne

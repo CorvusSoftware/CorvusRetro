@@ -298,7 +298,8 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
         }
         check(visible, name + " draws the actual badge image (image requests=" + imageRequests + ")");
     }
-    private void tap(MainActivity activity, float x, float y) {
+    private void tap(MainActivity activity, float x, float y) throws Exception {
+        waitFor(activity::hasWindowFocus, "activity owns the input window");
         int[] area = activity.safeWindowArea();
         float density = activity.getResources().getDisplayMetrics().density;
         long time = android.os.SystemClock.uptimeMillis();
@@ -307,9 +308,102 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
         sendPointerSync(android.view.MotionEvent.obtain(time, time + 16, android.view.MotionEvent.ACTION_UP, px, py, 0));
         android.os.SystemClock.sleep(500);
     }
+    private void tab(MainActivity activity, int index) throws Exception {
+        int[] area = activity.safeWindowArea();
+        float density = activity.getResources().getDisplayMetrics().density;
+        tap(activity, (area[0] - area[2] - area[4]) / density * (index + .5f) / 3,
+                (area[1] - area[3] - area[5]) / density - 32);
+    }
+    private String frontendState() throws Exception {
+        Process process = Runtime.getRuntime().exec(new String[] {"logcat", "-d", "--pid=" + android.os.Process.myPid(),
+                "-s", "CorvusRetro:D", "*:S"});
+        String state = "";
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) if (line.contains("frontend page=")) state = line;
+        }
+        process.waitFor();
+        return state;
+    }
+    private void state(int page, int core, int content, int quick) throws Exception {
+        waitFor(() -> { String current = frontendState(); return current.contains("frontend page=" + page + " core=" + core + " content=" + content + " quick=" + quick) && current.contains(" active=1 "); },
+                "native page/core/content state " + page + "/" + core + "/" + content + "/" + quick);
+    }
+    private void screenshot(String name) throws Exception {
+        android.graphics.Bitmap image = getUiAutomation().takeScreenshot();
+        check(image != null, "navigation screenshot " + name);
+        try (FileOutputStream out = new FileOutputStream(new File(getTargetContext().getFilesDir(), "test-navigation-" + name + ".png"))) {
+            image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out);
+        } finally { image.recycle(); }
+    }
+    private void selectFixtureCore(MainActivity activity) throws Exception {
+        tab(activity, 0); tap(activity, 150, 100); tap(activity, 150, 100);
+        state(0, 0, 0, 0);
+    }
+    private void closeContent() throws Exception {
+        sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+        state(8, 0, 1, 1);
+        for (int i = 0; i < 5; ++i) sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_DOWN);
+        sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER);
+        state(0, 0, 0, 0);
+    }
+    private void navigation() throws Exception {
+        prepareGame();
+        Context context = getTargetContext();
+        android.content.SharedPreferences preferences = context.getSharedPreferences("corvus", Context.MODE_PRIVATE);
+        preferences.edit().putInt("achievements_enabled", 0).putString("theme", "corvus").putBoolean("audio", true).commit();
+        MainActivity activity = (MainActivity) startActivitySync(new Intent(context, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        try {
+            check(getUiAutomation().setRotation(landscape ? android.app.UiAutomation.ROTATION_FREEZE_90 : android.app.UiAutomation.ROTATION_FREEZE_0), "navigation rotation requested");
+            waitFor(() -> { int[] area = activity.safeWindowArea(); return area != null && (area[0] > area[1]) == landscape; }, "navigation viewport orientation");
+            state(0, -1, 0, 0);
+            android.graphics.drawable.Drawable icon = context.getPackageManager().getApplicationIcon(context.getPackageName());
+            check(icon instanceof android.graphics.drawable.AdaptiveIconDrawable, "APK exposes the adaptive launcher logo");
+            android.graphics.Bitmap launcher = android.graphics.Bitmap.createBitmap(256, 256, android.graphics.Bitmap.Config.ARGB_8888);
+            icon.setBounds(0, 0, 256, 256); icon.draw(new android.graphics.Canvas(launcher));
+            try (FileOutputStream out = new FileOutputStream(new File(context.getFilesDir(), "test-navigation-launcher.png"))) {
+                launcher.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out);
+            } finally { launcher.recycle(); }
+            tap(activity, 150, 176);
+            check(activity.hasWindowFocus() && frontendState().contains("core=-1 content=0"), "content picker stays closed without a selected core");
+            tab(activity, 1); screenshot("history-only");
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_DOWN);
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER);
+            state(4, -1, 0, 0);
+            tap(activity, 150, 100); state(4, -1, 0, 0); screenshot("blocked-history");
+            selectFixtureCore(activity);
+            tab(activity, 1); tap(activity, 150, 100); tap(activity, 150, 100);
+            state(8, 0, 1, 0); screenshot("playing");
+            closeContent(); screenshot("closed-core-kept");
+            tab(activity, 1); tap(activity, 150, 100); tap(activity, 150, 100);
+            state(8, 0, 1, 0);
+            closeContent(); tap(activity, 150, 100); state(0, -1, 0, 0);
+            tab(activity, 1); tap(activity, 150, 100); tap(activity, 150, 100);
+            state(4, -1, 0, 0);
+            for (int theme : new int[] {0, 3, 2}) {
+                tab(activity, 2); tap(activity, 150, 100); tap(activity, 150, 100);
+                tap(activity, 150, 100 + 76 * (theme == 0 ? 1 : theme == 3 ? 2 : 0));
+                check(activity.preference("theme", -1) == theme, "native theme selection persisted");
+                tab(activity, 2); tap(activity, 150, 252);
+                screenshot("switch-on-" + theme);
+                tap(activity, 150, 100);
+                check(activity.preference("audio", -1) == 0, "native switch disabled audio once");
+                screenshot("switch-off-" + theme);
+                tap(activity, 150, 100);
+                check(activity.preference("audio", -1) == 1, "native switch enabled audio once");
+            }
+            tab(activity, 0); screenshot("main");
+        } finally { runOnMainSync(activity::finish); }
+    }
     private void noLaunchPlaceholder(MainActivity activity, String stage) throws Exception {
-        android.graphics.Bitmap screen = getUiAutomation().takeScreenshot();
-        check(screen != null, stage + " screenshot available");
+        android.graphics.Bitmap screen = null;
+        long deadline = android.os.SystemClock.uptimeMillis() + 5000;
+        do {
+            if (screen != null) screen.recycle();
+            android.os.SystemClock.sleep(100);
+            screen = getUiAutomation().takeScreenshot();
+        } while ((screen == null || !hasColor(screen, 0xffe0f8d0)) && android.os.SystemClock.uptimeMillis() < deadline);
+        check(screen != null && hasColor(screen, 0xffe0f8d0), stage + " shows an actual GB video frame");
         int[] area = activity.safeWindowArea();
         int height = Math.min((int) (120 * activity.getResources().getDisplayMetrics().density), screen.getHeight() - area[3]);
         android.graphics.Bitmap popupArea = android.graphics.Bitmap.createBitmap(screen, area[2], area[3],
@@ -330,7 +424,7 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
         try (FileOutputStream out = new FileOutputStream(onlineFlag)) { out.write(1); }
         RetroAchievementsService account = new RetroAchievementsService(context);
         account.saveCredentials("", ""); storageDrained(); account.saveCredentials(USER, TOKEN); storageDrained(); account.close();
-        context.getSharedPreferences("corvus", Context.MODE_PRIVATE).edit().putInt("achievements_enabled", 1).putInt("theme", 2).commit();
+        context.getSharedPreferences("corvus", Context.MODE_PRIVATE).edit().putInt("achievements_enabled", 1).putString("theme", "corvus").commit();
         MainActivity activity = (MainActivity) startActivitySync(new Intent(context, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         try {
             check(getUiAutomation().setRotation(landscape ? android.app.UiAutomation.ROTATION_FREEZE_90 : android.app.UiAutomation.ROTATION_FREEZE_0),
@@ -346,11 +440,13 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
                 waitFor(() -> activity.achievementImage("https://media.retroachievements.org/" + image) != null,
                         "fixture image ready before timed popup capture");
             android.os.SystemClock.sleep(800);
+            selectFixtureCore(activity);
             int[] area = activity.safeWindowArea();
             float density = activity.getResources().getDisplayMetrics().density;
             tap(activity, (area[0] - area[2] - area[4]) / density / 2,
                     (area[1] - area[3] - area[5]) / density - 32);
             tap(activity, 150, 100); tap(activity, 150, 100);
+            state(8, 0, 1, 0);
             waitFor(() -> metadataRequested, "game identification is pending");
             noLaunchPlaceholder(activity, "waiting-metadata");
             metadataRelease.countDown();
@@ -373,13 +469,11 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BUTTON_B);
             capturePopup("unlocked", UNLOCK_COLOR);
             waitFor(() -> awards == 1, "actual core memory unlocked one achievement with decoded images");
-            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
-            for (int i = 0; i < 4; ++i) sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_DOWN);
-            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER); android.os.SystemClock.sleep(300);
-            tap(activity, 150, 176);
+            closeContent();
             android.graphics.Bitmap cleared = getUiAutomation().takeScreenshot();
-            check(cleared != null && !hasColor(cleared, UNLOCK_COLOR), "unloading removes the old game's popup");
+            check(cleared != null && !hasColor(cleared, UNLOCK_COLOR), "closing content keeps the core and removes the old game's popup");
             if (cleared != null) cleared.recycle();
+            tap(activity, 150, 100); state(0, -1, 0, 0);
         } finally {
             metadataRelease.countDown(); gameImageRelease.countDown();
             activity.achievementCredentialsSet("", ""); storageDrained(); runOnMainSync(activity::finish);
@@ -394,6 +488,8 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
         clear.saveCredentials("", ""); storageDrained(); clear.close();
         context.getSharedPreferences("corvus", Context.MODE_PRIVATE).edit().putInt("achievements_enabled", 0).commit();
         MainActivity activity = (MainActivity) startActivitySync(new Intent(context, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        waitFor(() -> activity.safeWindowArea() != null, "safe viewport ready before selecting a core");
+        selectFixtureCore(activity);
         android.util.Log.i("CorvusRetroTest", "RA_UI_READY");
         long deadline = android.os.SystemClock.uptimeMillis() + 150000;
         try {
@@ -417,7 +513,7 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
     @Override public void onStart() {
         Bundle result = new Bundle();
         try {
-            if ("popups".equals(phase)) popups(); else if ("ui".equals(phase)) ui(); else if ("outbox".equals(phase)) outbox(); else if ("recover".equals(phase)) recover(); else credentials();
+            if ("navigation".equals(phase)) navigation(); else if ("popups".equals(phase)) popups(); else if ("ui".equals(phase)) ui(); else if ("outbox".equals(phase)) outbox(); else if ("recover".equals(phase)) recover(); else credentials();
             result.putString("stream", "PASS " + checks + " Android RetroAchievements checks phase=" + phase + " pid=" + android.os.Process.myPid() + "\n");
             finish(Activity.RESULT_OK, result);
         } catch (Throwable failure) {

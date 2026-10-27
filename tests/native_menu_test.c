@@ -24,6 +24,9 @@ typedef struct {
     unsigned badge_count;
     float minimum_badge;
     float viewport_center;
+    bool home_tab, settings_tab;
+    unsigned switch_ends;
+    float switch_thumb, toggle_text_end;
 } capture;
 static void rect(void *ctx, float x, float y, float w, float h, uint32_t color) {
     capture *c = ctx;
@@ -43,6 +46,8 @@ static void rect(void *ctx, float x, float y, float w, float h, uint32_t color) 
 static void circle(void *ctx, float x, float y, float r, uint32_t color) {
     (void)r;
     capture *c = ctx;
+    if (fabsf(y - 102) < .01f && r == 14) ++c->switch_ends;
+    if (fabsf(y - 102) < .01f && r == 10) c->switch_thumb = x;
     if (x > c->ax - 1 && x < c->ax + 1 && y > c->ay - 1 && y < c->ay + 1)
         c->a_body = color;
 }
@@ -53,6 +58,7 @@ static void text(void *ctx, const char *s, float x, float y, float size, uint32_
     (void)size;
     (void)max;
     capture *c = ctx;
+    if (x == 66 && y == 93) c->toggle_text_end = x + max;
     size_t n = strlen(c->text);
     snprintf(c->text + n, sizeof(c->text) - n, "%s\n", s);
     if (strcmp(s, "A") == 0)
@@ -64,6 +70,8 @@ static float measure(void *ctx, const char *s, float size) {
 }
 static void icon(void *ctx, int kind, float x, float y, float size, uint32_t color) {
     capture *c = ctx;
+    if (y > 600 && kind == CR_ICON_HOME) c->home_tab = true;
+    if (y > 600 && kind == CR_ICON_SETTINGS) c->settings_tab = true;
     if (c->layout && kind == CR_ICON_CROW) {
         if (!c->badge_count)
             check(size + .001f >= c->minimum_badge, "centered layout never shrinks the card below the original safe area");
@@ -175,6 +183,12 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     cr_ui_update(u, .01);
     check(u->notifications.count == 1 && u->notifications.progress.visible,
           "refused unload keeps the running game's notifications");
+    u->page = CR_PLAY; u->quick = true; u->focus = 5;
+    cr_ui_confirm(u);
+    check(u->engine.loaded && u->engine.handle == handle && u->quick &&
+              u->notifications.count == 1 && u->notifications.progress.visible,
+          "failed save also refuses content close without losing the core or notifications");
+    u->quick = false;
     check(unlink(saves) == 0, "remove battery directory obstruction");
     u->page = CR_CORE_DOWNLOADS;
     row(u, 1);
@@ -194,8 +208,15 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     cr_ui_install_status(u, "Installation annulée", true);
     check(!u->installing && cr_ui_running(u) && u->engine.handle == handle,
           "terminal cancellation resumes the preserved game");
-    u->page = CR_MAIN;
-    row(u, 1);
+    u->quick = true; u->focus = 5;
+    cr_ui_confirm(u);
+    c = draw(u);
+    check(u->page == CR_MAIN && u->engine.handle == handle && !u->engine.loaded &&
+              !u->title[0] && strstr(c.text, "Décharger le cœur") && !strstr(c.text, "Menu rapide"),
+          "closing content preserves the selected core and returns to the main menu");
+    check(!u->notifications.count && !u->notifications.progress.visible && !u->notifications_loaded,
+          "content close clears notifications immediately while keeping the core");
+    row(u, 0);
     c = draw(u);
     check(!u->engine.handle && !u->engine.loaded && !u->title[0] &&
               strstr(c.text, "Charger un cœur") && !strstr(c.text, "Décharger le cœur") &&
@@ -232,6 +253,7 @@ int main(void) {
                                 .install_core_pack = install_core_pack}, root);
     cr_ui_size(&u, 384, 700);
     capture c = draw(&u);
+    check(c.home_tab && c.settings_tab, "navigation uses home and settings icons");
     check(strstr(c.text, "Charger un cœur") && strstr(c.text, "Informations") &&
               !strstr(c.text, "Historique") && !strstr(c.text, "Décharger le cœur"),
           "main contains loading and information, history lives in playlists");
@@ -312,15 +334,14 @@ int main(void) {
     loaded_core_lifecycle(&u, root);
     tab(&u, 1);
     c = draw(&u);
-    check(u.page == CR_LISTS && strstr(c.text, "Historique") && strstr(c.text, "Game Boy Advance"),
-          "playlists contain history and console categories");
+    check(u.page == CR_LISTS && strstr(c.text, "Historique") && !strstr(c.text, "Game Boy Advance") &&
+              !strstr(c.text, "Game Boy Color"),
+          "playlists contain history only");
     row(&u, 0);
     check(u.page == CR_GAMES && u.filter == -1 && u.tab == 1, "history category");
     cr_ui_back(&u);
-    row(&u, 3);
-    check(u.page == CR_GAMES && u.filter == 2, "GBA playlist");
-    cr_ui_back(&u);
-    check(u.page == CR_LISTS && u.focus == 3, "back restores console selection");
+    cr_ui_move(&u, 1);
+    check(u.page == CR_LISTS && u.focus == 0, "history is the only selectable playlist");
     tab(&u, 2);
     c = draw(&u);
     check(strstr(c.text, "Interface utilisateur") && strstr(c.text, "Vidéo") &&
@@ -336,6 +357,9 @@ int main(void) {
     cr_ui_touch_at(&u, 0, CR_TOUCH_UP, 160, 252, 10.1);
     check(u.page == CR_AUDIO_SETTINGS, "tap activates at release");
     bool audio = u.audio;
+    c = draw(&u);
+    check(c.switch_ends == 2 && c.switch_thumb == (u.audio ? 346 : 326) && c.toggle_text_end <= 300,
+          "rounded switch and label have distinct nonoverlapping bounds");
     cr_ui_touch_at(&u, 0, CR_TOUCH_DOWN, 160, 100, 20);
     cr_ui_update(&u, .3);
     cr_ui_touch_at(&u, 0, CR_TOUCH_UP, 160, 100, 20.3);
@@ -346,6 +370,8 @@ int main(void) {
     cr_ui_touch_at(&u, 0, CR_TOUCH_UP, 160, 100, 30.05);
     check(u.audio != audio && saved_audio == u.audio && writes == 1,
           "tap duration independent of frame timing");
+    c = draw(&u);
+    check(c.switch_thumb == (u.audio ? 346 : 326), "switch thumb follows the actual saved setting");
     cr_ui_touch_at(&u, 0, CR_TOUCH_DOWN, 160, 100, 40);
     cr_ui_touch_at(&u, 1, CR_TOUCH_DOWN, 160, 100, 40.01);
     cr_ui_touch_at(&u, 1, CR_TOUCH_UP, 160, 100, 40.02);

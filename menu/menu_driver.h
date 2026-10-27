@@ -55,7 +55,7 @@ typedef struct {
     size_t game_count;
     cr_core_catalog core_catalog;
     bool catalog_loading;
-    int page, return_page, filter, theme, focus, tab, menu_pointer, feedback_target;
+    int page, filter, theme, focus, tab, menu_pointer, feedback_target;
     bool quick, audio, awake, importing, show_input, installing;
     float width, height, scroll, quick_scroll, text_height;
     float feedback_alpha, control_feedback[10];
