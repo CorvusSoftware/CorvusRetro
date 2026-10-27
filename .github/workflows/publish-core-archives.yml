@@ -13,10 +13,10 @@ on:
         type: string
         required: false
       tag:
-        description: "Existing tag at the current tested main commit, e.g. v0.15.1"
+        description: "Existing tag at the current tested main commit, e.g. v0.15.2"
         type: string
         required: true
-        default: v0.15.1
+        default: v0.15.2
 
 permissions:
   contents: write
@@ -207,8 +207,8 @@ jobs:
             "$release_base" \
             "$RUNNER_TEMP/native-cores/"*.zip \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --verify-tag --prerelease \
-            --title "CorvusRetro $CORVUS_TAG - Centered achievement animations" \
-            --notes "Signed Android release with centered game launch and achievement popups with descending icons and expanding titles, plus measured progress notifications, official game icons and badges, asynchronous image caching, automatic provider catalog discovery and RetroAchievements in normal mode. Includes official CorvusCore 0.14.1 native ZIPs for ARM64 and x86_64; open the in-app core downloader to install a core. Android 8.0+."
+            --title "CorvusRetro $CORVUS_TAG - Stable game launch artwork" \
+            --notes "Signed Android release with a single game launch popup that waits for its artwork, centered game launch and achievement popups with descending icons and expanding titles, plus measured progress notifications, official game icons and badges, asynchronous image caching, automatic provider catalog discovery and RetroAchievements in normal mode. Includes official CorvusCore 0.14.1 native ZIPs for ARM64 and x86_64; open the in-app core downloader to install a core. Android 8.0+."
 
       - name: Upload catalog metadata for CorvusRepository review
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

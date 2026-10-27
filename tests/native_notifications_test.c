@@ -15,6 +15,14 @@ static void check(bool condition, const char *message) {
         exit(1);
     }
 }
+static bool available(void *context, const char *url) {
+    (void)context;
+    return url && url[0];
+}
+static void prepare_ready(cr_notifications *n) {
+    cr_painter p = {.image_ready = available};
+    cr_notifications_prepare(n, &p);
+}
 static void queue_tests(void) {
     cr_notifications n = {0};
     char title[] = "Jeu original", url[] = "https://media.retroachievements.org/Images/1.png";
@@ -22,6 +30,7 @@ static void queue_tests(void) {
     title[0] = 'X'; url[0] = 'X';
     check(strcmp(n.cards[0].title, "Jeu original") == 0 && n.cards[0].image_url[0] == 'h',
           "cards own their strings beyond the callback");
+    prepare_ready(&n);
     cr_notifications_update(&n, 0);
     cr_notifications_update(&n, .8);
     cr_notifications_push(&n, CR_NOTIFICATION_GAME, 10, "Jeu identifié", "3/10 succès", "icon");
@@ -36,6 +45,7 @@ static void queue_tests(void) {
     cr_notifications_push(&n, CR_NOTIFICATION_GAME, 10, "Jeu et icône", "", "icon");
     check(n.count == 2 && strcmp(n.cards[1].title, "Jeu et icône") == 0,
           "waiting game cards are coalesced without disturbing current unlock");
+    prepare_ready(&n);
     cr_notifications_update(&n, 0);
     cr_notifications_update(&n, 20);
     check(n.count == 1 && n.cards[0].id == 10 && n.elapsed == 0,
@@ -45,9 +55,10 @@ static void queue_tests(void) {
         cr_notifications_push(&n, CR_NOTIFICATION_UNLOCK, id, "Succès", "", "badge");
     check(n.count == CR_NOTIFICATION_CAPACITY && n.cards[0].id == 0 &&
           n.cards[n.count - 1].id == 19, "flood is bounded while preserving visible and newest cards");
-    cr_notifications_update(&n, 0);
     uint32_t previous = n.cards[0].id;
     while (n.count) {
+        prepare_ready(&n);
+        cr_notifications_update(&n, 0);
         cr_notifications_update(&n, 6);
         check(!n.count || n.cards[0].id > previous, "waiting notifications retain arrival order");
         if (n.count) previous = n.cards[0].id;
@@ -147,6 +158,10 @@ static bool image(void *context, const char *url, float x, float y, float width,
     ++c->images;
     return c->ready;
 }
+static bool image_ready(void *context, const char *url) {
+    (void)url;
+    return ((capture *)context)->ready;
+}
 static void clip(void *context, float x, float y, float width, float height) {
     capture *c = context;
     check(isfinite(x) && isfinite(y) && isfinite(width) && isfinite(height) && width >= 0 && height >= 0,
@@ -157,21 +172,24 @@ static void clip(void *context, float x, float y, float width, float height) {
 }
 static cr_painter painter(capture *c) {
     return (cr_painter){.context = c, .rect = rectangle, .text = text, .measure = measure,
-                        .icon = icon, .clip = clip, .image = image};
+                        .icon = icon, .clip = clip, .image = image, .image_ready = image_ready};
 }
 static void draw_tests(void) {
     cr_notifications n = {0};
     cr_notifications_push(&n, CR_NOTIFICATION_UNLOCK, 1, "Succès débloqué", "Nom long du succès - 10 points", "badge");
     cr_notifications_progress(&n, 2, "5/10", "locked", 50);
-    cr_notifications_update(&n, 0);
-    cr_notifications_update(&n, .8);
     capture c = {.width = 360, .bottom = 640};
     cr_painter p = painter(&c);
+    cr_notifications_prepare(&n, &p);
     cr_notifications_draw(&n, &p, 360, 640, cr_theme_get(CR_THEME_CORVUS));
-    check(c.images == 2 && c.icons == 2 && c.measured_text, "both notifications display real measured text with image fallbacks");
+    check(c.images == 1 && c.icons == 1 && c.measured_text && n.elapsed == 0,
+          "progress stays independent while the card waits for its image");
     c = (capture){.width = 360, .bottom = 640, .ready = true};
+    cr_notifications_prepare(&n, &p);
+    cr_notifications_update(&n, 0);
+    cr_notifications_update(&n, .8);
     cr_notifications_draw(&n, &p, 360, 640, cr_theme_get(CR_THEME_CORVUS));
-    check(c.images == 2 && c.icons == 0 && c.measured_text, "late images replace fallbacks without replacing notification state");
+    check(c.images == 2 && c.icons == 0 && c.measured_text, "ready images start the card directly without a visible fallback");
     check(c.clips > 0 && c.clip_x == 0 && c.clip_y == 0 && c.clip_w == 360 && c.clip_h == 640,
           "card text clipping restores the supplied region");
     const float sizes[][2] = {{240, 320}, {360, 640}, {720, 320}, {100, 100}, {320, 48}, {32, 24}};
@@ -201,6 +219,8 @@ static void draw_tests(void) {
 static capture frame(cr_notifications *n, double time) {
     capture c = {.width = 360, .top = 20, .bottom = 640, .ready = true};
     cr_painter p = painter(&c);
+    cr_notifications_prepare(n, &p);
+    if (!n->card_started) cr_notifications_update(n, 0);
     n->elapsed = time;
     cr_notifications_draw_area(n, &p, c.width, c.top, c.bottom, cr_theme_get(CR_THEME_CORVUS));
     return c;
@@ -242,7 +262,63 @@ static void animation_tests(void) {
     cr_notifications_push(&n, CR_NOTIFICATION_GAME, 1, "Jeu identifié", "", "image");
     check(n.elapsed == 4.8, "late images do not reverse an ongoing exit");
 }
+static void artwork_tests(void) {
+    for (int kind = CR_NOTIFICATION_GAME; kind <= CR_NOTIFICATION_UNLOCK; ++kind) {
+        cr_notifications n = {0};
+        capture c = {.width = 360, .bottom = 640};
+        cr_painter p = painter(&c);
+        cr_notifications_push(&n, kind, 1, "Jeu ou succès", "", "delayed-image");
+        cr_notifications_update(&n, 20);
+        check(n.cards[0].image_pending && n.image_wait == 0,
+              "loading before the first image request cannot exhaust the image deadline");
+        cr_notifications_prepare(&n, &p);
+        cr_notifications_update(&n, 1.5);
+        cr_notifications_draw(&n, &p, 360, 640, cr_theme_get(CR_THEME_CORVUS));
+        check(!c.rectangles && !c.icons && !c.images && !c.texts && n.elapsed == 0,
+              "delayed artwork produces no preliminary crow or partial popup");
+        c.ready = true;
+        cr_notifications_prepare(&n, &p);
+        cr_notifications_update(&n, 0);
+        cr_notifications_update(&n, .1);
+        cr_notifications_draw(&n, &p, 360, 640, cr_theme_get(CR_THEME_CORVUS));
+        check(c.images == 1 && !c.icons && !c.texts && n.elapsed == .1,
+              "the real image descends alone from the start after becoming ready");
+        if (kind == CR_NOTIFICATION_GAME) {
+            cr_notifications_push(&n, kind, 1, "Jeu identifié", "", "another-image");
+            check(strcmp(n.cards[0].image_url, "delayed-image") == 0,
+                  "late metadata cannot replace artwork in the visible launch card");
+        }
+        c = (capture){.width = 360, .bottom = 640};
+        cr_notifications_draw(&n, &p, 360, 640, cr_theme_get(CR_THEME_CORVUS));
+        check(c.images == 1 && !c.icons, "a lost texture never flashes the crow over selected artwork");
+        cr_notifications_clear(&n);
+        cr_notifications_push(&n, kind, 2, "Image indisponible", "", "failed-image");
+        cr_notifications_prepare(&n, &p);
+        cr_notifications_update(&n, 3.1);
+        cr_notifications_prepare(&n, &p);
+        check(!n.cards[0].image_pending && !n.cards[0].image_url[0],
+              "failed artwork chooses one stable fallback within a bounded deadline");
+        c = (capture){.width = 360, .bottom = 640, .ready = true};
+        cr_notifications_prepare(&n, &p);
+        cr_notifications_update(&n, 0);
+        cr_notifications_update(&n, .8);
+        cr_notifications_draw(&n, &p, 360, 640, cr_theme_get(CR_THEME_CORVUS));
+        check(c.icons == 1 && !c.images, "a late image never replaces an already selected fallback");
+        cr_notifications_clear(&n);
+        check(!n.count && !n.image_wait && !n.image_wait_started,
+              "unload cancels pending artwork along with the notification");
+        cr_notifications_push(&n, kind, 3, "Après pause", "", "cached-while-paused");
+        c.ready = false;
+        cr_notifications_prepare(&n, &p);
+        cr_notifications_update(&n, 20);
+        c.ready = true;
+        cr_notifications_prepare(&n, &p);
+        check(!n.cards[0].image_pending && n.cards[0].image_url[0] && n.elapsed == 0,
+              "resume uses artwork already available before considering the timeout fallback");
+    }
+}
 int main(void) {
+    artwork_tests();
     animation_tests();
     queue_tests();
     progress_tests();

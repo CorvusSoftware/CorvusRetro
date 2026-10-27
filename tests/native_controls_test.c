@@ -135,7 +135,7 @@ int main(void) {
         cr_ui_size(&u, sizes[k][0], sizes[k][1]);
         cr_play_layout p = cr_play_layout_make(u.width, u.height, 0, 160, 144);
         capture c = {0};
-        cr_painter painter = {&c, box, circle, text, measure, icon, NULL, game, NULL};
+        cr_painter painter = {&c, box, circle, text, measure, icon, NULL, game, NULL, NULL};
         cr_ui_draw(&u, &painter);
         check(c.games == 1 && c.menu_icons == 1 && !c.title,
               "game and one menu icon without title bar");

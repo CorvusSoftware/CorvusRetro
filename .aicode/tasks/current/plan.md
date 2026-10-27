@@ -1,6 +1,4 @@
-Objectif : animation RetroArch pour les cartes de lancement et de succès, en haut au centre.
-Référence lue : gfx_widget_achievement_popup.c, descente330ms, ouverture330ms, maintien4s, fermeture330ms, remontée330ms ; ease-out quadratique et centrage conservé pendant l'ouverture.
-Périmètre : gfx/widgets/notifications, clip du painter dans menu_driver, tests natifs et qualification Android ; aucun changement réseau, SDK, sauvegardes ou progression.
-Plan : chronologie déterministe ancrée au premier affichage ; badge seul puis révélation du texte par clip ; repli et sortie ; tests positions/clip/phases/queue ; Android portrait/paysage ; review, CI et APK0.15.1.
-Vérifications P0 : badge centré en descente, aucun titre avant ouverture, carte centrée pendant ouverture/fermeture, maintien complet et queue5.32s, pas de phase sautée après chargement.
-P1 : géométrie GB/GBC/GBA, images tardives et restitution du clip, build/lint/ASan, vidéo/captures Android réelles.
+Objectif : supprimer le corbeau provisoire avant l'icône réelle au lancement d'un jeu.
+Périmètre STANDARD : menu/open_game, notifications C et disponibilité de la texture GL ; aucun changement réseau, ABI CorvusAPI, cœur ou sauvegarde.
+Contrat : une seule carte après identification ; descente seulement après préparation de l'image ; visuel stable pendant toute l'animation. Échec image après3s : fallback unique figé. Progression indépendante et animation5.32s conservées.
+Plan : reproduire sur0.15.1 avec réponse image bloquée ; enlever la carte générique ; différer l'animation jusqu'à image prête ; tests attente/timeout/pause/queue/unload ; Android avec identification/image retardées ; build/lint/ASan ; main/CI et APK0.15.2/code18 signé.

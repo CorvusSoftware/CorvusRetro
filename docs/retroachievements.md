@@ -27,16 +27,20 @@ transition durant 330 ms. L'animation utilise un ralentissement quadratique et
 conserve le centrage pendant l'ouverture et la fermeture. Un chargement lent
 ne consomme pas le début de la descente. Les déblocages successifs
 utilisent une file bornée de 8 cartes. L'identification RetroAchievements ajoute
-l'icône officielle du jeu et le nombre de succès au lancement.
+l'icône officielle du jeu et le nombre de succès au lancement. Cette carte est
+créée après identification, sans carte générique préalable. Un jeu non reconnu,
+un compte déconnecté ou un cœur sans support des succès ne produit pas cette carte.
 
 La progression mesurée est un indicateur séparé : badge verrouillé, compteur
 fourni par rcheevos et barre mesurée. Chaque changement renouvelle son affichage
 pendant 2 s ; un événement HIDE, une réinitialisation ou la fermeture du contenu
-le retire. Les cœurs sans support des succès gardent le lancement standard.
+le retire.
 
 Les images publiques sont téléchargées et décodées en arrière-plan, avec caches
-mémoire et disque bornés. Une image absente utilise le corbeau Corvus ; son
-arrivée tardive remplace cette icône sans déclencher une autre notification.
+mémoire et disque bornés. Une carte attend que sa texture soit disponible avant
+de commencer la descente. Après 3 s sans image, elle choisit le corbeau Corvus
+pour toute sa durée ; une image tardive ne remplace jamais le visuel déjà animé.
+La progression conserve son indicateur indépendant.
 Aucune requête ni lecture disque ne bloque le rendu. Les cartes respectent les
 marges système et la zone hors commandes tactiles ; une zone trop courte donne
 priorité à la carte pour éviter le chevauchement avec la progression. En paysage
@@ -76,7 +80,7 @@ unique corvusapi.h. Les nouvelles déclarations mémoire n'altèrent pas l'ABI0.
 - Neuf CTest natifs passent, avec ASan/UBSan pour le code original.
 - Le client rcheevos a 136 contrôles de protocole, hash, RAM, succès, déconnexion,
   erreurs réseau, sauvegarde de progression et réponses tardives.
-- Les widgets ont 5176 contrôles de file, phases d'animation, progression, images,
+- Les widgets ont 5260 contrôles de file, phases d'animation, progression, images,
   centrage et clipping dans la zone sûre.
 - Le service images passe 29 contrôles Android de réseau borné, cache et lifecycle.
 - Android 15 : 14 contrôles de compte, Keystore et absence de blocage du frontend,
@@ -108,3 +112,5 @@ la progression et le déblocage à partir de l'émulation réelle. Les images de
 qualification sont synthétiques et restent dans l'APK de test séparé.
 L'argument `-e orientation landscape` force le paysage ; le runner vérifie les
 dimensions réelles du viewport avant de naviguer.
+La phase `popups` bloque séparément les réponses d'identification et d'image,
+avec un cache froid, et vérifie l'absence de carte provisoire dans les deux cas.

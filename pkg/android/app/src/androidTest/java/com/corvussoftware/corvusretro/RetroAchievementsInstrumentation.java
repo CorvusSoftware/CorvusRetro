@@ -34,6 +34,9 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
     private volatile int failedAwards, awards, logins, acceptedRequests, imageRequests;
     private volatile boolean replyAlreadyAwarded;
     private volatile boolean serverUnlocked;
+    private volatile boolean metadataRequested, gameImageRequested;
+    private final java.util.concurrent.CountDownLatch metadataRelease = new java.util.concurrent.CountDownLatch(1);
+    private final java.util.concurrent.CountDownLatch gameImageRelease = new java.util.concurrent.CountDownLatch(1);
     private File onlineFlag;
     private static final String USER = "CorvusTest", TOKEN = "SyntheticSessionToken";
     private static final String LOGIN = "{\"Success\":true,\"User\":\"CorvusTest\",\"Token\":\"SyntheticSessionToken\",\"Score\":0,\"SoftcoreScore\":0,\"Messages\":0}";
@@ -117,6 +120,13 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
         check(USER.equals(service.credentials()[0]) && TOKEN.equals(service.credentials()[1]), "Keystore session restored in a fresh process");
         service.saveCredentials("", ""); storageDrained(); service.close();
     }
+    private void awaitFixture(java.util.concurrent.CountDownLatch release) {
+        try {
+            if (!release.await(15, TimeUnit.SECONDS)) throw new AssertionError("delayed popup fixture timed out");
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt(); throw new AssertionError(interrupted);
+        }
+    }
     private void transport() {
         URL.setURLStreamHandlerFactory(protocol -> "https".equals(protocol) ? new URLStreamHandler() {
             @Override protected URLConnection openConnection(URL address) {
@@ -131,13 +141,19 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
                         if (responseStarted) return;
                         responseStarted = true;
                         if (RetroAchievementsImages.allowed(address.toString())) {
+                            if ("popups".equals(phase) && address.getPath().contains("/Images/")) {
+                                gameImageRequested = true; awaitFixture(gameImageRelease);
+                            }
                             image = fixtureImage(address.toString()); imageRequests++; status = 200; return;
                         }
                         check(RetroAchievementsService.allowed(address.toString()), "no credential redirect or foreign server");
                         String body = new String(output.toByteArray(), StandardCharsets.UTF_8);
                         status = 200;
                         if (body.contains("r=login2")) { response = LOGIN; logins++; }
-                        else if (body.contains("r=achievementsets")) response = "popups".equals(phase) ? GAME.replace("0xH00c000=66", "M:0xH00c000=66") : GAME;
+                        else if (body.contains("r=achievementsets")) {
+                            if ("popups".equals(phase)) { metadataRequested = true; awaitFixture(metadataRelease); }
+                            response = "popups".equals(phase) ? GAME.replace("0xH00c000=66", "M:0xH00c000=66") : GAME;
+                        }
                         else if (body.contains("r=startsession")) response = "{\"Success\":true,\"Unlocks\":[],\"HardcoreUnlocks\":[]}";
                         else if (body.contains("r=awardachievement")) {
                             if (!onlineFlag.exists()) {
@@ -291,9 +307,25 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
         sendPointerSync(android.view.MotionEvent.obtain(time, time + 16, android.view.MotionEvent.ACTION_UP, px, py, 0));
         android.os.SystemClock.sleep(500);
     }
+    private void noLaunchPlaceholder(MainActivity activity, String stage) throws Exception {
+        android.graphics.Bitmap screen = getUiAutomation().takeScreenshot();
+        check(screen != null, stage + " screenshot available");
+        int[] area = activity.safeWindowArea();
+        int height = Math.min((int) (120 * activity.getResources().getDisplayMetrics().density), screen.getHeight() - area[3]);
+        android.graphics.Bitmap popupArea = android.graphics.Bitmap.createBitmap(screen, area[2], area[3],
+                screen.getWidth() - area[2] - area[4], height);
+        try {
+            try (FileOutputStream out = new FileOutputStream(new File(getTargetContext().getFilesDir(), "test-popup-" + stage + ".png"))) {
+                screen.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out);
+            }
+            check(!hasColor(popupArea, 0xffb69aff), stage + " shows no preliminary crow popup");
+        } finally { popupArea.recycle(); screen.recycle(); }
+    }
     private void popups() throws Exception {
         transport(); prepareGame();
         Context context = getTargetContext();
+        File[] cachedImages = new File(context.getCacheDir(), "achievement-images").listFiles();
+        if (cachedImages != null) for (File image : cachedImages) check(image.delete(), "cold image cache fixture");
         onlineFlag = new File(context.getExternalFilesDir(null), "ra-network-online");
         try (FileOutputStream out = new FileOutputStream(onlineFlag)) { out.write(1); }
         RetroAchievementsService account = new RetroAchievementsService(context);
@@ -310,7 +342,7 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             }, "actual native viewport matches requested orientation");
             android.graphics.Bitmap warmup = getUiAutomation().takeScreenshot();
             if (warmup != null) warmup.recycle();
-            for (String image : new String[] {"Images/1.png", "Badge/00001_lock.png", "Badge/00001.png"})
+            for (String image : new String[] {"Badge/00001_lock.png", "Badge/00001.png"})
                 waitFor(() -> activity.achievementImage("https://media.retroachievements.org/" + image) != null,
                         "fixture image ready before timed popup capture");
             android.os.SystemClock.sleep(800);
@@ -319,6 +351,12 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             tap(activity, (area[0] - area[2] - area[4]) / density / 2,
                     (area[1] - area[3] - area[5]) / density - 32);
             tap(activity, 150, 100); tap(activity, 150, 100);
+            waitFor(() -> metadataRequested, "game identification is pending");
+            noLaunchPlaceholder(activity, "waiting-metadata");
+            metadataRelease.countDown();
+            waitFor(() -> gameImageRequested, "game image requested after identification");
+            noLaunchPlaceholder(activity, "waiting-image");
+            gameImageRelease.countDown();
             capturePopup("launch", GAME_COLOR);
             android.os.SystemClock.sleep(4500);
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BUTTON_A);
@@ -343,6 +381,7 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             check(cleared != null && !hasColor(cleared, UNLOCK_COLOR), "unloading removes the old game's popup");
             if (cleared != null) cleared.recycle();
         } finally {
+            metadataRelease.countDown(); gameImageRelease.countDown();
             activity.achievementCredentialsSet("", ""); storageDrained(); runOnMainSync(activity::finish);
             context.getSharedPreferences("corvus", Context.MODE_PRIVATE).edit().putInt("achievements_enabled", 0).commit();
         }

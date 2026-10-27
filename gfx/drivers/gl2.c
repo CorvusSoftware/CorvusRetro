@@ -375,6 +375,10 @@ static cr_gl_image *image_texture(cr_gl *g, const char *url) {
     oldest->stamp = ++g->stamp;
     return oldest;
 }
+static bool image_ready(void *ctx, const char *url) {
+    return url && url[0] && strlen(url) < sizeof(((cr_gl_image *)0)->url) &&
+           image_texture(ctx, url) != NULL;
+}
 static bool image(void *ctx, const char *url, float x, float y, float w, float h, float alpha) {
     if (!url || !url[0] || strlen(url) >= sizeof(((cr_gl_image *)0)->url) ||
         !isfinite(x) || !isfinite(y) || !isfinite(w) || !isfinite(h) || !isfinite(alpha) ||
@@ -444,5 +448,5 @@ bool cr_gl_end(cr_gl *g) {
     return eglSwapBuffers(g->display, g->surface) == EGL_TRUE;
 }
 cr_painter cr_gl_painter(cr_gl *g) {
-    return (cr_painter){g, solid, circle, draw_text, measure, icon, clip, game, image};
+    return (cr_painter){g, solid, circle, draw_text, measure, icon, clip, game, image, image_ready};
 }

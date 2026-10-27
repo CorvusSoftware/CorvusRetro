@@ -9,6 +9,7 @@
 #define CR_CARD_HOLD 4.0
 #define CR_PROGRESS_HOLD 2.0
 #define CR_CARD_DURATION (CR_CARD_HOLD + CR_CARD_ANIMATION * 4)
+#define CR_IMAGE_WAIT 3.0
 
 static void copy_text(char *destination, size_t capacity, const char *source) {
     size_t size = 0;
@@ -33,7 +34,11 @@ void cr_notifications_push(cr_notifications *n, int kind, uint32_t id, const cha
                 break;
             }
     if (!card) {
-        if (!n->count) n->card_started = false;
+        if (!n->count) {
+            n->card_started = false;
+            n->image_wait_started = false;
+            n->image_wait = 0;
+        }
         if (n->count == CR_NOTIFICATION_CAPACITY) {
             /* Preserve the visible card while keeping the most recent waiting events. */
             memmove(&n->cards[1], &n->cards[2], (n->count - 2) * sizeof(n->cards[0]));
@@ -45,7 +50,11 @@ void cr_notifications_push(cr_notifications *n, int kind, uint32_t id, const cha
     card->id = id;
     copy_text(card->title, sizeof(card->title), title);
     copy_text(card->detail, sizeof(card->detail), detail);
-    copy_text(card->image_url, sizeof(card->image_url), image_url);
+    /* Artwork stays fixed once the visible animation has started. */
+    if (card != &n->cards[0] || !n->card_started) {
+        copy_text(card->image_url, sizeof(card->image_url), image_url);
+        card->image_pending = card->image_url[0] != 0;
+    }
 }
 void cr_notifications_progress(cr_notifications *n, uint32_t id, const char *text,
                                const char *image_url, float percent) {
@@ -66,9 +75,25 @@ void cr_notifications_hide_progress(cr_notifications *n, uint32_t id) {
 void cr_notifications_clear(cr_notifications *n) {
     if (n) memset(n, 0, sizeof(*n));
 }
+void cr_notifications_prepare(cr_notifications *n, const cr_painter *p) {
+    if (!n || !n->count || !p) return;
+    cr_notification_card *card = &n->cards[0];
+    if (!card->image_pending) return;
+    n->image_wait_started = true;
+    if (p->image_ready && p->image_ready(p->context, card->image_url)) {
+        card->image_pending = false;
+        n->image_wait = 0;
+    } else if (n->image_wait >= CR_IMAGE_WAIT) {
+        /* Commit to one fallback if artwork fails; never swap it mid-animation. */
+        card->image_pending = false;
+        card->image_url[0] = 0;
+    }
+}
 void cr_notifications_update(cr_notifications *n, double seconds) {
     if (!n || !isfinite(seconds) || seconds < 0) return;
-    if (n->count) {
+    if (n->count && n->cards[0].image_pending) {
+        if (n->image_wait_started) n->image_wait += seconds;
+    } else if (n->count) {
         /* Loading time before the first presentation must not skip the descent. */
         if (!n->card_started) n->card_started = true;
         else n->elapsed += seconds;
@@ -77,6 +102,9 @@ void cr_notifications_update(cr_notifications *n, double seconds) {
             memmove(n->cards, &n->cards[1], n->count * sizeof(n->cards[0]));
             memset(&n->cards[n->count], 0, sizeof(n->cards[0]));
             n->elapsed = 0;
+            n->image_wait = 0;
+            n->card_started = false;
+            n->image_wait_started = false;
         }
     }
     n->progress_time = fmax(0, n->progress_time - seconds);
@@ -99,9 +127,12 @@ static void label(const cr_painter *p, const char *text, float x, float y, float
     if (p->text && width > 0) p->text(p->context, text, x, y, size, color, width);
 }
 static void badge(const cr_painter *p, const cr_theme *theme, const char *url, float x,
-                  float y, float size, float opacity) {
+                  float y, float size, float opacity, bool live_fallback) {
     p->rect(p->context, x, y, size, size, alpha(theme->background, opacity));
-    if (url[0] && p->image && p->image(p->context, url, x, y, size, size, opacity)) return;
+    if (url[0]) {
+        if (p->image && p->image(p->context, url, x, y, size, size, opacity)) return;
+        if (!live_fallback) return;
+    }
     if (p->icon)
         p->icon(p->context, CR_ICON_CROW, x + size * .15f, y + size * .15f,
                 size * .7f, alpha(theme->accent, opacity));
@@ -120,7 +151,7 @@ void cr_notifications_draw_region(const cr_notifications *n, const cr_painter *p
     float margin = 12 * scale, card_height = 80 * scale;
     float available = width - margin * 2;
     bool card_visible = false;
-    if (n->count) {
+    if (n->count && !n->cards[0].image_pending) {
         double time = n->elapsed;
         float slide = ease_out(time / CR_CARD_ANIMATION);
         float unfold = ease_out((time - CR_CARD_ANIMATION) / CR_CARD_ANIMATION);
@@ -138,7 +169,7 @@ void cr_notifications_draw_region(const cr_notifications *n, const cr_painter *p
             p->rect(p->context, x, y + 2 * scale, shown, card_height, 0x40000000);
             p->rect(p->context, x, y, shown, card_height, alpha(theme->surface, .97f));
             p->rect(p->context, x, y, 3 * scale, card_height, theme->accent);
-            badge(p, theme, c->image_url, x + 8 * scale, y + 8 * scale, 64 * scale, 1);
+            badge(p, theme, c->image_url, x + 8 * scale, y + 8 * scale, 64 * scale, 1, false);
             if (unfold > 0 && (p->clip || unfold == 1)) {
                 if (p->clip)
                     p->clip(p->context, x + card_height, fmaxf(top, y), panel * unfold,
@@ -161,7 +192,7 @@ void cr_notifications_draw_region(const cr_notifications *n, const cr_painter *p
         float x = left + width - margin - w;
         float opacity = (float)fmin(1, n->progress_time / .2);
         p->rect(p->context, x, y, w, h, alpha(theme->surface, opacity * .97f));
-        badge(p, theme, n->progress.image_url, x + 6 * scale, y + 6 * scale, 32 * scale, opacity);
+        badge(p, theme, n->progress.image_url, x + 6 * scale, y + 6 * scale, 32 * scale, opacity, true);
         float tx = x + 48 * scale, max = w - 54 * scale;
         label(p, n->progress.text, tx, y + 26 * scale, 14 * scale,
               alpha(theme->text, opacity), max);

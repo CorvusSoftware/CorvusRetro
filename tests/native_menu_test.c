@@ -89,7 +89,7 @@ static capture draw(cr_ui *u) {
     cr_play_layout p = cr_play_layout_make(u->width, u->height, u->engine.system, 160, 144);
     cr_area a = p.controls[4].area;
     capture c = {.ax = a.x + a.w / 2, .ay = a.y + a.h / 2};
-    cr_painter painter = {&c, rect, circle, text, measure, icon, NULL, game, NULL};
+    cr_painter painter = {&c, rect, circle, text, measure, icon, NULL, game, NULL, NULL};
     cr_ui_draw(u, &painter);
     return c;
 }
@@ -444,7 +444,7 @@ int main(void) {
                                                layout.controls[5].area.y)) - 8 * layout.scale;
             popup.viewport_center = u.width / 2;
             popup.minimum_badge = 64 * .7f * fmaxf(0, fminf(1, fminf(u.width / 320, (bottom - top) / 104)));
-            cr_painter painter = {&popup, rect, circle, text, measure, icon, NULL, game, NULL};
+            cr_painter painter = {&popup, rect, circle, text, measure, icon, NULL, game, NULL, NULL};
             cr_ui_draw(&u, &painter);
             check(popup.popup_count > 0, "every phone layout retains a visible notification");
         }

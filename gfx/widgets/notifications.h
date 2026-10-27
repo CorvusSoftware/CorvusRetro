@@ -11,6 +11,7 @@ enum { CR_NOTIFICATION_CAPACITY = 8 };
 typedef struct {
     int kind;
     uint32_t id;
+    bool image_pending;
     char title[192], detail[256], image_url[512];
 } cr_notification_card;
 typedef struct {
@@ -22,8 +23,8 @@ typedef struct {
 typedef struct {
     cr_notification_card cards[CR_NOTIFICATION_CAPACITY];
     size_t count;
-    double elapsed, progress_time;
-    bool card_started;
+    double elapsed, progress_time, image_wait;
+    bool card_started, image_wait_started;
     cr_notification_progress progress;
 } cr_notifications;
 
@@ -37,6 +38,8 @@ void cr_notifications_progress(cr_notifications *, uint32_t id, const char *text
 void cr_notifications_hide_progress(cr_notifications *, uint32_t id);
 void cr_notifications_clear(cr_notifications *);
 void cr_notifications_update(cr_notifications *, double seconds);
+/* Requests/uploads the first card's image without drawing or blocking on network IO. */
+void cr_notifications_prepare(cr_notifications *, const cr_painter *);
 void cr_notifications_draw(const cr_notifications *, const cr_painter *, float width,
                            float height, const cr_theme *);
 /* The caller supplies a safe area and restores its clip after drawing animated cards. */

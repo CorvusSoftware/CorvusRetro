@@ -529,7 +529,6 @@ static void open_game(cr_ui *u, int system, const char *id, const char *title, c
         return;
     cr_notifications_clear(&u->notifications);
     achievement_sync(u, true);
-    cr_notifications_push(&u->notifications, CR_NOTIFICATION_GAME, 0, title, "Jeu lancé", "");
     u->notifications_loaded = true;
     u->return_page = u->page == CR_PLAY ? CR_MAIN : u->page;
     snprintf(u->title, sizeof(u->title), "%s", title);
@@ -1223,7 +1222,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         if (u->page == CR_ABOUT)
             u->text_height = paragraphs(
                 p,
-                "CorvusRetro 0.15.1\n\nFrontend original en C, rendu OpenGL ES et audio "
+                "CorvusRetro 0.15.2\n\nFrontend original en C, rendu OpenGL ES et audio "
                 "AAudio.\n\nCorvusSoftware\nCœurs officiels CorvusCore 0.14.1 : Game Boy, Game "
                 "Boy Color, Game Boy Advance (expérimental).\n\nNavigation inspirée de "
                 "MaterialUI. Thèmes CorvusRetro, ASUS et NVIDIA Shield.\n\nCopyright (C) 2026 "
@@ -1340,6 +1339,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
     }
     if (u->message_time > 0)
         popup_bottom = fminf(popup_bottom, h - (u->page == CR_PLAY ? 112 : 146));
+    cr_notifications_prepare(&u->notifications, p);
     cr_notifications_draw_region(&u->notifications, p, popup_left, popup_top, popup_right, popup_bottom, theme);
     if (u->notifications.count && p->clip) p->clip(p->context, 0, 0, w, h);
 }
