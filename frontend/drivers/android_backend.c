@@ -39,6 +39,13 @@ static void wake_frontend(void) {
     pthread_mutex_unlock(&import_mutex);
 }
 
+JNIEXPORT void JNICALL Java_com_corvussoftware_corvusretro_MainActivity_achievementImageReady(
+    JNIEnv *env, jclass cls) {
+    (void)env;
+    (void)cls;
+    wake_frontend();
+}
+
 JNIEXPORT void JNICALL Java_com_corvussoftware_corvusretro_MainActivity_achievementResponse(
     JNIEnv *env, jclass cls, jlong id, jint status, jbyteArray body) {
     (void)cls;
@@ -291,6 +298,7 @@ bool cr_android_init(cr_android *p, struct android_app *app) {
     METHOD(achievement_credentials, "achievementCredentials", "()[Ljava/lang/String;");
     METHOD(achievement_credentials_set, "achievementCredentialsSet", "(Ljava/lang/String;Ljava/lang/String;)V");
     METHOD(edit_text, "textInput", "(ILjava/lang/String;Z)V");
+    METHOD(achievement_image, "achievementImage", "(Ljava/lang/String;)Landroid/graphics/Bitmap;");
 #undef METHOD
     jobjectArray modules = (*p->env)->CallObjectMethod(p->env, app->activity->clazz,
                                                       p->installed_modules);

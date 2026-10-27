@@ -30,7 +30,7 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
     private String phase;
     private File fixtures;
     private int checks;
-    private volatile int failedAwards, awards, logins, acceptedRequests;
+    private volatile int failedAwards, awards, logins, acceptedRequests, imageRequests;
     private volatile boolean replyAlreadyAwarded;
     private volatile boolean serverUnlocked;
     private File onlineFlag;
@@ -124,15 +124,19 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
                     private boolean responseStarted;
                     private String response;
                     private int status;
+                    private byte[] image;
                     @Override public java.io.OutputStream getOutputStream() { return output; }
                     private void respond() {
                         if (responseStarted) return;
                         responseStarted = true;
+                        if (RetroAchievementsImages.allowed(address.toString())) {
+                            image = fixtureImage(address.toString()); imageRequests++; status = 200; return;
+                        }
                         check(RetroAchievementsService.allowed(address.toString()), "no credential redirect or foreign server");
                         String body = new String(output.toByteArray(), StandardCharsets.UTF_8);
                         status = 200;
                         if (body.contains("r=login2")) { response = LOGIN; logins++; }
-                        else if (body.contains("r=achievementsets")) response = GAME;
+                        else if (body.contains("r=achievementsets")) response = "popups".equals(phase) ? GAME.replace("0xH00c000=66", "M:0xH00c000=66") : GAME;
                         else if (body.contains("r=startsession")) response = "{\"Success\":true,\"Unlocks\":[],\"HardcoreUnlocks\":[]}";
                         else if (body.contains("r=awardachievement")) {
                             if (!onlineFlag.exists()) {
@@ -149,7 +153,7 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
                         else throw new AssertionError("Unexpected test protocol request");
                     }
                     @Override public int getResponseCode() { respond(); return status; }
-                    @Override public InputStream getInputStream() { respond(); return new ByteArrayInputStream(response.getBytes(StandardCharsets.UTF_8)); }
+                    @Override public InputStream getInputStream() { respond(); return new ByteArrayInputStream(image != null ? image : response.getBytes(StandardCharsets.UTF_8)); }
                     @Override public InputStream getErrorStream() { return getInputStream(); }
                     @Override public void disconnect() { }
                     @Override public boolean usingProxy() { return false; }
@@ -212,6 +216,10 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
         byte[] rom = new byte[32768];
         rom[0x100] = (byte) 0xc3; rom[0x101] = 0x50; rom[0x102] = 1;
         byte[] program = {(byte)0x3e,0x10,(byte)0xe0,0,(byte)0xf0,0,(byte)0xe6,1,0x20,(byte)0xfa,0x3e,0x42,(byte)0xea,0,(byte)0xc0,0x18,(byte)0xfe};
+        if ("popups".equals(phase)) program = new byte[] {
+            (byte)0x3e,0x10,(byte)0xe0,0,(byte)0xf0,0,(byte)0xe6,1,0x20,(byte)0xfa,
+            0x3e,0x21,(byte)0xea,0,(byte)0xc0,(byte)0xf0,0,(byte)0xe6,1,0x28,(byte)0xfa,
+            (byte)0xf0,0,(byte)0xe6,2,0x20,(byte)0xfa,0x3e,0x42,(byte)0xea,0,(byte)0xc0,0x18,(byte)0xfe};
         System.arraycopy(program, 0, rom, 0x150, program.length);
         System.arraycopy("CORVUS RA TEST".getBytes(StandardCharsets.US_ASCII), 0, rom, 0x134, 14);
         int checksum = 0;
@@ -228,6 +236,101 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
         GameLibrary.Game game = new GameLibrary.Game(hash + "-0", "CorvusAchievement.gb", 0, 0, "corvus.gb", "nintendo.game_boy");
         library.commit(new GameLibrary.Pending(game, temporary), 0, "corvus.gb", "nintendo.game_boy");
         library.touch(game.id);
+    }
+    private static final int GAME_COLOR = 0xff0bd997, PROGRESS_COLOR = 0xffe56f13, UNLOCK_COLOR = 0xff28a5ed;
+    private byte[] fixtureImage(String url) {
+        android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(64, 64, android.graphics.Bitmap.Config.ARGB_8888);
+        bitmap.eraseColor(url.contains("/Images/") ? GAME_COLOR : url.contains("_lock") ? PROGRESS_COLOR : UNLOCK_COLOR);
+        android.graphics.Canvas canvas = new android.graphics.Canvas(bitmap);
+        android.graphics.Paint paint = new android.graphics.Paint(); paint.setColor(0xffffffff);
+        canvas.drawCircle(32, 32, 15, paint);
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, bytes); bitmap.recycle();
+        return bytes.toByteArray();
+    }
+    private boolean hasColor(android.graphics.Bitmap bitmap, int color) {
+        int count = 0, width = bitmap.getWidth(), height = bitmap.getHeight();
+        int[] pixels = new int[width * height];
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height);
+        for (int y = 0; y < height; y += 2)
+            for (int x = 0; x < width; x += 2)
+                if ((pixels[y * width + x] & 0xffffff) == (color & 0xffffff) && ++count >= 30) return true;
+        return false;
+    }
+    private void capturePopup(String name, int color) throws Exception {
+        long deadline = android.os.SystemClock.uptimeMillis() + 1800;
+        android.graphics.Bitmap bitmap = null;
+        do {
+            if (bitmap != null) bitmap.recycle();
+            android.os.SystemClock.sleep(100);
+            bitmap = getUiAutomation().takeScreenshot();
+        } while ((bitmap == null || !hasColor(bitmap, color)) && android.os.SystemClock.uptimeMillis() < deadline);
+        boolean visible = bitmap != null && hasColor(bitmap, color);
+        if (bitmap != null) {
+            try (FileOutputStream out = new FileOutputStream(new File(getTargetContext().getFilesDir(), "test-popup-" + name + ".png"))) {
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out);
+            } finally { bitmap.recycle(); }
+        }
+        check(visible, name + " draws the actual badge image (image requests=" + imageRequests + ")");
+    }
+    private void tap(MainActivity activity, float x, float y) {
+        int[] area = activity.safeWindowArea();
+        float density = activity.getResources().getDisplayMetrics().density;
+        long time = android.os.SystemClock.uptimeMillis();
+        float px = area[2] + x * density, py = area[3] + y * density;
+        sendPointerSync(android.view.MotionEvent.obtain(time, time, android.view.MotionEvent.ACTION_DOWN, px, py, 0));
+        sendPointerSync(android.view.MotionEvent.obtain(time, time + 16, android.view.MotionEvent.ACTION_UP, px, py, 0));
+        android.os.SystemClock.sleep(500);
+    }
+    private void popups() throws Exception {
+        transport(); prepareGame();
+        Context context = getTargetContext();
+        onlineFlag = new File(context.getExternalFilesDir(null), "ra-network-online");
+        try (FileOutputStream out = new FileOutputStream(onlineFlag)) { out.write(1); }
+        RetroAchievementsService account = new RetroAchievementsService(context);
+        account.saveCredentials("", ""); storageDrained(); account.saveCredentials(USER, TOKEN); storageDrained(); account.close();
+        context.getSharedPreferences("corvus", Context.MODE_PRIVATE).edit().putInt("achievements_enabled", 1).putInt("theme", 2).commit();
+        MainActivity activity = (MainActivity) startActivitySync(new Intent(context, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        try {
+            waitFor(() -> activity.safeWindowArea() != null && logins > 0, "native account and safe viewport ready");
+            android.graphics.Bitmap warmup = getUiAutomation().takeScreenshot();
+            if (warmup != null) warmup.recycle();
+            for (String image : new String[] {"Images/1.png", "Badge/00001_lock.png", "Badge/00001.png"})
+                waitFor(() -> activity.achievementImage("https://media.retroachievements.org/" + image) != null,
+                        "fixture image ready before timed popup capture");
+            android.os.SystemClock.sleep(800);
+            int[] area = activity.safeWindowArea();
+            float density = activity.getResources().getDisplayMetrics().density;
+            tap(activity, (area[0] - area[2] - area[4]) / density / 2,
+                    (area[1] - area[3] - area[5]) / density - 32);
+            tap(activity, 150, 100); tap(activity, 150, 100);
+            capturePopup("launch", GAME_COLOR);
+            android.os.SystemClock.sleep(4500);
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BUTTON_A);
+            capturePopup("progress", PROGRESS_COLOR);
+            android.os.SystemClock.sleep(2200);
+            android.graphics.Bitmap hidden = getUiAutomation().takeScreenshot();
+            check(hidden != null && !hasColor(hidden, PROGRESS_COLOR), "progress indicator expires after two seconds");
+            if (hidden != null) hidden.recycle();
+            check(getUiAutomation().performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME),
+                    "pause to exercise native window lifecycle");
+            android.os.SystemClock.sleep(500);
+            context.startActivity(new Intent(context, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
+            android.os.SystemClock.sleep(1000);
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BUTTON_B);
+            capturePopup("unlocked", UNLOCK_COLOR);
+            check(awards == 1, "actual core memory unlocked one achievement with decoded images");
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+            for (int i = 0; i < 4; ++i) sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_DOWN);
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER); android.os.SystemClock.sleep(300);
+            tap(activity, 150, 176);
+            android.graphics.Bitmap cleared = getUiAutomation().takeScreenshot();
+            check(cleared != null && !hasColor(cleared, UNLOCK_COLOR), "unloading removes the old game's popup");
+            if (cleared != null) cleared.recycle();
+        } finally {
+            activity.achievementCredentialsSet("", ""); storageDrained(); runOnMainSync(activity::finish);
+            context.getSharedPreferences("corvus", Context.MODE_PRIVATE).edit().putInt("achievements_enabled", 0).commit();
+        }
     }
     private void ui() throws Exception {
         transport(); prepareGame();
@@ -259,7 +362,7 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
     @Override public void onStart() {
         Bundle result = new Bundle();
         try {
-            if ("ui".equals(phase)) ui(); else if ("outbox".equals(phase)) outbox(); else if ("recover".equals(phase)) recover(); else credentials();
+            if ("popups".equals(phase)) popups(); else if ("ui".equals(phase)) ui(); else if ("outbox".equals(phase)) outbox(); else if ("recover".equals(phase)) recover(); else credentials();
             result.putString("stream", "PASS " + checks + " Android RetroAchievements checks phase=" + phase + " pid=" + android.os.Process.myPid() + "\n");
             finish(Activity.RESULT_OK, result);
         } catch (Throwable failure) {

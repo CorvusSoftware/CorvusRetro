@@ -10,6 +10,12 @@ typedef struct {
     float x, y, u, v, r, g, b, a;
 } cr_vertex;
 typedef struct {
+    char url[512];
+    GLuint texture;
+    int width, height;
+    uint64_t stamp;
+} cr_gl_image;
+typedef struct {
     cr_android *platform;
     EGLDisplay display;
     EGLSurface surface;
@@ -23,6 +29,7 @@ typedef struct {
     float advances[480];
     uint32_t codepoints[480];
     uint64_t stamps[480], stamp;
+    cr_gl_image images[16];
 } cr_gl;
 bool cr_gl_init(cr_gl *, cr_android *);
 void cr_gl_destroy(cr_gl *);

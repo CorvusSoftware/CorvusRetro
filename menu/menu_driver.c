@@ -336,12 +336,48 @@ static void achievement_credentials(void *context, const char *user, const char 
         u->platform.save_achievement_credentials(u->platform.context, user, token);
 }
 static void achievement_notice(void *context, const char *message) { cr_ui_message(context, message); }
+static void achievement_notification(void *context, const cr_cheevos_notification *event) {
+    cr_ui *u = context;
+    char detail[256];
+    switch (event->type) {
+    case CR_CHEEVOS_GAME_READY:
+        snprintf(detail, sizeof(detail), "%u/%u succès - Mode normal", event->unlocked, event->total);
+        cr_notifications_push(&u->notifications, CR_NOTIFICATION_GAME, 0,
+                              event->title, detail, event->image_url);
+        break;
+    case CR_CHEEVOS_UNLOCKED:
+        snprintf(detail, sizeof(detail), "%s", event->title);
+        char title[96];
+        snprintf(title, sizeof(title), "Succès débloqué - %u points", event->points);
+        cr_notifications_push(&u->notifications, CR_NOTIFICATION_UNLOCK, event->id,
+                              title, detail, event->image_url);
+        break;
+    case CR_CHEEVOS_PROGRESS:
+        cr_notifications_progress(&u->notifications, event->id, event->detail,
+                                  event->image_url, event->percent);
+        break;
+    case CR_CHEEVOS_PROGRESS_HIDE:
+        cr_notifications_hide_progress(&u->notifications, event->id);
+        break;
+    case CR_CHEEVOS_COMPLETED:
+        cr_notifications_push(&u->notifications, CR_NOTIFICATION_UNLOCK, 0,
+                              "Tous les succès débloqués", event->title, event->image_url);
+        break;
+    case CR_CHEEVOS_CLEAR:
+        cr_notifications_clear(&u->notifications);
+        break;
+    }
+}
 static size_t achievement_memory(void *context, uint32_t address, uint8_t *bytes, size_t size) {
     cr_ui *u = context;
     if (!u->engine.loaded || strcmp(u->engine.id, u->ra_game_id) != 0 || u->engine.handle != u->ra_handle) return 0;
     return cr_engine_read_achievement_memory(&u->engine, address, bytes, size);
 }
 static void achievement_sync(cr_ui *u, bool identify) {
+    if (!u->engine.loaded && u->notifications_loaded) {
+        cr_notifications_clear(&u->notifications);
+        u->notifications_loaded = false;
+    }
     if (!u->achievements) return;
     if (!u->ra_enabled || !u->engine.loaded) {
         if (u->ra_game_id[0]) cr_cheevos_unload_game(u->achievements);
@@ -399,8 +435,9 @@ void cr_ui_init(cr_ui *u, cr_platform p, const char *root) {
         u->awake = true;
     }
     if (p.achievement_request) {
-        u->achievements = cr_cheevos_create((cr_cheevos_host){u, achievement_request,
-                achievement_credentials, achievement_notice});
+        u->achievements = cr_cheevos_create((cr_cheevos_host){.context = u, .request = achievement_request,
+                .save_credentials = achievement_credentials, .notice = achievement_notice,
+                .notification = achievement_notification});
         u->ra_enabled = p.preference && p.preference(p.context, "achievements_enabled", 0) != 0;
         if (p.achievement_credentials) {
             char token[257] = {0};
@@ -455,6 +492,7 @@ void cr_ui_update(cr_ui *u, double seconds) {
     cr_cheevos_idle(u->achievements);
     float dt = (float)fmax(0, seconds);
     u->time += dt;
+    cr_notifications_update(&u->notifications, dt);
     u->message_time = fmax(0, u->message_time - dt);
     unsigned held = u->keys | u->feedback_pulses;
     bool feedback = false;
@@ -489,7 +527,10 @@ static bool result(cr_ui *u, bool ok) {
 static void open_game(cr_ui *u, int system, const char *id, const char *title, const char *path) {
     if (!result(u, cr_engine_open(&u->engine, system, id, path)))
         return;
+    cr_notifications_clear(&u->notifications);
     achievement_sync(u, true);
+    cr_notifications_push(&u->notifications, CR_NOTIFICATION_GAME, 0, title, "Jeu lancé", "");
+    u->notifications_loaded = true;
     u->return_page = u->page == CR_PLAY ? CR_MAIN : u->page;
     snprintf(u->title, sizeof(u->title), "%s", title);
     page(u, CR_PLAY);
@@ -1182,7 +1223,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         if (u->page == CR_ABOUT)
             u->text_height = paragraphs(
                 p,
-                "CorvusRetro 0.13.0\n\nFrontend original en C, rendu OpenGL ES et audio "
+                "CorvusRetro 0.15.0\n\nFrontend original en C, rendu OpenGL ES et audio "
                 "AAudio.\n\nCorvusSoftware\nCœurs officiels CorvusCore 0.14.1 : Game Boy, Game "
                 "Boy Color, Game Boy Advance (expérimental).\n\nNavigation inspirée de "
                 "MaterialUI. Thèmes CorvusRetro, ASUS et NVIDIA Shield.\n\nCopyright (C) 2026 "
@@ -1268,4 +1309,31 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         rect(p, 12, y, w - 24, 52, 0xf0333333);
         text(p, u->message, 24, y + 32, 13, 0xffffffff, w - 48);
     }
+    float popup_left = 0, popup_right = w, popup_top = 56, popup_bottom = h - 72;
+    if (u->page == CR_PLAY) {
+        cr_play_layout layout = play_layout(u);
+        popup_top = 0;
+        popup_bottom = layout.panel.y;
+        if (!layout.portrait) {
+            popup_bottom = fminf(layout.controls[4].area.y, layout.controls[5].area.y) - 8 * layout.scale;
+            if (layout.count == 10)
+                popup_top = layout.controls[9].area.y + layout.controls[9].area.h + 8 * layout.scale;
+            if (popup_bottom - popup_top < 104) {
+                float left = layout.dpad.x + layout.dpad.w + 8 * layout.scale;
+                float right = layout.controls[5].area.x - 8 * layout.scale;
+                float bottom = layout.menu.y - 8 * layout.scale;
+                float current_scale = fminf(w / 320, (popup_bottom - popup_top) / 104);
+                float center_scale = fminf((right - left) / 320, bottom / 104);
+                if (center_scale > current_scale) {
+                    popup_left = left;
+                    popup_right = right;
+                    popup_top = 0;
+                    popup_bottom = bottom;
+                }
+            }
+        }
+    }
+    if (u->message_time > 0)
+        popup_bottom = fminf(popup_bottom, h - (u->page == CR_PLAY ? 112 : 146));
+    cr_notifications_draw_region(&u->notifications, p, popup_left, popup_top, popup_right, popup_bottom, theme);
 }

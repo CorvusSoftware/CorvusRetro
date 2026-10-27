@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "menu_driver.h"
 #include "play_layout.h"
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,9 +18,22 @@ typedef struct {
     char text[16384];
     uint32_t highlight, a_body, a_text;
     float ax, ay;
+    const cr_play_layout *layout;
+    uint32_t popup_color;
+    unsigned popup_count;
+    unsigned badge_count;
+    float minimum_badge;
 } capture;
 static void rect(void *ctx, float x, float y, float w, float h, uint32_t color) {
     capture *c = ctx;
+    if (c->layout && color == c->popup_color) {
+        ++c->popup_count;
+        for (int i = 0; i < c->layout->count; ++i) {
+            cr_area a = c->layout->controls[i].area;
+            check(x + w <= a.x || a.x + a.w <= x || y + h <= a.y || a.y + a.h <= y,
+                  "notification does not cover a touch control");
+        }
+    }
     if (x == 0 && y == 216 && w == 384 && h == 76)
         c->highlight = color;
 }
@@ -46,8 +60,12 @@ static float measure(void *ctx, const char *s, float size) {
     return strlen(s) * size * .5f;
 }
 static void icon(void *ctx, int kind, float x, float y, float size, uint32_t color) {
-    (void)ctx;
-    (void)kind;
+    capture *c = ctx;
+    if (c->layout && kind == CR_ICON_CROW) {
+        if (!c->badge_count)
+            check(size + .001f >= c->minimum_badge, "centered layout never shrinks the card below the original safe area");
+        ++c->badge_count;
+    }
     (void)x;
     (void)y;
     (void)size;
@@ -68,7 +86,7 @@ static capture draw(cr_ui *u) {
     cr_play_layout p = cr_play_layout_make(u->width, u->height, u->engine.system, 160, 144);
     cr_area a = p.controls[4].area;
     capture c = {.ax = a.x + a.w / 2, .ay = a.y + a.h / 2};
-    cr_painter painter = {&c, rect, circle, text, measure, icon, NULL, game};
+    cr_painter painter = {&c, rect, circle, text, measure, icon, NULL, game, NULL};
     cr_ui_draw(u, &painter);
     return c;
 }
@@ -123,6 +141,10 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     check(cr_engine_open(&u->engine, 2, id, path) && cr_engine_step(&u->engine, 0),
           "load real game and generate battery data through CorvusAPI");
     check(u->engine.api.battery_dirty(u->engine.handle), "test game has unsaved SRAM");
+    cr_notifications_push(&u->notifications, CR_NOTIFICATION_GAME, 0, "Original GBA test", "Jeu lancé", "");
+    cr_notifications_progress(&u->notifications, 1, "1/10", "", 10);
+    u->notifications_loaded = true;
+    cr_ui_update(u, .4);
     snprintf(u->title, sizeof(u->title), "Original GBA test");
     capture c = draw(u);
     check(strstr(c.text, "Menu rapide") && strstr(c.text, "Décharger le cœur") &&
@@ -147,6 +169,9 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
               strcmp(u->title, "Original GBA test") == 0 && u->message[0] &&
               strstr(c.text, "Décharger le cœur") && !strstr(c.text, "Charger un cœur"),
           "failed battery persistence keeps the game and unload action available for retry");
+    cr_ui_update(u, .01);
+    check(u->notifications.count == 1 && u->notifications.progress.visible,
+          "refused unload keeps the running game's notifications");
     check(unlink(saves) == 0, "remove battery directory obstruction");
     u->page = CR_CORE_DOWNLOADS;
     row(u, 1);
@@ -173,6 +198,9 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
               strstr(c.text, "Charger un cœur") && !strstr(c.text, "Décharger le cœur") &&
               !strstr(c.text, "Menu rapide"),
           "retry persists the game and restores the single load action");
+    cr_ui_update(u, .01);
+    check(!u->notifications.count && !u->notifications.progress.visible && !u->notifications_loaded,
+          "successful unload clears cards and measured progress even without an account");
     snprintf(path, sizeof(path), "%s/saves/%s.sav", root, id);
     check(access(path, F_OK) == 0 && unlink(path) == 0, "battery survived successful unload");
     check(rmdir(saves) == 0, "remove test saves directory");
@@ -391,6 +419,30 @@ int main(void) {
     check(c.a_body == idle && (c.a_text >> 24) == idle_text && cr_ui_input(&u) == 16,
           "disabling feedback preserves game input");
     cr_ui_touch(&u, 0, CR_TOUCH_CANCEL, 0, 0);
+    const float popup_sizes[][2] = {{360, 640}, {640, 360}, {320, 240}, {640, 240}, {960, 540}, {240, 320}};
+    u.message_time = 0;
+    for (int system = 0; system < 3; ++system) {
+        u.engine.system = system;
+        u.engine.width = system == 2 ? 240 : 160;
+        u.engine.height = system == 2 ? 160 : 144;
+        for (size_t i = 0; i < sizeof(popup_sizes) / sizeof(popup_sizes[0]); ++i) {
+            cr_ui_size(&u, popup_sizes[i][0], popup_sizes[i][1]);
+            cr_notifications_clear(&u.notifications);
+            cr_notifications_push(&u.notifications, CR_NOTIFICATION_GAME, 0, "Jeu", "Succès", "");
+            cr_notifications_progress(&u.notifications, 1, "33/66", "", 50);
+            cr_notifications_update(&u.notifications, .4);
+            cr_play_layout layout = cr_play_layout_make(u.width, u.height, system, u.engine.width, u.engine.height);
+            capture popup = {.layout = &layout, .popup_color = (cr_theme_get(u.theme)->surface & 0xffffffu) | 0xf7000000u};
+            float top = !layout.portrait && layout.count == 10
+                    ? layout.controls[9].area.y + layout.controls[9].area.h + 8 * layout.scale : 0;
+            float bottom = layout.portrait ? layout.panel.y
+                    : fminf(layout.controls[4].area.y, layout.controls[5].area.y) - 8 * layout.scale;
+            popup.minimum_badge = 64 * .7f * fmaxf(0, fminf(1, fminf(u.width / 320, (bottom - top) / 104)));
+            cr_painter painter = {&popup, rect, circle, text, measure, icon, NULL, game, NULL};
+            cr_ui_draw(&u, &painter);
+            check(popup.popup_count > 0, "every phone layout retains a visible notification");
+        }
+    }
     u.engine.loaded = false;
     cr_ui_destroy(&u);
     rmdir(root);

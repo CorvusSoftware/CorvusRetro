@@ -143,6 +143,9 @@ void cr_gl_destroy(cr_gl *g) {
             glDeleteTextures(1, &g->atlas);
         if (g->game)
             glDeleteTextures(1, &g->game);
+        for (size_t i = 0; i < sizeof(g->images) / sizeof(g->images[0]); ++i)
+            if (g->images[i].texture)
+                glDeleteTextures(1, &g->images[i].texture);
         if (g->vbo)
             glDeleteBuffers(1, &g->vbo);
         if (g->program)
@@ -320,6 +323,79 @@ static void game(void *ctx, const uint32_t *pixels, int width, int height, float
     glBindTexture(GL_TEXTURE_2D, g->atlas);
     glUniform1f(g->mode, 0);
 }
+static cr_gl_image *image_texture(cr_gl *g, const char *url) {
+    cr_gl_image *oldest = &g->images[0];
+    for (size_t i = 0; i < sizeof(g->images) / sizeof(g->images[0]); ++i) {
+        cr_gl_image *image = &g->images[i];
+        if (image->texture && strcmp(image->url, url) == 0) {
+            image->stamp = ++g->stamp;
+            return image;
+        }
+        if (image->stamp < oldest->stamp)
+            oldest = image;
+    }
+    cr_android *p = g->platform;
+    jstring address = (*p->env)->NewStringUTF(p->env, url);
+    if (!address) {
+        cr_android_clear_error(p);
+        return NULL;
+    }
+    jobject bitmap = (*p->env)->CallObjectMethod(p->env, p->app->activity->clazz,
+                                                p->achievement_image, address);
+    (*p->env)->DeleteLocalRef(p->env, address);
+    bool error = cr_android_clear_error(p);
+    AndroidBitmapInfo info;
+    if (error || !bitmap || AndroidBitmap_getInfo(p->env, bitmap, &info) != ANDROID_BITMAP_RESULT_SUCCESS ||
+        info.format != ANDROID_BITMAP_FORMAT_RGBA_8888 || !info.width || !info.height ||
+        info.width > 96 || info.height > 96 || info.stride != info.width * 4) {
+        if (bitmap) (*p->env)->DeleteLocalRef(p->env, bitmap);
+        return NULL;
+    }
+    flush(g);
+    GLuint texture = 0;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    bool uploaded = texture && bitmap_upload(p, texture, bitmap, 0, 0, true);
+    (*p->env)->DeleteLocalRef(p->env, bitmap);
+    glBindTexture(GL_TEXTURE_2D, g->atlas);
+    glUniform1f(g->mode, 0);
+    if (!uploaded) {
+        if (texture) glDeleteTextures(1, &texture);
+        return NULL;
+    }
+    if (oldest->texture) glDeleteTextures(1, &oldest->texture);
+    snprintf(oldest->url, sizeof(oldest->url), "%s", url);
+    oldest->texture = texture;
+    oldest->width = (int)info.width;
+    oldest->height = (int)info.height;
+    oldest->stamp = ++g->stamp;
+    return oldest;
+}
+static bool image(void *ctx, const char *url, float x, float y, float w, float h, float alpha) {
+    if (!url || !url[0] || strlen(url) >= sizeof(((cr_gl_image *)0)->url) ||
+        !isfinite(x) || !isfinite(y) || !isfinite(w) || !isfinite(h) || !isfinite(alpha) ||
+        w <= 0 || h <= 0)
+        return false;
+    cr_gl *g = ctx;
+    cr_gl_image *entry = image_texture(g, url);
+    if (!entry) return false;
+    float scale = fminf(w / entry->width, h / entry->height);
+    float width = entry->width * scale, height = entry->height * scale;
+    uint32_t opacity = (uint32_t)(fminf(1, fmaxf(0, alpha)) * 255 + .5f);
+    flush(g);
+    glBindTexture(GL_TEXTURE_2D, entry->texture);
+    glUniform1f(g->mode, 0);
+    quad(g, x + (w - width) / 2, y + (h - height) / 2, width, height,
+         0, 0, 1, 1, (opacity << 24) | 0xffffff);
+    flush(g);
+    glBindTexture(GL_TEXTURE_2D, g->atlas);
+    glUniform1f(g->mode, 0);
+    return true;
+}
 void cr_gl_begin(cr_gl *g, uint32_t system_bar) {
     eglQuerySurface(g->display, g->surface, EGL_WIDTH, &g->full_width);
     eglQuerySurface(g->display, g->surface, EGL_HEIGHT, &g->full_height);
@@ -368,5 +444,5 @@ bool cr_gl_end(cr_gl *g) {
     return eglSwapBuffers(g->display, g->surface) == EGL_TRUE;
 }
 cr_painter cr_gl_painter(cr_gl *g) {
-    return (cr_painter){g, solid, circle, draw_text, measure, icon, clip, game};
+    return (cr_painter){g, solid, circle, draw_text, measure, icon, clip, game, image};
 }

@@ -8,6 +8,7 @@
 #include "render.h"
 #include "theme.h"
 #include "cheevos.h"
+#include "notifications.h"
 enum {
     CR_MAIN,
     CR_LISTS,
@@ -44,6 +45,8 @@ typedef struct {
     cr_engine engine;
     cr_platform platform;
     cr_cheevos *achievements;
+    cr_notifications notifications;
+    bool notifications_loaded;
     bool ra_enabled;
     int ra_editing;
     void *ra_handle;

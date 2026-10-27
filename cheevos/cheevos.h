@@ -9,12 +9,28 @@
 
 typedef struct cr_cheevos cr_cheevos;
 typedef size_t (*cr_cheevos_read_memory)(void *, uint32_t, uint8_t *, size_t);
+enum {
+    CR_CHEEVOS_GAME_READY,
+    CR_CHEEVOS_UNLOCKED,
+    CR_CHEEVOS_PROGRESS,
+    CR_CHEEVOS_PROGRESS_HIDE,
+    CR_CHEEVOS_COMPLETED,
+    CR_CHEEVOS_CLEAR
+};
+typedef struct {
+    int type;
+    uint32_t id, points, unlocked, total;
+    char title[192], detail[256], image_url[512];
+    float percent;
+} cr_cheevos_notification;
 typedef struct {
     void *context;
     /* Must copy request strings before returning; completion is delivered on the owner thread. */
     void (*request)(void *, uint64_t, const char *, const char *);
     void (*save_credentials)(void *, const char *, const char *);
     void (*notice)(void *, const char *);
+    /* Notification strings are copied values, valid for the duration of this callback. */
+    void (*notification)(void *, const cr_cheevos_notification *);
 } cr_cheevos_host;
 typedef struct {
     bool connected, pending, game_loaded, memory_supported;

@@ -31,5 +31,6 @@ typedef struct {
     void (*icon)(void *, int, float, float, float, uint32_t);
     void (*clip)(void *, float, float, float, float);
     void (*game)(void *, const uint32_t *, int, int, float, float, float, float);
+    bool (*image)(void *, const char *, float, float, float, float, float);
 } cr_painter;
 #endif

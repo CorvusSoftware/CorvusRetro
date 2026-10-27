@@ -1,28 +1,18 @@
-État : code et distribution 0.13.0 publiés, catalogue public vérifié prêt pour main.
-Demande : nettoyage, organisation inspirée de RetroArch et RetroAchievements fonctionnel.
-Autorisations : publication main et APK ; extensions CorvusAPI/CorvusCore explicitement approuvées.
+État : ACTIVE, qualification locale terminée, publication en attente.
+Demande : notifications inspirées de RetroArch pour lancement avec icône, déblocage et progression avec badges.
+Amont6f00c2d intégré dans work/achievement-popups ; checkpoint local113649d conservé. Version0.14.0/code15 déjà publique, nouvelle feature0.15.0/code16.
+Aucun ancien catalogue JSON réintroduit ; découverte multi-fournisseur de CorvusRepository conservée, SDK/pins inchangés.
 
-La migration amont50105de du header unique corvusapi.h est conservée.
-Source fonctionnelle2248329, correction des chemins de productionf87a0ca2544696d57992189c2ce1003230ceff3b.
-CorvusCore2d7bdd2020894fa27d153cbecd421da47bcb37f4 (0.14.1), APIbfdbed337ed7bc7334ed2d8e1f510ab503fa475d, rcheevos1433173220a7eaede6a9ed7a18e94117be1821e0 (MIT).
+Implémenté : événements rc_client typés, cartes natives file8/4s/330ms, progression2s et HIDE/reset, cartes de jeu terminé, marges hors commandes.
+Images publiques async et caches bornés, fallbackCorvus, texturesGL16 et JNI sans IO sur le frontend.
+Référence RetroArchdda31fef21aeb472be9de7ee53eb386cc8db1417 inspectée, code frontend original.
 
-Structure : menu/cores/gfx/input/audio/frontend/cheevos/tasks/deps, Android sous pkg/android.
-Anciens producteurs et projets de splits, documentation et captures obsolètes supprimés ; catalogues historiques conservés.
-RetroAchievements normal : interface C, clavier Android, rc_client officiel, lecture mémoire facultative publique ABI0.
-HTTPS strict, session et file AES-GCM Keystore, reprise après fermeture du jeu, déconnexion invalidant les anciens travaux.
+Preuves :9CTest normaux et9ASan/UBSan passent ;136contrôles client et1682widgets ; builds Debug/Release/lint/testAPK passent ; base sans moteur/sixELF16Ko/archives validés.
+Android15 :29contrôles images ;16contrôles popups en portrait et16en paysage, captures inspectées. Vrai cœurGB et programme original : A écrit33 puisB66, progrès33/66 puis succès, expiration2s, pause/reprise et clear après unload.
+Revue indépendante : aucun P1 ; P2 du corridor trop étroit corrigé, non-régression de taille et absence de chevauchement vérifiées sur6tailles x3systèmes.
+Crash rcheevos de mastery différée à la fermeture corrigé par reset pendant que le jeu est attaché, avant unload ; régression passeASan sans modifier la dépendance.
+Le test de pixels Android lit les buffers en bloc ; les images de qualification sont synthétiques et ne sont pas dans la base.
 
-Qualification : 8CTest et8ASan/UBSan,78contrôles client ; builds Debug/Release, base sans moteur, sixELF16Ko par variante.
-Android15 x86_64 :14compte/Keystore/nonblocage,1restauration processus,13file persistante,15parcoursUI,39téléchargeur.
-Programme GB original exécuté par le vrai cœur : A modifie WRAM, succès obtenu,503 puis fermeture et reprise sans doublon.
-Ancienne batterie GBA inchangée : SHA256d5b703aea92f05004a0d761ab80aecf958f950f96bd1cafc27bbc7fc935fc3f1.
-Transport synthétique ; aucun compte réel, jeu commercial, téléphone physique ou exécutionARM64.
-
-CI source40394372804, build signé40394816280 et publication40395188701 réussis.
-Première construction signée40393518093 avait échoué : sortie AGP RelWithDebInfo contre Release attendu. Correction reproduite et désormais contrôlée par la CI principale.
-Tagv0.13.0 immutable surf87a0ca : base0.13.0/code14 et sixZIP0.14.1 publics.
-Signature de la vraie base vérifiée contre l'ancrage indépendant ; sixZIP réels vérifiés, extension mémoire et catalogue exact.
-Mise à jour du vrai APK signé0.12->0.13 sur Android10 acceptée, thème ASUS et historique conservés, captures inspectées.
-Branche candidateautomation/core-catalog-40395188701-1 modifie uniquement cores-v3.json et correspond exactement aux octets publics.
-
-Observer la CI du commit de promotion après push. Reçu détaillé : /workspace/setup/CorvusRetro-0.13-qualification-receipt.txt.
-Ne pas reconstruire ou remplacer les assets immuables ; ne pas réécrire les changements utilisateur.
+Régression finale :51contrôles multi-fournisseur passent, batterie GBA historique inchangée.
+Prochain : consolider les commits locaux depuis origin/main sans perdre les changements utilisateur ; pousser main, observer CI/signature, tagv0.15.0 et vérifier les assets publics.
+Autorisation de publication persistante, ne pas redemander. Ne pas modifier les catalogues externes pour des moteurs inchangés.

@@ -18,6 +18,27 @@ chargement d'un état réinitialise l'évaluation des conditions ; les succès d
 validés sur le compte restent acquis. Un ancien module sans extension mémoire
 reste jouable et affiche clairement son absence de support des succès.
 
+## Notifications
+
+Le lancement et le déblocage utilisent une même carte native : image carrée,
+nom et résumé, animation de 330 ms et maintien de 4 s. Les déblocages successifs
+utilisent une file bornée de 8 cartes. L'identification RetroAchievements ajoute
+l'icône officielle du jeu et le nombre de succès au lancement.
+
+La progression mesurée est un indicateur séparé : badge verrouillé, compteur
+fourni par rcheevos et barre mesurée. Chaque changement renouvelle son affichage
+pendant 2 s ; un événement HIDE, une réinitialisation ou la fermeture du contenu
+le retire. Les cœurs sans support des succès gardent le lancement standard.
+
+Les images publiques sont téléchargées et décodées en arrière-plan, avec caches
+mémoire et disque bornés. Une image absente utilise le corbeau Corvus ; son
+arrivée tardive remplace cette icône sans déclencher une autre notification.
+Aucune requête ni lecture disque ne bloque le rendu. Les cartes respectent les
+marges système et la zone hors commandes tactiles ; une zone trop courte donne
+priorité à la carte pour éviter le chevauchement avec la progression. En paysage
+court, le placement central est retenu uniquement s’il améliore la lisibilité
+tout en dégageant les commandes.
+
 ## Frontières et sécurité
 
 - cheevos/ utilise rc_client pour login, hash ROM, session, liste, évaluations et envois.
@@ -48,12 +69,14 @@ unique corvusapi.h. Les nouvelles déclarations mémoire n'altèrent pas l'ABI0.
 
 ## Vérifications
 
-- Huit CTest natifs passent, avec ASan/UBSan pour le code original.
-- Le client rcheevos a 78 contrôles de protocole, hash, RAM, succès, déconnexion,
+- Neuf CTest natifs passent, avec ASan/UBSan pour le code original.
+- Le client rcheevos a 136 contrôles de protocole, hash, RAM, succès, déconnexion,
   erreurs réseau, sauvegarde de progression et réponses tardives.
+- Les widgets ont 1682 contrôles de file, durée, progression, images et géométrie.
+- Le service images passe 29 contrôles Android de réseau borné, cache et lifecycle.
 - Android 15 : 14 contrôles de compte, Keystore et absence de blocage du frontend,
   restauration dans un processus neuf et 13 contrôles de file persistante passent.
-  Les 39 contrôles du téléchargeur passent avec les nouveaux cœurs.
+  Les contrôles du téléchargeur sont exécutés séparément avec les catalogues de fournisseurs.
 - Le parcours clavier/compte est exercé avec un protocole synthétique. Un vrai
   cœur GB exécute un programme original qui attend A puis écrit en WRAM ; cette
   transition déclenche un succès. Après HTTP503 et fermeture du jeu, la file
@@ -72,3 +95,9 @@ Pour exécuter l'instrumentation dédiée :
 
 Le runner par défaut reste CoreRepositoryInstrumentation pour les régressions du
 téléchargeur. Les artefacts de qualification ne sont pas embarqués dans la base.
+
+Pour les caches et les images uniquement, sélectionner le runner
+RetroAchievementsImagesInstrumentation. La phase `popups` du runner de compte
+utilise un programme GB original : A écrit 33 en RAM puis B écrit 66, ce qui vérifie
+la progression et le déblocage à partir de l'émulation réelle. Les images de
+qualification sont synthétiques et restent dans l'APK de test séparé.

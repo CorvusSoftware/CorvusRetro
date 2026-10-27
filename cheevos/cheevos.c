@@ -38,6 +38,10 @@ static const char cancelled[] = "{\"Success\":false,\"Error\":\"Operation cancel
 static void message(cr_cheevos *c, const char *text) {
     snprintf(c->message, sizeof(c->message), "%s", text);
 }
+static void notify(cr_cheevos *c, const cr_cheevos_notification *notification) {
+    if (!c->closing && c->host.notification)
+        c->host.notification(c->host.context, notification);
+}
 static void erase_free(char *text) {
     if (!text) return;
     volatile unsigned char *p = (volatile unsigned char *)text;
@@ -114,9 +118,18 @@ static void game_loaded(int result, const char *error, rc_client_t *client, void
     ++c->load_completions;
     c->load = NULL;
     if (c->closing) return;
-    if (result == RC_OK && rc_client_get_game_info(client))
+    const rc_client_game_t *game = rc_client_get_game_info(client);
+    if (result == RC_OK && game) {
         message(c, rc_client_has_achievements(client) ? "Succès du jeu prêts, mode normal" : "Ce jeu ne propose pas de succès");
-    else
+        rc_client_user_game_summary_t summary;
+        rc_client_get_user_game_summary(client, &summary);
+        cr_cheevos_notification notification = {.type = CR_CHEEVOS_GAME_READY, .id = game->id,
+            .unlocked = summary.num_unlocked_achievements, .total = summary.num_core_achievements};
+        snprintf(notification.title, sizeof(notification.title), "%s", game->title);
+        if (rc_client_game_get_image_url(game, notification.image_url, sizeof(notification.image_url)) != RC_OK)
+            notification.image_url[0] = 0;
+        notify(c, &notification);
+    } else
         message(c, result == RC_NO_GAME_LOADED ? "Jeu non reconnu par RetroAchievements" : "Succès du jeu indisponibles");
 }
 static void begin_game(cr_cheevos *c) {
@@ -147,12 +160,42 @@ static void event(const rc_client_event_t *event, rc_client_t *client) {
     cr_cheevos *c = rc_client_get_userdata(client);
     if (!c || c->closing) return;
     char text[384];
+    cr_cheevos_notification notification = {0};
     switch (event->type) {
     case RC_CLIENT_EVENT_ACHIEVEMENT_TRIGGERED:
         if (event->achievement) {
-            snprintf(text, sizeof(text), "Succès débloqué : %s", event->achievement->title);
-            if (c->host.notice) c->host.notice(c->host.context, text);
+            notification.type = CR_CHEEVOS_UNLOCKED;
+            notification.id = event->achievement->id;
+            notification.points = event->achievement->points;
+            snprintf(notification.title, sizeof(notification.title), "%s", event->achievement->title);
+            snprintf(notification.detail, sizeof(notification.detail), "%s", event->achievement->description);
+            if (rc_client_achievement_get_image_url(event->achievement, RC_CLIENT_ACHIEVEMENT_STATE_UNLOCKED,
+                    notification.image_url, sizeof(notification.image_url)) != RC_OK)
+                notification.image_url[0] = 0;
+            notify(c, &notification);
+            if (!c->host.notification && c->host.notice) {
+                snprintf(text, sizeof(text), "Succès débloqué : %s", event->achievement->title);
+                c->host.notice(c->host.context, text);
+            }
         }
+        break;
+    case RC_CLIENT_EVENT_ACHIEVEMENT_PROGRESS_INDICATOR_SHOW:
+    case RC_CLIENT_EVENT_ACHIEVEMENT_PROGRESS_INDICATOR_UPDATE:
+        if (event->achievement) {
+            notification.type = CR_CHEEVOS_PROGRESS;
+            notification.id = event->achievement->id;
+            notification.percent = event->achievement->measured_percent;
+            snprintf(notification.title, sizeof(notification.title), "%s", event->achievement->title);
+            snprintf(notification.detail, sizeof(notification.detail), "%s", event->achievement->measured_progress);
+            if (rc_client_achievement_get_image_url(event->achievement, RC_CLIENT_ACHIEVEMENT_STATE_ACTIVE,
+                    notification.image_url, sizeof(notification.image_url)) != RC_OK)
+                notification.image_url[0] = 0;
+            notify(c, &notification);
+        }
+        break;
+    case RC_CLIENT_EVENT_ACHIEVEMENT_PROGRESS_INDICATOR_HIDE:
+        notification.type = CR_CHEEVOS_PROGRESS_HIDE;
+        notify(c, &notification);
         break;
     case RC_CLIENT_EVENT_DISCONNECTED:
         message(c, "Connexion interrompue, envoi des succès différé");
@@ -164,7 +207,17 @@ static void event(const rc_client_event_t *event, rc_client_t *client) {
         message(c, "Une requête RetroAchievements a échoué");
         break;
     case RC_CLIENT_EVENT_GAME_COMPLETED:
-        if (c->host.notice) c->host.notice(c->host.context, "Tous les succès du jeu sont débloqués");
+        notification.type = CR_CHEEVOS_COMPLETED;
+        const rc_client_game_t *game = rc_client_get_game_info(client);
+        if (game) {
+            notification.id = game->id;
+            snprintf(notification.title, sizeof(notification.title), "%s", game->title);
+            if (rc_client_game_get_image_url(game, notification.image_url, sizeof(notification.image_url)) != RC_OK)
+                notification.image_url[0] = 0;
+        }
+        notify(c, &notification);
+        if (!c->host.notification && c->host.notice)
+            c->host.notice(c->host.context, "Tous les succès du jeu sont débloqués");
         break;
     default:
         break;
@@ -190,6 +243,8 @@ static void cancel(cr_cheevos *c, bool authentication) {
     if (c->load) rc_client_abort_async(c->client, c->load);
     if (authentication) c->login = NULL;
     c->load = NULL;
+    /* Retire deferred UI events while the game is still attached to rc_client. */
+    rc_client_reset(c->client);
     rc_client_unload_game(c->client);
     for (size_t i = 0; i < CR_RA_REQUESTS; ++i) {
         cr_ra_request request = c->requests[i];
@@ -203,6 +258,7 @@ static void cancel(cr_cheevos *c, bool authentication) {
     // Due retries receive a terminal cancellation while their client is still valid.
     rc_client_idle(c->client);
     c->closing = false;
+    notify(c, &(cr_cheevos_notification){.type = CR_CHEEVOS_CLEAR});
 }
 void cr_cheevos_destroy(cr_cheevos *c) {
     if (!c) return;
@@ -291,7 +347,12 @@ void cr_cheevos_frame(cr_cheevos *c) {
     dispatch(c);
 }
 void cr_cheevos_idle(cr_cheevos *c) { if (c) { rc_client_idle(c->client); dispatch(c); } }
-void cr_cheevos_reset(cr_cheevos *c) { if (c) rc_client_reset(c->client); }
+void cr_cheevos_reset(cr_cheevos *c) {
+    if (c) {
+        rc_client_reset(c->client);
+        notify(c, &(cr_cheevos_notification){.type = CR_CHEEVOS_PROGRESS_HIDE});
+    }
+}
 size_t cr_cheevos_progress_size(cr_cheevos *c) { return c ? rc_client_progress_size(c->client) : 0; }
 bool cr_cheevos_progress_save(cr_cheevos *c, void *bytes, size_t size) {
     return c && bytes && rc_client_serialize_progress_sized(c->client, bytes, size) == RC_OK;

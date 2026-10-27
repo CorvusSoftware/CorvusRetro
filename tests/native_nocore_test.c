@@ -46,6 +46,6 @@ int main(void) {
     check(ui.page == CR_MAIN, "back navigation works without installed cores");
 
     cr_ui_destroy(&ui);
-    puts("PASS core-free CorvusRetro 0.13");
+    puts("PASS core-free CorvusRetro");
     return 0;
 }

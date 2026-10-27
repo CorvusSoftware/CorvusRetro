@@ -59,6 +59,7 @@ Les modules officiels sont disponibles pour **arm64-v8a** et **x86_64**.
 - **Thèmes :** CorvusRetro, NVIDIA Shield et ASUS.
 - **Cœurs téléchargeables :** installation et mise à jour indépendantes de l'application.
 - **RetroAchievements :** identification des jeux et suivi des succès dans le mode normal.
+- **Notifications natives :** icône du jeu au lancement, badges des succès et progression mesurée, avec chargement des images en arrière-plan.
 
 Le **mode Hardcore** de RetroAchievements n'est pas encore pris en charge. Les jetons de connexion et les succès en attente sont protégés par Android Keystore ; les mots de passe ne sont pas conservés.
 

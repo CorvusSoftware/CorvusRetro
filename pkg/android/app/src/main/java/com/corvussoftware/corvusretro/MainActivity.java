@@ -46,6 +46,7 @@ public final class MainActivity extends NativeActivity {
     private GameLibrary library;
     private CoreRepository coreRepository;
     private RetroAchievementsService achievements;
+    private RetroAchievementsImages achievementImages;
     private NativeTextInput textInput;
     private GameLibrary.Pending pending;
     private volatile boolean destroyed;
@@ -57,6 +58,7 @@ public final class MainActivity extends NativeActivity {
 
     private static native void imported(String id, String title, int system, String path, String error);
     static native void achievementResponse(long id, int status, byte[] body);
+    static native void achievementImageReady();
     static native void textInputResult(int field, String text, boolean accepted);
     static native void coreCatalogUpdated(String[] packages, String error);
     static native void coreModulesUpdated(String[] paths);
@@ -67,6 +69,7 @@ public final class MainActivity extends NativeActivity {
         library = new GameLibrary(this);
         coreRepository = new CoreRepository(this, io);
         achievements = new RetroAchievementsService(this);
+        achievementImages = new RetroAchievementsImages(this, MainActivity::achievementImageReady);
         textInput = new NativeTextInput(this);
         if (state != null) {
             pickerOpen = state.getBoolean("picker", false);
@@ -130,6 +133,7 @@ public final class MainActivity extends NativeActivity {
         }
         textInput.cancel();
         achievements.close();
+        achievementImages.close();
         io.shutdown();
         super.onDestroy();
     }
@@ -162,6 +166,7 @@ public final class MainActivity extends NativeActivity {
         }
         return modules.toArray(new String[0]);
     }
+    public Bitmap achievementImage(String url) { return achievementImages.get(url); }
     public void achievementRequest(long id, String url, String post) { achievements.request(id, url, post); }
     public String[] achievementCredentials() { return achievements.credentials(); }
     public void achievementCredentialsSet(String user, String token) { achievements.saveCredentials(user, token); }
