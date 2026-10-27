@@ -1,18 +1,22 @@
-État : ACTIVE, qualification locale terminée, publication en attente.
-Demande : notifications inspirées de RetroArch pour lancement avec icône, déblocage et progression avec badges.
-Amont6f00c2d intégré dans work/achievement-popups ; checkpoint local113649d conservé. Version0.14.0/code15 déjà publique, nouvelle feature0.15.0/code16.
-Aucun ancien catalogue JSON réintroduit ; découverte multi-fournisseur de CorvusRepository conservée, SDK/pins inchangés.
+État : DONE pour le code et la distribution, contrôler la CI de ce commit documentaire après push.
+Demande : notifications inspirées de RetroArch, lancement avec icône, succès et progression avec badges.
+Source publiée a4a76e71e98f12ffca88e05bc3e0cba0e64e7bab, tagv0.15.0, app0.15.0/code16.
+Les changements utilisateur6f00c2d sont conservés : découverte multi-fournisseur CorvusRepository, aucun catalogue JSON local réintroduit, SDK/pins inchangés.
 
-Implémenté : événements rc_client typés, cartes natives file8/4s/330ms, progression2s et HIDE/reset, cartes de jeu terminé, marges hors commandes.
-Images publiques async et caches bornés, fallbackCorvus, texturesGL16 et JNI sans IO sur le frontend.
-Référence RetroArchdda31fef21aeb472be9de7ee53eb386cc8db1417 inspectée, code frontend original.
+Cartes C de lancement/déblocage/complétion : file8, maintien4s, animation330ms. Progression mesurée avec badge verrouillé et durée2s, HIDE/reset/fermeture.
+PNG officiels téléchargés et décodés hors rendu, caches bornés, fallback corbeau et texturesGL16. Placement hors commandes, choix de l'espace le plus lisible en paysage court.
+Code original CorvusSoftware, rcheevos MIT et référence RetroArchdda31fef21aeb472be9de7ee53eb386cc8db1417.
 
-Preuves :9CTest normaux et9ASan/UBSan passent ;136contrôles client et1682widgets ; builds Debug/Release/lint/testAPK passent ; base sans moteur/sixELF16Ko/archives validés.
-Android15 :29contrôles images ;16contrôles popups en portrait et16en paysage, captures inspectées. Vrai cœurGB et programme original : A écrit33 puisB66, progrès33/66 puis succès, expiration2s, pause/reprise et clear après unload.
-Revue indépendante : aucun P1 ; P2 du corridor trop étroit corrigé, non-régression de taille et absence de chevauchement vérifiées sur6tailles x3systèmes.
-Crash rcheevos de mastery différée à la fermeture corrigé par reset pendant que le jeu est attaché, avant unload ; régression passeASan sans modifier la dépendance.
-Le test de pixels Android lit les buffers en bloc ; les images de qualification sont synthétiques et ne sont pas dans la base.
+Preuves :9CTest et9ASan/UBSan,136contrôles client,1682widgets, géométrie6tailles x3systèmes. Builds Debug/Release/lint et base sans moteur/sixELF16Ko passent.
+Android15 :29contrôles images,16popups portrait et16paysage,51téléchargeur multi-fournisseur. Vrai cœurGB et programme original A=33 puisB=66, progression33/66 et un succès ; pixels des images, expiration, pause/reprise et déchargement vérifiés, captures inspectées.
+Batterie GBA historique SHA256d5b703aea92f05004a0d761ab80aecf958f950f96bd1cafc27bbc7fc935fc3f1 inchangée.
+Revue indépendante : crash rcheevos différé à l'unload corrigé sans modifier la dépendance ; P2 de lisibilité du corridor corrigé avec régression ; aucun P1/P2 bloquant ouvert connu.
 
-Régression finale :51contrôles multi-fournisseur passent, batterie GBA historique inchangée.
-Prochain : consolider les commits locaux depuis origin/main sans perdre les changements utilisateur ; pousser main, observer CI/signature, tagv0.15.0 et vérifier les assets publics.
-Autorisation de publication persistante, ne pas redemander. Ne pas modifier les catalogues externes pour des moteurs inchangés.
+CI40460984893, build signé40461309741, publication40461656784 réussis sur la source exacte.
+Sept assets publics vérifiés indépendamment : APK0.15.0/code16, signataire durable, absence de moteurs et notice MIT ; sixZIP0.14.1 avec ABI/16Ko/extension mémoire.
+Les sixZIP sont identiques aux modules0.14.1 déjà qualifiés, aucun catalogue externe modifié.
+Mise à jour du vrai APK signé sur Android10 acceptée ; thème ASUS et historique conservés, capture finale inspectée.
+
+Limites : protocole et images synthétiques dans les tests, aucun compte réel, téléphone physique ou exécutionARM64 revendiqué.
+Observer la CI du commit documentaire. Reçu détaillé : /workspace/setup/CorvusRetro-0.15-qualification.txt.
+Ne pas remplacer les assets immuables et ne pas modifier CorvusRepository pour des moteurs inchangés.

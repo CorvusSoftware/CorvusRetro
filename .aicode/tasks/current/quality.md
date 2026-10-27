@@ -1,9 +1,18 @@
-Status: PARTIAL, code qualifié localement, publication distante en attente.
+Status: PASS pour le code et la distribution qualifiés ; observer la CI du commit documentaire après push.
 Risk: DEEP.
-P0 PASS : notifications réelles depuis rc_client/RAM ; file/durée/progression ; sécurité et asynchronisme des images ;9CTest normaux et9ASan/UBSan.
-P1 PASS : Android15 portrait/paysage16contrôles chacun, trois images réellement dessinées, pause/reprise et déchargement ;29contrôles du service images ; contrôle géométrique des commandes GB/GBC/GBA.
-Builds Debug/Release/lint, base sans moteur et sixELF16Ko passent.
-Review : P2 de réduction de lisibilité corrigé et couvert ; aucun P1/P2 bloquant ouvert connu.
-P1 PASS :51contrôles multi-fournisseur, sauvegarde GBA historique identique.
-Reste : CI du commit exact, APK signé et octets publics.
-Limites : réseau et images synthétiques, pas de compte réel, téléphone physique ou exécutionARM64.
+
+Criteria:
+- PASS : lancement, déblocage, complétion et progression avec icônes/badges réels du transport, sans IO dans le rendu.
+- PASS : timers/queue/annulation et géométrie lisible hors commandes, GB/GBC/GBA sur6tailles.
+- PASS : conservation du téléchargeur multi-fournisseur, sauvegarde historique et signer durable.
+
+Evidence:
+-9CTest normaux et9ASan/UBSan,136contrôles client,1682widgets.
+- Android15 :29contrôles images,16popups portrait,16paysage,51téléchargeur.
+- Builds Debug/Release/lint, zéro moteur dans la base, sixELF16Ko et archives valides.
+- SourceCI40460984893, signé40461309741, publication40461656784 réussis sura4a76e7.
+- Vrais fichiers publics vérifiés, APK0.15.0/code16 avec signataire indépendant ; mise à jour Android10 et données conservées.
+
+Review : P2 de lisibilité corrigé et couvert, aucun finding bloquant restant connu.
+Limites : serveurs/images de test synthétiques, aucun compte réel, téléphone physique ou runtimeARM64.
+Décision : comportement natif et frontières Android vérifiés ; publication immutable disponible. Contrôler la CI du commit documentaire après push.

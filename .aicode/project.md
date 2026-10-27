@@ -1,7 +1,7 @@
 # CorvusRetro
 
 Frontend Android original C11 : NativeActivity, EGL/OpenGL ES2, AAudio. Java fournit uniquement les services OS.
-Version préparée 0.15.0/code16 ; cible35/min26 ; NDK27.2 ; JDK17+ ; Gradle8.13/AGP8.9.1.
+Version publiée 0.15.0/code16 ; cible35/min26 ; NDK27.2 ; JDK17+ ; Gradle8.13/AGP8.9.1.
 Sources : menu/, cores/, gfx/drivers/gl2, gfx/widgets/notifications, audio/drivers/aaudio, input/, frontend/drivers/, tasks/, cheevos/.
 Android sous pkg/android/, wrapper Gradle racine délégué ; dépendances sous deps/.
 Base sans moteur ; six modules CorvusAPI distincts, exclus de l'APK, distribués en archives individuelles vérifiées.
