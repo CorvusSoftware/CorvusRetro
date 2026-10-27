@@ -28,6 +28,7 @@ import org.json.JSONObject;
 /** Only synthetic account/protocol data and an original button-controlled homebrew. */
 public final class RetroAchievementsInstrumentation extends Instrumentation {
     private String phase;
+    private boolean landscape;
     private File fixtures;
     private int checks;
     private volatile int failedAwards, awards, logins, acceptedRequests, imageRequests;
@@ -265,6 +266,14 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             android.os.SystemClock.sleep(100);
             bitmap = getUiAutomation().takeScreenshot();
         } while ((bitmap == null || !hasColor(bitmap, color)) && android.os.SystemClock.uptimeMillis() < deadline);
+        if (("launch".equals(name) || "unlocked".equals(name)) && bitmap != null && hasColor(bitmap, color)) {
+            try (FileOutputStream out = new FileOutputStream(new File(getTargetContext().getFilesDir(), "test-popup-" + name + "-entry.png"))) {
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out);
+            }
+            bitmap.recycle();
+            android.os.SystemClock.sleep(750);
+            bitmap = getUiAutomation().takeScreenshot();
+        }
         boolean visible = bitmap != null && hasColor(bitmap, color);
         if (bitmap != null) {
             try (FileOutputStream out = new FileOutputStream(new File(getTargetContext().getFilesDir(), "test-popup-" + name + ".png"))) {
@@ -292,7 +301,13 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
         context.getSharedPreferences("corvus", Context.MODE_PRIVATE).edit().putInt("achievements_enabled", 1).putInt("theme", 2).commit();
         MainActivity activity = (MainActivity) startActivitySync(new Intent(context, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         try {
+            check(getUiAutomation().setRotation(landscape ? android.app.UiAutomation.ROTATION_FREEZE_90 : android.app.UiAutomation.ROTATION_FREEZE_0),
+                    "requested popup test rotation");
             waitFor(() -> activity.safeWindowArea() != null && logins > 0, "native account and safe viewport ready");
+            waitFor(() -> {
+                int[] area = activity.safeWindowArea();
+                return area != null && (area[0] > area[1]) == landscape;
+            }, "actual native viewport matches requested orientation");
             android.graphics.Bitmap warmup = getUiAutomation().takeScreenshot();
             if (warmup != null) warmup.recycle();
             for (String image : new String[] {"Images/1.png", "Badge/00001_lock.png", "Badge/00001.png"})
@@ -319,7 +334,7 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             android.os.SystemClock.sleep(1000);
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BUTTON_B);
             capturePopup("unlocked", UNLOCK_COLOR);
-            check(awards == 1, "actual core memory unlocked one achievement with decoded images");
+            waitFor(() -> awards == 1, "actual core memory unlocked one achievement with decoded images");
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
             for (int i = 0; i < 4; ++i) sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_DOWN);
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER); android.os.SystemClock.sleep(300);
@@ -357,6 +372,7 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
     @Override public void onCreate(Bundle arguments) {
         super.onCreate(arguments);
         phase = arguments.getString("phase", "credentials");
+        landscape = "landscape".equals(arguments.getString("orientation", "portrait"));
         fixtures = new File(arguments.getString("fixture_dir", "")); start();
     }
     @Override public void onStart() {

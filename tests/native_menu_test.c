@@ -23,10 +23,13 @@ typedef struct {
     unsigned popup_count;
     unsigned badge_count;
     float minimum_badge;
+    float viewport_center;
 } capture;
 static void rect(void *ctx, float x, float y, float w, float h, uint32_t color) {
     capture *c = ctx;
     if (c->layout && color == c->popup_color) {
+        if (!c->popup_count)
+            check(fabsf(x + w / 2 - c->viewport_center) < .01f, "launch and achievement cards stay centered in the viewport");
         ++c->popup_count;
         for (int i = 0; i < c->layout->count; ++i) {
             cr_area a = c->layout->controls[i].area;
@@ -430,13 +433,16 @@ int main(void) {
             cr_notifications_clear(&u.notifications);
             cr_notifications_push(&u.notifications, CR_NOTIFICATION_GAME, 0, "Jeu", "Succès", "");
             cr_notifications_progress(&u.notifications, 1, "33/66", "", 50);
-            cr_notifications_update(&u.notifications, .4);
+            cr_notifications_update(&u.notifications, 0);
+            cr_notifications_update(&u.notifications, .8);
             cr_play_layout layout = cr_play_layout_make(u.width, u.height, system, u.engine.width, u.engine.height);
             capture popup = {.layout = &layout, .popup_color = (cr_theme_get(u.theme)->surface & 0xffffffu) | 0xf7000000u};
             float top = !layout.portrait && layout.count == 10
                     ? layout.controls[9].area.y + layout.controls[9].area.h + 8 * layout.scale : 0;
             float bottom = layout.portrait ? layout.panel.y
-                    : fminf(layout.controls[4].area.y, layout.controls[5].area.y) - 8 * layout.scale;
+                    : fminf(layout.dpad.y, fminf(layout.controls[4].area.y,
+                                               layout.controls[5].area.y)) - 8 * layout.scale;
+            popup.viewport_center = u.width / 2;
             popup.minimum_badge = 64 * .7f * fmaxf(0, fminf(1, fminf(u.width / 320, (bottom - top) / 104)));
             cr_painter painter = {&popup, rect, circle, text, measure, icon, NULL, game, NULL};
             cr_ui_draw(&u, &painter);

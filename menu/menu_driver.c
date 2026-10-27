@@ -1223,7 +1223,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         if (u->page == CR_ABOUT)
             u->text_height = paragraphs(
                 p,
-                "CorvusRetro 0.15.0\n\nFrontend original en C, rendu OpenGL ES et audio "
+                "CorvusRetro 0.15.1\n\nFrontend original en C, rendu OpenGL ES et audio "
                 "AAudio.\n\nCorvusSoftware\nCœurs officiels CorvusCore 0.14.1 : Game Boy, Game "
                 "Boy Color, Game Boy Advance (expérimental).\n\nNavigation inspirée de "
                 "MaterialUI. Thèmes CorvusRetro, ASUS et NVIDIA Shield.\n\nCopyright (C) 2026 "
@@ -1315,16 +1315,21 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         popup_top = 0;
         popup_bottom = layout.panel.y;
         if (!layout.portrait) {
-            popup_bottom = fminf(layout.controls[4].area.y, layout.controls[5].area.y) - 8 * layout.scale;
+            popup_bottom = fminf(layout.dpad.y, fminf(layout.controls[4].area.y,
+                                 layout.controls[5].area.y)) - 8 * layout.scale;
             if (layout.count == 10)
                 popup_top = layout.controls[9].area.y + layout.controls[9].area.h + 8 * layout.scale;
-            if (popup_bottom - popup_top < 104) {
+            if (popup_top > 0 || popup_bottom - popup_top < 104) {
                 float left = layout.dpad.x + layout.dpad.w + 8 * layout.scale;
                 float right = layout.controls[5].area.x - 8 * layout.scale;
+                float half = fminf(w / 2 - left, right - w / 2);
+                left = w / 2 - half;
+                right = w / 2 + half;
                 float bottom = layout.menu.y - 8 * layout.scale;
-                float current_scale = fminf(w / 320, (popup_bottom - popup_top) / 104);
-                float center_scale = fminf((right - left) / 320, bottom / 104);
-                if (center_scale > current_scale) {
+                float current_scale = fminf(1, fminf(w / 320, (popup_bottom - popup_top) / 104));
+                float center_scale = fminf(1, fminf((right - left) / 320, bottom / 104));
+                if (center_scale > 0 && (center_scale > current_scale ||
+                                        (popup_top > 0 && center_scale == current_scale))) {
                     popup_left = left;
                     popup_right = right;
                     popup_top = 0;
@@ -1336,4 +1341,5 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
     if (u->message_time > 0)
         popup_bottom = fminf(popup_bottom, h - (u->page == CR_PLAY ? 112 : 146));
     cr_notifications_draw_region(&u->notifications, p, popup_left, popup_top, popup_right, popup_bottom, theme);
+    if (u->notifications.count && p->clip) p->clip(p->context, 0, 0, w, h);
 }

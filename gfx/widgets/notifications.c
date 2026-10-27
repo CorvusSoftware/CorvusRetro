@@ -8,6 +8,7 @@
 #define CR_CARD_ANIMATION .33
 #define CR_CARD_HOLD 4.0
 #define CR_PROGRESS_HOLD 2.0
+#define CR_CARD_DURATION (CR_CARD_HOLD + CR_CARD_ANIMATION * 4)
 
 static void copy_text(char *destination, size_t capacity, const char *source) {
     size_t size = 0;
@@ -26,10 +27,13 @@ void cr_notifications_push(cr_notifications *n, int kind, uint32_t id, const cha
         for (size_t i = 0; i < n->count; ++i)
             if (n->cards[i].kind == kind && n->cards[i].id == id) {
                 card = &n->cards[i];
-                if (!i && n->elapsed > CR_CARD_ANIMATION) n->elapsed = CR_CARD_ANIMATION;
+                if (!i && n->elapsed >= CR_CARD_ANIMATION * 2 &&
+                    n->elapsed < CR_CARD_ANIMATION * 2 + CR_CARD_HOLD)
+                    n->elapsed = CR_CARD_ANIMATION * 2;
                 break;
             }
     if (!card) {
+        if (!n->count) n->card_started = false;
         if (n->count == CR_NOTIFICATION_CAPACITY) {
             /* Preserve the visible card while keeping the most recent waiting events. */
             memmove(&n->cards[1], &n->cards[2], (n->count - 2) * sizeof(n->cards[0]));
@@ -63,10 +67,12 @@ void cr_notifications_clear(cr_notifications *n) {
     if (n) memset(n, 0, sizeof(*n));
 }
 void cr_notifications_update(cr_notifications *n, double seconds) {
-    if (!n || !isfinite(seconds) || seconds <= 0) return;
+    if (!n || !isfinite(seconds) || seconds < 0) return;
     if (n->count) {
-        n->elapsed += seconds;
-        if (n->elapsed >= CR_CARD_HOLD + CR_CARD_ANIMATION * 2) {
+        /* Loading time before the first presentation must not skip the descent. */
+        if (!n->card_started) n->card_started = true;
+        else n->elapsed += seconds;
+        if (n->elapsed >= CR_CARD_DURATION) {
             --n->count;
             memmove(n->cards, &n->cards[1], n->count * sizeof(n->cards[0]));
             memset(&n->cards[n->count], 0, sizeof(n->cards[0]));
@@ -75,6 +81,10 @@ void cr_notifications_update(cr_notifications *n, double seconds) {
     }
     n->progress_time = fmax(0, n->progress_time - seconds);
     if (!n->progress_time) cr_notifications_hide_progress(n, 0);
+}
+static float ease_out(double phase) {
+    float t = (float)fmax(0, fmin(1, phase));
+    return 1 - (1 - t) * (1 - t);
 }
 static uint32_t alpha(uint32_t color, float opacity) {
     unsigned value = (unsigned)((color >> 24) * fmaxf(0, fminf(1, opacity)) + .5f);
@@ -111,23 +121,34 @@ void cr_notifications_draw_region(const cr_notifications *n, const cr_painter *p
     float available = width - margin * 2;
     bool card_visible = false;
     if (n->count) {
-        float fade = (float)fmin(1, fmin(n->elapsed / CR_CARD_ANIMATION,
-                    (CR_CARD_HOLD + CR_CARD_ANIMATION * 2 - n->elapsed) / CR_CARD_ANIMATION));
-        float opacity = fmaxf(0, fade);
-        if (opacity > 0) {
-            float eased = 1 - (1 - opacity) * (1 - opacity);
+        double time = n->elapsed;
+        float slide = ease_out(time / CR_CARD_ANIMATION);
+        float unfold = ease_out((time - CR_CARD_ANIMATION) / CR_CARD_ANIMATION);
+        if (time >= CR_CARD_ANIMATION * 2 + CR_CARD_HOLD)
+            unfold = 1 - ease_out((time - CR_CARD_ANIMATION * 2 - CR_CARD_HOLD) / CR_CARD_ANIMATION);
+        if (time >= CR_CARD_ANIMATION * 3 + CR_CARD_HOLD)
+            slide = 1 - ease_out((time - CR_CARD_ANIMATION * 3 - CR_CARD_HOLD) / CR_CARD_ANIMATION);
+        if (slide > 0 && time < CR_CARD_DURATION) {
             const cr_notification_card *c = &n->cards[0];
             float w = card_width(c, p, scale, available);
-            float x = left + width - margin - w + margin * (1 - eased);
-            float y = top + margin;
-            p->rect(p->context, x, y + 2 * scale, w, card_height,
-                    alpha(0x40000000, opacity));
-            p->rect(p->context, x, y, w, card_height, alpha(theme->surface, opacity * .97f));
-            p->rect(p->context, x, y, 3 * scale, card_height, alpha(theme->accent, opacity));
-            badge(p, theme, c->image_url, x + 8 * scale, y + 8 * scale, 64 * scale, opacity);
-            float tx = x + 84 * scale, max = w - 92 * scale;
-            label(p, c->title, tx, y + 30 * scale, 16 * scale, alpha(theme->text, opacity), max);
-            label(p, c->detail, tx, y + 53 * scale, 13 * scale, alpha(theme->muted, opacity), max);
+            float panel = w - card_height, shown = card_height + panel * unfold;
+            float x = left + (width - shown) / 2;
+            float y = top - card_height + (margin + card_height) * slide;
+            if (p->clip) p->clip(p->context, left, top, width, height);
+            p->rect(p->context, x, y + 2 * scale, shown, card_height, 0x40000000);
+            p->rect(p->context, x, y, shown, card_height, alpha(theme->surface, .97f));
+            p->rect(p->context, x, y, 3 * scale, card_height, theme->accent);
+            badge(p, theme, c->image_url, x + 8 * scale, y + 8 * scale, 64 * scale, 1);
+            if (unfold > 0 && (p->clip || unfold == 1)) {
+                if (p->clip)
+                    p->clip(p->context, x + card_height, fmaxf(top, y), panel * unfold,
+                            fminf(bottom, y + card_height) - fmaxf(top, y));
+                float tx = x + 84 * scale - panel * (1 - unfold) / 2;
+                float max = w - 92 * scale;
+                label(p, c->title, tx, y + 30 * scale, 16 * scale, theme->text, max);
+                label(p, c->detail, tx, y + 53 * scale, 13 * scale, theme->muted, max);
+            }
+            if (p->clip) p->clip(p->context, left, top, width, height);
             card_visible = true;
         }
     }

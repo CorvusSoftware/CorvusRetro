@@ -20,8 +20,12 @@ reste jouable et affiche clairement son absence de support des succès.
 
 ## Notifications
 
-Le lancement et le déblocage utilisent une même carte native : image carrée,
-nom et résumé, animation de 330 ms et maintien de 4 s. Les déblocages successifs
+Le lancement et le déblocage utilisent une même carte native en haut au centre.
+L'icône descend seule pendant 330 ms, puis le panneau du titre se déploie pendant
+330 ms. Après un maintien de 4 s, le panneau se replie et l'icône remonte, chaque
+transition durant 330 ms. L'animation utilise un ralentissement quadratique et
+conserve le centrage pendant l'ouverture et la fermeture. Un chargement lent
+ne consomme pas le début de la descente. Les déblocages successifs
 utilisent une file bornée de 8 cartes. L'identification RetroAchievements ajoute
 l'icône officielle du jeu et le nombre de succès au lancement.
 
@@ -36,8 +40,8 @@ arrivée tardive remplace cette icône sans déclencher une autre notification.
 Aucune requête ni lecture disque ne bloque le rendu. Les cartes respectent les
 marges système et la zone hors commandes tactiles ; une zone trop courte donne
 priorité à la carte pour éviter le chevauchement avec la progression. En paysage
-court, le placement central est retenu uniquement s’il améliore la lisibilité
-tout en dégageant les commandes.
+court, la zone centrale est élargie quand cela améliore la lisibilité ou permet
+de remonter la carte, tout en dégageant les commandes.
 
 ## Frontières et sécurité
 
@@ -72,7 +76,8 @@ unique corvusapi.h. Les nouvelles déclarations mémoire n'altèrent pas l'ABI0.
 - Neuf CTest natifs passent, avec ASan/UBSan pour le code original.
 - Le client rcheevos a 136 contrôles de protocole, hash, RAM, succès, déconnexion,
   erreurs réseau, sauvegarde de progression et réponses tardives.
-- Les widgets ont 1682 contrôles de file, durée, progression, images et géométrie.
+- Les widgets ont 5176 contrôles de file, phases d'animation, progression, images,
+  centrage et clipping dans la zone sûre.
 - Le service images passe 29 contrôles Android de réseau borné, cache et lifecycle.
 - Android 15 : 14 contrôles de compte, Keystore et absence de blocage du frontend,
   restauration dans un processus neuf et 13 contrôles de file persistante passent.
@@ -101,3 +106,5 @@ RetroAchievementsImagesInstrumentation. La phase `popups` du runner de compte
 utilise un programme GB original : A écrit 33 en RAM puis B écrit 66, ce qui vérifie
 la progression et le déblocage à partir de l'émulation réelle. Les images de
 qualification sont synthétiques et restent dans l'APK de test séparé.
+L'argument `-e orientation landscape` force le paysage ; le runner vérifie les
+dimensions réelles du viewport avant de naviguer.

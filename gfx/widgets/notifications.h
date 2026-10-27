@@ -23,6 +23,7 @@ typedef struct {
     cr_notification_card cards[CR_NOTIFICATION_CAPACITY];
     size_t count;
     double elapsed, progress_time;
+    bool card_started;
     cr_notification_progress progress;
 } cr_notifications;
 
@@ -38,7 +39,7 @@ void cr_notifications_clear(cr_notifications *);
 void cr_notifications_update(cr_notifications *, double seconds);
 void cr_notifications_draw(const cr_notifications *, const cr_painter *, float width,
                            float height, const cr_theme *);
-/* The caller supplies an area clear of system bars and touch controls. */
+/* The caller supplies a safe area and restores its clip after drawing animated cards. */
 void cr_notifications_draw_area(const cr_notifications *, const cr_painter *, float width,
                                 float top, float bottom, const cr_theme *);
 void cr_notifications_draw_region(const cr_notifications *, const cr_painter *, float left,

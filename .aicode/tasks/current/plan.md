@@ -1,8 +1,6 @@
-Objectif : notifications natives de lancement, succès débloqué et progression avec icônes/badges, selon les comportements RetroArch.
-Budget : DEEP, callbacks C, images asynchrones Java/JNI et textures GL, sans changement SDK ni sauvegardes.
-Référence : RetroArch dda31fef21aeb472be9de7ee53eb386cc8db1417 ; rcheevos existant.
-Plan : événements typés rc_client ; widget C borné ; service images officiel et caches bornés ; rendu GL ; intégration dans viewport sûr ; tests et revue ; publication autorisée sur main/CI/APK.
-Vérifications : protocole synthétique avec vraie progression RAM, queue/timing/petits viewports, images hostiles/cache/asynchronisme, CTest normal/ASan, Android build/lint et parcours réel sur émulateur, CI exacte.
-Invariants : interface C11 ; Java seulement OS/HTTPS/décodage ; aucun IO dans rendu ; TLS et origines strictes ; aucun badge inventé ; pas de modification des cœurs, contenus ou sauvegardes.
-
-TestMatrix : P0 protocole/mesureRAM+notifications, widgetqueues/timing/géométrie, serviceimages TLS/bornes/cache/async ; P1 JNI/GL vrais pixels et rotation, menu+savehistoriques ; P2 régressiondownload selonamont etCI/qualificationsignée.
+Objectif : animation RetroArch pour les cartes de lancement et de succès, en haut au centre.
+Référence lue : gfx_widget_achievement_popup.c, descente330ms, ouverture330ms, maintien4s, fermeture330ms, remontée330ms ; ease-out quadratique et centrage conservé pendant l'ouverture.
+Périmètre : gfx/widgets/notifications, clip du painter dans menu_driver, tests natifs et qualification Android ; aucun changement réseau, SDK, sauvegardes ou progression.
+Plan : chronologie déterministe ancrée au premier affichage ; badge seul puis révélation du texte par clip ; repli et sortie ; tests positions/clip/phases/queue ; Android portrait/paysage ; review, CI et APK0.15.1.
+Vérifications P0 : badge centré en descente, aucun titre avant ouverture, carte centrée pendant ouverture/fermeture, maintien complet et queue5.32s, pas de phase sautée après chargement.
+P1 : géométrie GB/GBC/GBA, images tardives et restitution du clip, build/lint/ASan, vidéo/captures Android réelles.
