@@ -153,6 +153,11 @@ static void text(void *ctx, const char *text, float x, float y, float size, uint
     (void)size;
     (void)color;
     (void)max;
+    if (strcmp(text, "SELECT") == 0 || strcmp(text, "START") == 0) {
+        float cursor = x;
+        for (const char *letter = text; *letter; ++letter) cursor += size * .5f;
+        check(cursor <= x + max, "utility captions retain their last glyph after float accumulation");
+    }
     ((capture *)ctx)->title |= strcmp(text, "REMOVED TITLE") == 0;
 }
 static float measure(void *ctx, const char *text, float size) {
@@ -192,7 +197,7 @@ int main(void) {
     u.engine.width = 160;
     u.engine.height = 144;
     snprintf(u.title, sizeof(u.title), "REMOVED TITLE");
-    const float sizes[][2] = {{384, 696}, {720, 320}, {320, 480}};
+    const float sizes[][2] = {{384, 696}, {720, 320}, {320, 480}, {719, 321}, {393, 851}, {900, 450}};
     for (size_t k = 0; k < sizeof(sizes) / sizeof(sizes[0]); k++) {
         cr_ui_size(&u, sizes[k][0], sizes[k][1]);
         cr_play_layout p = cr_play_layout_make(u.width, u.height, 0, 160, 144);

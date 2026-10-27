@@ -32,7 +32,8 @@ static void caption(const cr_painter *p, const char *text, float x, float y, flo
     if (!p->text) return;
     float width = p->measure ? p->measure(p->context, text, size) : strlen(text) * size * .5f;
     float span = fminf(width, maximum);
-    p->text(p->context, text, x - span / 2, y, size, value, span);
+    p->text(p->context, text, x - span / 2, y, size, value,
+            fminf(maximum, span + 1));
 }
 static void rectangle(const cr_painter *p, cr_area a, float inset, float width, uint32_t value) {
     float points[] = {a.x + inset, a.y + inset, a.x + a.w - inset, a.y + inset,
