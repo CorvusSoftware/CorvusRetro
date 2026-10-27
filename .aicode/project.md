@@ -1,7 +1,7 @@
 # CorvusRetro
 
 Frontend Android original C11 : NativeActivity, EGL/OpenGL ES2, AAudio. Java fournit uniquement les services OS.
-Version publiée 0.15.2/code18 ; cible35/min26 ; NDK27.2 ; JDK17+ ; Gradle8.13/AGP8.9.1.
+Version publiée 0.16.0/code19 ; cible35/min26 ; NDK27.2 ; JDK17+ ; Gradle8.13/AGP8.9.1.
 Sources : menu/, cores/, gfx/drivers/gl2, gfx/widgets/notifications, audio/drivers/aaudio, input/, frontend/drivers/, tasks/, cheevos/.
 Android sous pkg/android/, wrapper Gradle racine délégué ; dépendances sous deps/.
 Base sans moteur ; six modules CorvusAPI distincts, exclus de l'APK, distribués en archives individuelles vérifiées.
@@ -18,3 +18,7 @@ Thèmes stables :0Shield/2Corvus/3ASUS, défautCorvus. Les notifications respect
 Validation : make test et SANITIZE=ON ; Gradle Debug/Release/lint ; runner CoreRepositoryInstrumentation par défaut, RetroAchievementsInstrumentation pour compte/popups, RetroAchievementsImagesInstrumentation pour images.
 Aucun compte réel, téléphone physique ou runtimeARM64 revendiqué par les tests synthétiques Android.
 Publication autorisée sur main et APK signé durable. Les nouveaux catalogues sont des artefacts temporaires pour revue dans CorvusRepository ; aucun JSON de catalogue à maintenir ici.
+
+Cycle contenu : frontend exige cœur sélectionné compatible avant pick/import/historique. cr_engine_unload_game sauvegarde puis ferme seulement le contenu en gardant handle/module/output/API/system ; cr_engine_close reste unload complet. Refus batterie sans mutation, RA/notifications nettoyés seulement après fermeture réussie.
+UI : Listes de lecture=Historique seul ; navbar maison/engrenage, switches natifs arrondis. Logo launcher adaptatif blanc/fond noir sous res/drawable-nodpi/corvus_logo.png.
+Instrumentation navigation : attendre focus fenêtre et état active=1 après rotation ; lire préférences via activity.preference (thème String/audio Boolean). Vérifier une vraie frame vidéo avant d'analyser le popup.
