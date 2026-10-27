@@ -1,7 +1,7 @@
 # CorvusRetro
 
 Frontend Android original C11 : NativeActivity, EGL/OpenGL ES2, AAudio. Java fournit uniquement les services OS.
-Version publiée 0.15.1/code17 ; cible35/min26 ; NDK27.2 ; JDK17+ ; Gradle8.13/AGP8.9.1.
+Version publiée 0.15.2/code18 ; cible35/min26 ; NDK27.2 ; JDK17+ ; Gradle8.13/AGP8.9.1.
 Sources : menu/, cores/, gfx/drivers/gl2, gfx/widgets/notifications, audio/drivers/aaudio, input/, frontend/drivers/, tasks/, cheevos/.
 Android sous pkg/android/, wrapper Gradle racine délégué ; dépendances sous deps/.
 Base sans moteur ; six modules CorvusAPI distincts, exclus de l'APK, distribués en archives individuelles vérifiées.
@@ -10,6 +10,7 @@ CorvusCore0.14.1 pin2d7bdd2020894fa27d153cbecd421da47bcb37f4, CorvusAPI bfdbed33
 rcheevos MIT pin1433173220a7eaede6a9ed7a18e94117be1821e0 ; frontend original AGPL-3.0-only.
 Succès en mode normal ; hash à l'ouverture, évaluation après chaque frame émulée ; token et file d'envois AES-GCM Keystore, aucun mot de passe persisté.
 Notifications C : file8 ; cartes en haut au centre, descente/ouverture/repli/remontée330ms chacune, maintien4s, total5.32s ; progression mesurée2s ; callbacks copiés, clear à la fermeture et HIDE/reset.
+Carte de lancement uniquement après identification du jeu ; texture préparée avant descente, attente3s maximum, fallback figé. Aucun corbeau provisoire remplacé ensuite par une image.
 Images officielles media.retroachievements.org : PNG borné512KiB/1024px, tuile96px, deux workers/queue16, mémoire32/disque64, texturesGL16. Aucun IO/décodage dans le rendu.
 Le thread frontend possède seul le cœur, rc_client, les notifications et les textures. Les callbacks image réveillent seulement le looper.
 Préserver les identités historiques SHA-0/-1/-2, sauvegardes et acquittements de batterie ; un échec de sauvegarde conserve le cœur.
