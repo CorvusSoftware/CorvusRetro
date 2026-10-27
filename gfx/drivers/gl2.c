@@ -198,6 +198,21 @@ static void quad(cr_gl *g, float x, float y, float w, float h, float u, float v,
 static void solid(void *ctx, float x, float y, float w, float h, uint32_t c) {
     quad(ctx, x, y, w, h, 962.f / 1024, 1986.f / 2048, 0, 0, c);
 }
+static void line(void *ctx, float x1, float y1, float x2, float y2, float width, uint32_t color) {
+    float length = hypotf(x2 - x1, y2 - y1);
+    if (!isfinite(length) || !isfinite(width) || length <= 0 || width <= 0) return;
+    cr_gl *g = ctx;
+    if (g->count + 6 > sizeof(g->vertices) / sizeof(g->vertices[0])) flush(g);
+    float dx = (y1 - y2) * width / (2 * length);
+    float dy = (x2 - x1) * width / (2 * length);
+    const float u = 962.f / 1024, v = 1986.f / 2048;
+    vertex(g, x1 + dx, y1 + dy, u, v, color);
+    vertex(g, x2 + dx, y2 + dy, u, v, color);
+    vertex(g, x1 - dx, y1 - dy, u, v, color);
+    vertex(g, x1 - dx, y1 - dy, u, v, color);
+    vertex(g, x2 + dx, y2 + dy, u, v, color);
+    vertex(g, x2 - dx, y2 - dy, u, v, color);
+}
 static void circle(void *ctx, float x, float y, float radius, uint32_t c) {
     cr_gl *g = ctx;
     for (int i = 0; i < 32; i++) {
@@ -448,5 +463,5 @@ bool cr_gl_end(cr_gl *g) {
     return eglSwapBuffers(g->display, g->surface) == EGL_TRUE;
 }
 cr_painter cr_gl_painter(cr_gl *g) {
-    return (cr_painter){g, solid, circle, draw_text, measure, icon, clip, game, image, image_ready};
+    return (cr_painter){g, solid, circle, draw_text, measure, icon, clip, game, image, image_ready, line};
 }

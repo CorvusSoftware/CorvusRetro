@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "menu_driver.h"
 #include "play_layout.h"
+#include "overlay.h"
 #include "core_registry.h"
 #include <ctype.h>
 #include <math.h>
@@ -19,9 +20,6 @@ static const char *system_name(int index) {
     return core ? core->system_name : "Système indisponible";
 }
 
-static const char *quick_labels[] = {"Reprendre le contenu", "Redémarrer le contenu",
-                                     "Sauvegarder l’état",   "Charger l’état",
-                                     "Menu principal",       "Fermer le contenu", "Succès"};
 enum {
     ACT_NONE,
     ACT_CORES,
@@ -45,18 +43,21 @@ enum {
     ACT_RA_ENABLE,
     ACT_RA_USER,
     ACT_RA_PASSWORD,
-    ACT_RA_CONNECT
+    ACT_RA_CONNECT,
+    ACT_QUICK_ACTION,
+    ACT_SAVE_STATE,
+    ACT_LOAD_STATE
 };
 typedef struct {
     char label[512], hint[256];
     int icon, action, value;
     bool toggle, checked, disabled;
 } row;
-static float quick_height(const cr_ui *u);
+static void quick_action(cr_ui *u, int action);
 static void quick_clamp(cr_ui *u);
 static int target(const cr_ui *u, float x, float y);
 static bool has_back(const cr_ui *u) {
-    return u->depth || (u->page != CR_MAIN && u->page != CR_LISTS && u->page != CR_SETTINGS);
+    return u->quick || u->depth || (u->page != CR_MAIN && u->page != CR_LISTS && u->page != CR_SETTINGS);
 }
 static void press_controls(cr_ui *u, unsigned mask) {
     /* Keep brief input visible for a rendered frame, independently of the engine latch. */
@@ -69,6 +70,8 @@ static float body_bottom(const cr_ui *u) {
     return u->height - 100;
 }
 static int rows(const cr_ui *u) {
+    if (u->quick) return CR_QUICK_COUNT;
+    if (u->page == CR_SAVESTATES) return 2;
     if (u->page == CR_MAIN)
         return 3 + (u->engine.loaded ? 1 : 0);
     if (u->page == CR_LISTS)
@@ -109,7 +112,30 @@ static void fill(row *r, const char *label, const char *hint, int icon, int acti
 static row get_row(const cr_ui *u, int index) {
     row r;
     fill(&r, "", "", CR_ICON_FILE, ACT_NONE, 0);
-    if (u->page == CR_MAIN) {
+    if (u->quick) {
+        static const char *labels[CR_QUICK_COUNT] = {
+            "Reprendre le contenu", "Redémarrer le contenu", "Fermer le contenu",
+            "Sauvegardes d’état", "Commandes", "Succès", "Informations sur le cœur",
+            "Menu principal"
+        };
+        static const char *hints[CR_QUICK_COUNT] = {
+            "Retourner au jeu", "Relancer le contenu actuel", "Garder le cœur chargé",
+            "Sauvegarder ou charger l’état du jeu", "Surimpression tactile",
+            "Compte et succès du jeu", "Version et fonctions disponibles", "Retourner aux menus"
+        };
+        static const int icons[CR_QUICK_COUNT] = {
+            CR_ICON_CONTENT, CR_ICON_CONTENT, CR_ICON_UNLOAD, CR_ICON_FILE,
+            CR_ICON_SETTINGS, CR_ICON_INFO, CR_ICON_CORE, CR_ICON_HOME
+        };
+        fill(&r, labels[index], hints[index], icons[index], ACT_QUICK_ACTION, index);
+        r.disabled = (index == CR_QUICK_RESTART && !u->engine.api.reset) ||
+                     (index == CR_QUICK_STATES && (!u->engine.api.serialize_size ||
+                       !u->engine.api.serialize || !u->engine.api.unserialize));
+    } else if (u->page == CR_SAVESTATES) {
+        fill(&r, index ? "Charger l’état" : "Sauvegarder l’état",
+             index ? "Restaurer la sauvegarde de ce contenu" : "Enregistrer la position actuelle",
+             CR_ICON_FILE, index ? ACT_LOAD_STATE : ACT_SAVE_STATE, 0);
+    } else if (u->page == CR_MAIN) {
         int n = 0;
         if (u->engine.loaded) {
             if (index == n++)
@@ -211,7 +237,7 @@ static row get_row(const cr_ui *u, int index) {
         fill(&r, "Surimpression tactile", "Retour visuel des commandes", CR_ICON_SETTINGS, ACT_PAGE,
              CR_OVERLAY_SETTINGS);
     } else if (u->page == CR_OVERLAY_SETTINGS) {
-        fill(&r, "Afficher les appuis", "Accentuer les commandes pendant l’appui", CR_ICON_SETTINGS,
+        fill(&r, "Afficher les commandes", "Afficher les commandes tactiles pendant le jeu", CR_ICON_SETTINGS,
              ACT_SHOW_INPUT, 0);
         r.toggle = true;
         r.checked = u->show_input;
@@ -277,7 +303,10 @@ static void page(cr_ui *u, int p) {
 static void push_page(cr_ui *u, int p) {
     if (u->depth >= sizeof(u->history) / sizeof(u->history[0]))
         return;
-    u->history[u->depth++] = (cr_navigation){u->page, u->focus, u->filter, u->scroll};
+    u->history[u->depth++] = (cr_navigation){
+        .page = u->page, .focus = u->focus, .filter = u->filter, .tab = u->tab,
+        .scroll = u->scroll, .quick_scroll = u->quick_scroll, .quick = u->quick
+    };
     view(u, p);
 }
 static bool pop_page(cr_ui *u) {
@@ -287,10 +316,14 @@ static bool pop_page(cr_ui *u) {
     view(u, previous.page);
     u->focus = previous.focus;
     u->filter = previous.filter;
+    u->tab = previous.tab;
     u->scroll = previous.scroll;
+    u->quick = previous.quick;
+    u->quick_scroll = previous.quick_scroll;
     int count = rows(u);
     u->focus = count > 0 ? (u->focus < count ? u->focus : count - 1) : 0;
-    clamp_scroll(u);
+    if (u->quick) quick_clamp(u);
+    else clamp_scroll(u);
     return true;
 }
 void cr_ui_message(cr_ui *u, const char *s) {
@@ -500,7 +533,7 @@ void cr_ui_update(cr_ui *u, double seconds) {
             p->target == u->feedback_target && target(u, p->last_x, p->last_y) == p->target) {
             feedback = true;
             if (p->held >= .2f) {
-                if (u->quick && p->target >= 10000 && p->target < 10007)
+                if (u->quick && p->target >= 10000 && p->target < 10000 + CR_QUICK_COUNT)
                     u->focus = p->target - 10000;
                 else if (!u->quick && p->target >= 0 && p->target < rows(u))
                     u->focus = p->target;
@@ -551,13 +584,28 @@ static void show_core_downloader(cr_ui *u) {
     }
 }
 static void activate(cr_ui *u, row r) {
+    if (r.disabled && r.action == ACT_QUICK_ACTION) return;
     if (u->installing && (r.action == ACT_INSTALL_CORE_PACK || r.action == ACT_GAME ||
                           r.action == ACT_SELECT || r.action == ACT_PICK ||
-                          r.action == ACT_UNLOAD)) {
+                          r.action == ACT_UNLOAD || r.action == ACT_SAVE_STATE ||
+                          r.action == ACT_LOAD_STATE)) {
         cr_ui_message(u, "Téléchargement du cœur en cours");
         return;
     }
     switch (r.action) {
+    case ACT_QUICK_ACTION:
+        quick_action(u, r.value);
+        break;
+    case ACT_SAVE_STATE:
+    case ACT_LOAD_STATE: {
+        bool load = r.action == ACT_LOAD_STATE;
+        if (result(u, load ? cr_engine_load_state(&u->engine) : cr_engine_save_state(&u->engine))) {
+            if (load) cr_cheevos_reset(u->achievements);
+            page(u, CR_PLAY);
+            cr_ui_message(u, load ? "État chargé" : "État sauvegardé");
+        }
+        break;
+    }
     case ACT_RA_ENABLE:
         u->ra_enabled = !u->ra_enabled;
         if (u->platform.set_preference) u->platform.set_preference(u->platform.context, "achievements_enabled", u->ra_enabled);
@@ -694,6 +742,7 @@ static void activate(cr_ui *u, row r) {
         push_page(u, r.value);
         break;
     case ACT_SHOW_INPUT:
+        cr_ui_clear_input(u);
         u->show_input = !u->show_input;
         if (u->platform.set_preference)
             u->platform.set_preference(u->platform.context, "show_input", u->show_input);
@@ -746,52 +795,38 @@ void cr_ui_import(cr_ui *u, const cr_import *item) {
     snprintf(path, sizeof(path), "%s/roms/%s.rom", u->engine.root, resolved.id);
     open_game(u, resolved.system, resolved.id, resolved.title, path);
 }
-static int quick_action_at(const cr_ui *u, int row) {
-    for (int action = 0; action < 7; ++action) {
-        if (action == 1 && !u->engine.api.reset) continue;
-        if ((action == 2 || action == 3) &&
-            (!u->engine.api.serialize_size ||
-             !u->engine.api.serialize || !u->engine.api.unserialize)) continue;
-        if (row-- == 0) return action;
-    }
-    return -1;
-}
-static int quick_count(const cr_ui *u) {
-    int count = 0;
-    while (quick_action_at(u, count) >= 0) ++count;
-    return count;
-}
-static void quick_action(cr_ui *u, int row) {
-    int i = quick_action_at(u, row);
-    if (i < 0) return;
-    if (u->installing && i != 0 && i != 4) {
+static void quick_action(cr_ui *u, int action) {
+    if (action < 0 || action >= CR_QUICK_COUNT || get_row(u, action).disabled) return;
+    if (u->installing && (action == CR_QUICK_RESTART || action == CR_QUICK_CLOSE ||
+                          action == CR_QUICK_STATES)) {
         cr_ui_message(u, "Téléchargement du cœur en cours");
         return;
     }
-    if (i == 0)
-        u->quick = false;
-    if (i == 1 && result(u, cr_engine_reset(&u->engine))) {
-        u->quick = false;
-        cr_cheevos_reset(u->achievements);
-        cr_ui_message(u, "Contenu redémarré");
+    switch (action) {
+    case CR_QUICK_RESUME:
+        page(u, CR_PLAY);
+        break;
+    case CR_QUICK_RESTART:
+        if (result(u, cr_engine_reset(&u->engine))) {
+            page(u, CR_PLAY);
+            cr_cheevos_reset(u->achievements);
+            cr_ui_message(u, "Contenu redémarré");
+        }
+        break;
+    case CR_QUICK_CLOSE:
+        if (result(u, cr_engine_unload_game(&u->engine))) {
+            achievement_sync(u, false);
+            u->title[0] = 0;
+            page(u, CR_MAIN);
+        }
+        break;
+    case CR_QUICK_STATES: push_page(u, CR_SAVESTATES); break;
+    case CR_QUICK_CONTROLS: push_page(u, CR_OVERLAY_SETTINGS); break;
+    case CR_QUICK_ACHIEVEMENTS: push_page(u, CR_ACHIEVEMENTS); break;
+    case CR_QUICK_CORE_INFO: push_page(u, CR_CORE_INFO); break;
+    case CR_QUICK_MAIN: page(u, CR_MAIN); break;
+    default: break;
     }
-    if (i == 2 && result(u, cr_engine_save_state(&u->engine))) {
-        u->quick = false;
-        cr_ui_message(u, "État sauvegardé");
-    }
-    if (i == 3 && result(u, cr_engine_load_state(&u->engine))) {
-        u->quick = false;
-        cr_cheevos_reset(u->achievements);
-        cr_ui_message(u, "État chargé");
-    }
-    if (i == 4)
-        page(u, CR_MAIN);
-    if (i == 5 && result(u, cr_engine_unload_game(&u->engine))) {
-        achievement_sync(u, false);
-        u->title[0] = 0;
-        page(u, CR_MAIN);
-    }
-    if (i == 6) push_page(u, CR_ACHIEVEMENTS);
     cr_ui_clear_input(u);
 }
 void cr_ui_back(cr_ui *u) {
@@ -831,17 +866,17 @@ void cr_ui_confirm(cr_ui *u) {
         activate(u, get_row(u, u->focus));
 }
 void cr_ui_move(cr_ui *u, int direction) {
-    int count = u->quick ? quick_count(u) : rows(u);
+    int count = rows(u);
     if (count <= 0)
         return;
     u->focus = (u->focus + direction + count) % count;
     if (u->quick) {
-        float top = u->focus * 56;
-        float view = fmaxf(1, quick_height(u) - 56);
+        float top = u->focus * 76;
+        float view = fmaxf(1, body_bottom(u) - 64);
         if (top < u->quick_scroll)
             u->quick_scroll = top;
-        if (top + 56 > u->quick_scroll + view)
-            u->quick_scroll = top + 56 - view;
+        if (top + 76 > u->quick_scroll + view)
+            u->quick_scroll = top + 76 - view;
         quick_clamp(u);
     } else {
         float top = u->focus * 76;
@@ -867,32 +902,21 @@ static cr_play_layout play_layout(const cr_ui *u) {
                                u->engine.height);
 }
 static unsigned button_at(const cr_ui *u, float x, float y) {
+    if (!u->show_input) return 0;
     cr_play_layout layout = play_layout(u);
     return cr_play_hit(&layout, x, y);
 }
-static float quick_height(const cr_ui *u) {
-    return fminf((float)(56 + quick_count(u) * 56), u->height - 16);
-}
 static void quick_clamp(cr_ui *u) {
     u->quick_scroll = fmaxf(0, fminf(u->quick_scroll,
-                       quick_count(u) * 56 - (quick_height(u) - 56)));
+                       CR_QUICK_COUNT * 76 - fmaxf(1, body_bottom(u) - 64)));
 }
 static int target(const cr_ui *u, float x, float y) {
     if (x < 0 || y < 0 || x >= u->width || y >= u->height)
         return -1;
-    if (u->quick) {
-        float w = fminf(360, u->width - 24), left = (u->width - w) / 2,
-              top = (u->height - quick_height(u)) / 2;
-        if (x < left || x > left + w || y < top || y > top + quick_height(u))
-            return -4;
-        if (y < top + 56)
-            return -1;
-        int row = (int)((y - top - 56 + u->quick_scroll) / 56);
-        return row >= 0 && row < quick_count(u) ? 10000 + row : -4;
-    }
-    if (u->page == CR_PLAY) {
+    if (u->page == CR_PLAY && !u->quick) {
         cr_play_layout layout = play_layout(u);
-        return cr_area_contains(layout.menu, x, y) ? -3 : -1;
+        return cr_area_contains(layout.menu, x, y) ? -3 :
+               cr_area_contains(layout.hide, x, y) ? -5 : -1;
     }
     if (y < 56)
         return x < 56 && has_back(u) ? -2 : -1;
@@ -900,8 +924,8 @@ static int target(const cr_ui *u, float x, float y) {
         return -100 - (int)fminf(2, fmaxf(0, floorf(x / u->width * 3)));
     if (y < 64 || y >= body_bottom(u))
         return -1;
-    int i = (int)((y - 64 + u->scroll) / 76);
-    return i < rows(u) ? i : -1;
+    int i = (int)((y - 64 + (u->quick ? u->quick_scroll : u->scroll)) / 76);
+    return i < rows(u) ? (u->quick ? 10000 + i : i) : -1;
 }
 void cr_ui_touch(cr_ui *u, int id, int phase, float x, float y) {
     cr_ui_touch_at(u, id, phase, x, y, u->time);
@@ -943,7 +967,7 @@ void cr_ui_touch_at(cr_ui *u, int id, int phase, float x, float y, double event_
         if (cr_ui_running(u)) {
             p->last_x = x;
             p->last_y = y;
-            if (p->target == -3)
+            if (p->target == -3 || p->target == -5)
                 return;
             unsigned mask = button_at(u, x, y);
             u->pulses |= mask & ~p->mask;
@@ -973,7 +997,7 @@ void cr_ui_touch_at(cr_ui *u, int id, int phase, float x, float y, double event_
         if (!click)
             return;
         if (event_time - p->started >= .2 && (t >= 0)) {
-            if (u->quick && t >= 10000 && t < 10007)
+            if (u->quick && t >= 10000 && t < 10000 + CR_QUICK_COUNT)
                 u->focus = t - 10000;
             else if (!u->quick && t < rows(u)) {
                 u->focus = t;
@@ -990,9 +1014,10 @@ void cr_ui_touch_at(cr_ui *u, int id, int phase, float x, float y, double event_
             quick_action(u, t - 10000);
             return;
         }
-        if (t == -4) {
-            u->quick = false;
-            cr_ui_clear_input(u);
+        if (t == -5) {
+            row r = {0};
+            r.action = ACT_SHOW_INPUT;
+            activate(u, r);
             return;
         }
         if (t == -3) {
@@ -1019,9 +1044,6 @@ void cr_ui_touch_at(cr_ui *u, int id, int phase, float x, float y, double event_
 
 static uint32_t alpha_color(uint32_t color, float alpha) {
     return (color & 0xffffff) | ((uint32_t)lroundf(fmaxf(0, fminf(1, alpha)) * 255) << 24);
-}
-static uint32_t press_color(uint32_t color, unsigned idle, float level) {
-    return alpha_color(color, (idle + (255 - idle) * level) / 255.f);
 }
 static void rect(const cr_painter *p, float x, float y, float w, float h, uint32_t c) {
     if (w > 0 && h > 0)
@@ -1094,53 +1116,23 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
     uint32_t line = theme->divider, focus = theme->focus;
     float w = u->width, h = u->height;
     rect(p, 0, 0, w, h, bg);
-    if (u->page == CR_PLAY) {
+    if (u->page == CR_PLAY && !u->quick) {
         rect(p, 0, 0, w, h, 0xff000000);
         cr_play_layout layout = play_layout(u);
         if (u->engine.loaded)
             p->game(p->context, u->engine.pixels, u->engine.width, u->engine.height, layout.video.x,
                     layout.video.y, layout.video.w, layout.video.h);
-        if (layout.portrait)
-            rect(p, layout.panel.x, layout.panel.y, layout.panel.w, layout.panel.h, bg);
         unsigned input = u->keys;
-        bool menu_down = false;
+        bool menu_down = false, hide_down = false;
         for (int i = 0; i < 32; i++)
             if (u->pointers[i].active) {
                 input |= u->pointers[i].mask;
                 menu_down |= u->pointers[i].target == -3 && !u->pointers[i].dragged;
+                hide_down |= u->pointers[i].target == -5 && !u->pointers[i].dragged;
             }
-        uint32_t idle = layout.portrait ? theme->control : (theme->control & 0xffffff) | 0xb0000000;
-        float cell = layout.dpad.w / 3;
-        rect(p, layout.dpad.x + cell, layout.dpad.y + cell, cell, cell, idle);
-        for (int i = 0; i < layout.count; i++) {
-            const cr_control *b = &layout.controls[i];
-            cr_area a = b->area;
-            float level = u->show_input ? u->control_feedback[i] : 0;
-            if (u->show_input && (input & b->mask))
-                level = 1;
-            uint32_t c = press_color(idle, idle >> 24, level);
-            if (i < 4)
-                rect(p, a.x, a.y, a.w, a.h, c);
-            else if (a.w == a.h)
-                p->circle(p->context, a.x + a.w / 2, a.y + a.h / 2, a.h / 2, c);
-            else {
-                rect(p, a.x + a.h / 2, a.y, a.w - a.h, a.h, c);
-                p->circle(p->context, a.x + a.h / 2, a.y + a.h / 2, a.h / 2, c);
-                p->circle(p->context, a.x + a.w - a.h / 2, a.y + a.h / 2, a.h / 2, c);
-            }
-            float font = (strlen(b->label) > 3 ? 9 : i < 4 ? 18 : 23) * layout.scale;
-            center(p, b->label, a.x + a.w / 2, a.y + a.h / 2 + font * .32f, font,
-                   press_color(theme->control_text, 176, level));
-        }
-        cr_area menu = layout.menu;
-        p->circle(p->context, menu.x + menu.w / 2, menu.y + menu.h / 2, menu.w / 2,
-                  press_color(idle, idle >> 24, u->show_input && menu_down ? 1 : 0));
-        float icon = 24 * layout.scale;
-        p->icon(p->context, CR_ICON_MENU, menu.x + (menu.w - icon) / 2,
-                menu.y + (menu.h - icon) / 2, icon,
-                press_color(theme->control_text, 176, u->show_input && menu_down ? 1 : 0));
+        cr_overlay_draw(&layout, p, input, u->control_feedback, u->show_input, menu_down, hide_down);
     } else {
-        const char *title = "Menu principal";
+        const char *title = u->quick ? "Menu rapide" : "Menu principal";
         switch (u->page) {
         case CR_LISTS:
             title = "Listes de lecture";
@@ -1150,6 +1142,9 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
             break;
         case CR_CORES:
             title = "Charger un cœur";
+            break;
+        case CR_SAVESTATES:
+            title = "Sauvegardes d’état";
             break;
         case CR_ACHIEVEMENTS:
             title = "RetroAchievements";
@@ -1197,13 +1192,13 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
             p->clip(p->context, 0, 56, w, fmaxf(1, body_bottom(u) - 56));
         int count = rows(u);
         for (int i = 0; i < count; i++) {
-            float y = 64 + i * 76 - u->scroll;
+            float y = 64 + i * 76 - (u->quick ? u->quick_scroll : u->scroll);
             if (y + 76 < 56 || y > body_bottom(u))
                 continue;
             row r = get_row(u, i);
             if (i == u->focus)
                 rect(p, 0, y, w, 76, focus);
-            else if (u->feedback_target == i && u->feedback_alpha > 0)
+            else if (u->feedback_target == (u->quick ? 10000 + i : i) && u->feedback_alpha > 0)
                 rect(p, 0, y, w, 76, alpha_color(focus, u->feedback_alpha));
             p->icon(p->context, r.icon, 20, y + 22, 32, r.disabled ? muted : theme->icon);
             float text_width = w - (r.toggle ? 150 : 110);
@@ -1232,7 +1227,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         if (u->page == CR_ABOUT)
             u->text_height = paragraphs(
                 p,
-                "CorvusRetro 0.16.0\n\nFrontend original en C, rendu OpenGL ES et audio "
+                "CorvusRetro 0.17.0\n\nFrontend original en C, rendu OpenGL ES et audio "
                 "AAudio.\n\nCorvusSoftware\nCœurs officiels CorvusCore 0.14.1 : Game Boy, Game "
                 "Boy Color, Game Boy Advance (expérimental).\n\nNavigation inspirée de "
                 "MaterialUI. Thèmes CorvusRetro, ASUS et NVIDIA Shield.\n\nCopyright (C) 2026 "
@@ -1291,60 +1286,20 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
             center(p, labels[i], x, h - 17, 10, c);
         }
     }
-    if (u->quick) {
-        rect(p, 0, 0, w, h, 0xb0000000);
-        float qh = quick_height(u), qw = fminf(360, w - 24), x = (w - qw) / 2, y = (h - qh) / 2;
-        rect(p, x, y, qw, qh, theme->surface);
-        if (p->clip)
-            p->clip(p->context, x, y + 56, qw, qh - 56);
-        for (int i = 0; i < quick_count(u); i++) {
-            float top = y + 56 + i * 56 - u->quick_scroll;
-            if (top + 56 < y + 56 || top > y + qh)
-                continue;
-            if (i == u->focus)
-                rect(p, x, top, qw, 56, focus);
-            else if (u->feedback_target == 10000 + i && u->feedback_alpha > 0)
-                rect(p, x, top, qw, 56, alpha_color(focus, u->feedback_alpha));
-            int action = quick_action_at(u, i);
-            text(p, quick_labels[action], x + 20, top + 35, 16, fg, qw - 40);
-        }
-        if (p->clip)
-            p->clip(p->context, 0, 0, w, h);
-        rect(p, x, y, qw, 56, header);
-        text(p, "Menu rapide", x + 20, y + 35, 20, theme->header_text, qw - 40);
-    }
     if (u->message_time > 0 && u->message[0]) {
         float y = u->page == CR_PLAY ? h - 108 : h - 142;
         rect(p, 12, y, w - 24, 52, 0xf0333333);
         text(p, u->message, 24, y + 32, 13, 0xffffffff, w - 48);
     }
     float popup_left = 0, popup_right = w, popup_top = 56, popup_bottom = h - 72;
-    if (u->page == CR_PLAY) {
+    if (u->page == CR_PLAY && !u->quick) {
         cr_play_layout layout = play_layout(u);
         popup_top = 0;
-        popup_bottom = layout.panel.y;
+        popup_bottom = layout.portrait ? layout.panel.y : h;
         if (!layout.portrait) {
-            popup_bottom = fminf(layout.dpad.y, fminf(layout.controls[4].area.y,
-                                 layout.controls[5].area.y)) - 8 * layout.scale;
-            if (layout.count == 10)
-                popup_top = layout.controls[9].area.y + layout.controls[9].area.h + 8 * layout.scale;
-            if (popup_top > 0 || popup_bottom - popup_top < 104) {
-                float left = layout.dpad.x + layout.dpad.w + 8 * layout.scale;
-                float right = layout.controls[5].area.x - 8 * layout.scale;
-                float half = fminf(w / 2 - left, right - w / 2);
-                left = w / 2 - half;
-                right = w / 2 + half;
-                float bottom = layout.menu.y - 8 * layout.scale;
-                float current_scale = fminf(1, fminf(w / 320, (popup_bottom - popup_top) / 104));
-                float center_scale = fminf(1, fminf((right - left) / 320, bottom / 104));
-                if (center_scale > 0 && (center_scale > current_scale ||
-                                        (popup_top > 0 && center_scale == current_scale))) {
-                    popup_left = left;
-                    popup_right = right;
-                    popup_top = 0;
-                    popup_bottom = bottom;
-                }
-            }
+            /* The centered video sits between both control gutters, including menu/hide. */
+            popup_left = layout.video.x;
+            popup_right = layout.video.x + layout.video.w;
         }
     }
     if (u->message_time > 0)

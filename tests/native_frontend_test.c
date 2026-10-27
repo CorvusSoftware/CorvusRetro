@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "menu_driver.h"
 #include "viewport.h"
+#include "play_layout.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -143,17 +144,22 @@ int main(void) {
     u.engine.api.serialize = fixture_serialize;
     u.engine.api.unserialize = fixture_unserialize;
     cr_ui_size(&u, 384, 700);
-    cr_ui_touch(&u, 0, CR_TOUCH_DOWN, 330, 520);
-    cr_ui_touch(&u, 1, CR_TOUCH_DOWN, 40, 565);
+    cr_play_layout input_layout = cr_play_layout_make(u.width, u.height, u.engine.system,
+                                                    u.engine.width, u.engine.height);
+    cr_area a = input_layout.controls[4].area, left = input_layout.controls[2].area;
+    float ax = a.x + a.w / 2, ay = a.y + a.h / 2;
+    float lx = left.x + left.w / 2, ly = left.y + left.h / 2;
+    cr_ui_touch(&u, 0, CR_TOUCH_DOWN, ax, ay);
+    cr_ui_touch(&u, 1, CR_TOUCH_DOWN, lx, ly);
     unsigned held = cr_ui_input(&u);
     check((held & 16) && (held & 4), "simultaneous A and left");
-    cr_ui_touch(&u, 0, CR_TOUCH_UP, 330, 520);
+    cr_ui_touch(&u, 0, CR_TOUCH_UP, ax, ay);
     held = cr_ui_input(&u);
     check(!(held & 16) && (held & 4), "one release preserves other pointer");
     cr_ui_touch(&u, 1, CR_TOUCH_CANCEL, 0, 0);
     check(cr_ui_input(&u) == 0, "cancel clears held input");
-    cr_ui_touch(&u, 0, CR_TOUCH_DOWN, 330, 520);
-    cr_ui_touch(&u, 0, CR_TOUCH_UP, 330, 520);
+    cr_ui_touch(&u, 0, CR_TOUCH_DOWN, ax, ay);
+    cr_ui_touch(&u, 0, CR_TOUCH_UP, ax, ay);
     check(cr_ui_input(&u) & 16, "short tap latched until frame");
     check(cr_ui_input(&u) == 0, "latched tap consumed exactly once");
     cr_ui_back(&u);
@@ -162,12 +168,47 @@ int main(void) {
     check(!u.quick && cr_ui_running(&u), "back resumes native loop");
     cr_ui_size(&u, 700, 300);
     cr_ui_back(&u);
-    for (int i = 0; i < 5; i++)
+    for (int i = 0; i < CR_QUICK_ACHIEVEMENTS; i++)
         cr_ui_move(&u, 1);
-    check(u.focus == 5 && u.quick_scroll >= 336 - (300 - 16 - 56),
+    check(u.focus == CR_QUICK_ACHIEVEMENTS && u.quick_scroll >= 6 * 76 - (300 - 100 - 64),
           "quick menu controller focus stays visible in landscape");
     cr_ui_size(&u, 384, 700);
-    check(u.quick_scroll == 0, "quick menu scroll clamps on rotation");
+    check(u.quick_scroll <= CR_QUICK_COUNT * 76 - (700 - 100 - 64) &&
+              u.focus * 76 >= u.quick_scroll && u.focus * 76 + 76 <= u.quick_scroll + 700 - 100 - 64,
+          "quick menu scroll clamps on rotation while keeping the focused row visible");
+    u.focus = CR_QUICK_STATES;
+    cr_ui_confirm(&u);
+    check(u.page == CR_SAVESTATES && !u.quick && !cr_ui_running(&u),
+          "supported state actions open their own paused submenu");
+    cr_ui_back(&u);
+    check(u.page == CR_PLAY && u.quick && u.focus == CR_QUICK_STATES && u.depth == 0,
+          "state submenu back restores the quick-menu selection");
+    cr_ui_size(&u, 700, 300);
+    u.focus = CR_QUICK_CORE_INFO;
+    cr_ui_move(&u, 0);
+    float quick_scroll = u.quick_scroll;
+    cr_ui_confirm(&u);
+    check(u.page == CR_CORE_INFO && !cr_ui_running(&u), "quick core information stays paused");
+    cr_ui_back(&u);
+    check(u.quick && u.focus == CR_QUICK_CORE_INFO && u.quick_scroll == quick_scroll,
+          "core information back restores landscape focus and scroll");
+    cr_ui_touch(&u, 0, CR_TOUCH_DOWN, 350, 150);
+    cr_ui_touch(&u, 0, CR_TOUCH_MOVE, 350, 220);
+    cr_ui_touch(&u, 0, CR_TOUCH_UP, 350, 220);
+    check(u.quick && u.quick_scroll < quick_scroll, "quick list supports drag scrolling");
+    cr_ui_back(&u);
+    cr_play_layout layout = cr_play_layout_make(u.width, u.height, 2, 0, 0);
+    tap(&u, layout.menu.x + layout.menu.w / 2, layout.menu.y + layout.menu.h / 2);
+    check(u.quick, "landscape menu hit follows the gutter layout");
+    u.focus = CR_QUICK_MAIN;
+    cr_ui_confirm(&u);
+    check(u.page == CR_MAIN && !u.quick && u.engine.loaded && !cr_ui_running(&u),
+          "quick main-menu action preserves paused content");
+    cr_ui_confirm(&u);
+    check(u.page == CR_PLAY && u.quick, "main menu reopens the quick menu");
+    u.focus = CR_QUICK_RESUME;
+    cr_ui_confirm(&u);
+    check(cr_ui_running(&u) && cr_ui_input(&u) == 0, "explicit resume releases menu input");
     // No engine handle is attached to this input-only test state.
     u.engine.loaded = false;
     cr_ui_destroy(&u);

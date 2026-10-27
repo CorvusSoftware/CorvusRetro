@@ -17,7 +17,7 @@ static void check(bool ok, const char *message) {
 typedef struct {
     char text[16384];
     uint32_t highlight, a_body, a_text;
-    float ax, ay;
+    float ax, ay, ar;
     const cr_play_layout *layout;
     uint32_t popup_color;
     unsigned popup_count;
@@ -25,7 +25,8 @@ typedef struct {
     float minimum_badge;
     float viewport_center;
     bool home_tab, settings_tab;
-    unsigned switch_ends;
+    unsigned switch_ends, games_drawn;
+    bool full_width_selection;
     float switch_thumb, toggle_text_end;
 } capture;
 static void rect(void *ctx, float x, float y, float w, float h, uint32_t color) {
@@ -34,12 +35,19 @@ static void rect(void *ctx, float x, float y, float w, float h, uint32_t color) 
         if (!c->popup_count)
             check(fabsf(x + w / 2 - c->viewport_center) < .01f, "launch and achievement cards stay centered in the viewport");
         ++c->popup_count;
+        cr_area system_buttons[] = {c->layout->menu, c->layout->hide};
+        for (size_t i = 0; i < sizeof(system_buttons) / sizeof(system_buttons[0]); ++i) {
+            cr_area a = system_buttons[i];
+            check(x + w <= a.x || a.x + a.w <= x || y + h <= a.y || a.y + a.h <= y,
+                  "notification does not cover menu or hide targets");
+        }
         for (int i = 0; i < c->layout->count; ++i) {
             cr_area a = c->layout->controls[i].area;
             check(x + w <= a.x || a.x + a.w <= x || y + h <= a.y || a.y + a.h <= y,
                   "notification does not cover a touch control");
         }
     }
+    if (x == 0 && y == 64 && w == 384 && h == 76) c->full_width_selection = true;
     if (x == 0 && y == 216 && w == 384 && h == 76)
         c->highlight = color;
 }
@@ -49,6 +57,14 @@ static void circle(void *ctx, float x, float y, float r, uint32_t color) {
     if (fabsf(y - 102) < .01f && r == 14) ++c->switch_ends;
     if (fabsf(y - 102) < .01f && r == 10) c->switch_thumb = x;
     if (x > c->ax - 1 && x < c->ax + 1 && y > c->ay - 1 && y < c->ay + 1)
+        c->a_body = color;
+}
+static void line(void *ctx, float x1, float y1, float x2, float y2, float thickness,
+                 uint32_t color) {
+    capture *c = ctx;
+    (void)thickness;
+    float r1 = hypotf(x1 - c->ax, y1 - c->ay), r2 = hypotf(x2 - c->ax, y2 - c->ay);
+    if (c->ar > 0 && fabsf(r1 - c->ar) < 3 && fabsf(r2 - c->ar) < 3)
         c->a_body = color;
 }
 static void text(void *ctx, const char *s, float x, float y, float size, uint32_t color,
@@ -84,7 +100,8 @@ static void icon(void *ctx, int kind, float x, float y, float size, uint32_t col
 }
 static void game(void *ctx, const uint32_t *pixels, int iw, int ih, float x, float y, float w,
                  float h) {
-    (void)ctx;
+    capture *c = ctx;
+    ++c->games_drawn;
     (void)pixels;
     (void)iw;
     (void)ih;
@@ -96,8 +113,8 @@ static void game(void *ctx, const uint32_t *pixels, int iw, int ih, float x, flo
 static capture draw(cr_ui *u) {
     cr_play_layout p = cr_play_layout_make(u->width, u->height, u->engine.system, 160, 144);
     cr_area a = p.controls[4].area;
-    capture c = {.ax = a.x + a.w / 2, .ay = a.y + a.h / 2};
-    cr_painter painter = {&c, rect, circle, text, measure, icon, NULL, game, NULL, NULL};
+    capture c = {.ax = a.x + a.w / 2, .ay = a.y + a.h / 2, .ar = a.w / 2};
+    cr_painter painter = {&c, rect, circle, text, measure, icon, NULL, game, NULL, NULL, line};
     cr_ui_draw(u, &painter);
     return c;
 }
@@ -161,6 +178,30 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     check(strstr(c.text, "Menu rapide") && strstr(c.text, "Décharger le cœur") &&
               !strstr(c.text, "Charger un cœur"),
           "loaded content keeps one core action after the quick menu row");
+    void *state_handle = u->engine.handle;
+    snprintf(path, sizeof(path), "%s/states", root);
+    file = fopen(path, "wb");
+    check(file && fclose(file) == 0, "obstruct state storage for the quick submenu");
+    u->page = CR_PLAY; u->quick = true; u->focus = CR_QUICK_STATES;
+    cr_ui_confirm(u);
+    check(u->page == CR_SAVESTATES && !cr_ui_running(u), "real core exposes the state submenu");
+    cr_ui_confirm(u);
+    check(u->page == CR_SAVESTATES && u->engine.handle == state_handle && u->engine.loaded &&
+              u->message[0], "failed state save preserves the loaded core and paused submenu");
+    check(unlink(path) == 0, "remove state directory obstruction");
+    cr_ui_confirm(u);
+    check(cr_ui_running(u) && u->engine.handle == state_handle && u->depth == 0 &&
+              strstr(u->message, "État sauvegardé"), "state submenu saves through the real engine and resumes");
+    cr_ui_back(u); u->focus = CR_QUICK_STATES;
+    cr_ui_confirm(u); u->focus = 1;
+    cr_ui_confirm(u);
+    check(cr_ui_running(u) && u->engine.handle == state_handle && u->depth == 0 &&
+              strstr(u->message, "État chargé"), "state submenu loads through the real engine and resumes");
+    snprintf(path, sizeof(path), "%s/states/%s-" CR_CORE_VERSION ".state", root, id);
+    check(unlink(path) == 0, "remove quick-menu state fixture");
+    snprintf(path, sizeof(path), "%s/states", root);
+    check(rmdir(path) == 0, "remove quick-menu state directory");
+    u->page = CR_MAIN;
     snprintf(saves, sizeof(saves), "%s/saves", root);
     check(rmdir(saves) == 0, "replace empty battery directory with an obstruction");
     file = fopen(saves, "wb");
@@ -183,7 +224,7 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     cr_ui_update(u, .01);
     check(u->notifications.count == 1 && u->notifications.progress.visible,
           "refused unload keeps the running game's notifications");
-    u->page = CR_PLAY; u->quick = true; u->focus = 5;
+    u->page = CR_PLAY; u->quick = true; u->focus = CR_QUICK_CLOSE;
     cr_ui_confirm(u);
     check(u->engine.loaded && u->engine.handle == handle && u->quick &&
               u->notifications.count == 1 && u->notifications.progress.visible,
@@ -200,7 +241,7 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     cr_ui_install_status(u, "Téléchargement en cours", false);
     check(u->installing && !cr_ui_running(u), "progress cannot release the installation barrier");
     u->quick = true;
-    u->focus = 5;
+    u->focus = CR_QUICK_CLOSE;
     cr_ui_confirm(u);
     check(u->engine.handle == handle && u->installing,
           "quick-menu close cannot mutate a game during installation");
@@ -208,7 +249,7 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     cr_ui_install_status(u, "Installation annulée", true);
     check(!u->installing && cr_ui_running(u) && u->engine.handle == handle,
           "terminal cancellation resumes the preserved game");
-    u->quick = true; u->focus = 5;
+    u->quick = true; u->focus = CR_QUICK_CLOSE;
     cr_ui_confirm(u);
     c = draw(u);
     check(u->page == CR_MAIN && u->engine.handle == handle && !u->engine.loaded &&
@@ -442,12 +483,62 @@ int main(void) {
     c = draw(&u);
     check(c.a_body == idle && (c.a_text >> 24) == idle_text && cr_ui_input(&u) == 0,
           "fade returns to idle without holding game input");
-    u.show_input = false;
+    cr_play_layout controls = cr_play_layout_make(u.width, u.height, 0, 160, 144);
+    cr_ui_touch(&u, 1, CR_TOUCH_DOWN, ax, ay);
+    cr_ui_key(&u, 16, true);
+    tap(&u, controls.hide.x + controls.hide.w / 2, controls.hide.y + controls.hide.h / 2);
+    check(!u.show_input && saved_show == 0 && cr_ui_input(&u) == 0,
+          "hide button persists visibility and releases every held input");
     cr_ui_touch(&u, 0, CR_TOUCH_DOWN, ax, ay);
     c = draw(&u);
-    check(c.a_body == idle && (c.a_text >> 24) == idle_text && cr_ui_input(&u) == 16,
-          "disabling feedback preserves game input");
+    check(c.a_body == 0 && c.a_text == 0 && cr_ui_input(&u) == 0,
+          "hidden virtual controls neither draw nor send game input");
     cr_ui_touch(&u, 0, CR_TOUCH_CANCEL, 0, 0);
+    tap(&u, controls.menu.x + controls.menu.w / 2, controls.menu.y + controls.menu.h / 2);
+    check(u.quick && !cr_ui_running(&u), "menu target stays interactive with hidden controls");
+    c = draw(&u);
+    check(c.games_drawn == 0 && c.full_width_selection,
+          "quick menu fills the native interface without drawing the game underneath");
+    const char *resume = strstr(c.text, "Reprendre le contenu");
+    const char *restart = strstr(c.text, "Redémarrer le contenu");
+    const char *close = strstr(c.text, "Fermer le contenu");
+    const char *states = strstr(c.text, "Sauvegardes d’état");
+    check(resume && restart && close && states && resume < restart && restart < close && close < states,
+          "quick menu begins with resume, restart, close and the state submenu");
+    check(!strstr(c.text, "Charger l’état") && !strstr(c.text, "Sauvegarder l’état") &&
+              !strstr(c.text, "Shaders") && !strstr(c.text, "Triches"),
+          "quick root contains only working menus and nests state actions");
+    u.focus = CR_QUICK_RESTART;
+    cr_ui_confirm(&u);
+    check(u.quick, "unsupported restart remains disabled without changing row IDs");
+    u.focus = CR_QUICK_STATES;
+    cr_ui_confirm(&u);
+    check(u.quick, "unsupported state operations remain disabled");
+    u.focus = CR_QUICK_CONTROLS;
+    cr_ui_move(&u, 0);
+    float quick_scroll = u.quick_scroll;
+    cr_ui_confirm(&u);
+    check(u.page == CR_OVERLAY_SETTINGS && !u.quick && !cr_ui_running(&u),
+          "quick commands opens the real overlay settings while paused");
+    row(&u, 0);
+    check(u.show_input && saved_show == 1, "quick commands updates the saved overlay setting");
+    cr_ui_back(&u);
+    check(u.page == CR_PLAY && u.quick && u.focus == CR_QUICK_CONTROLS &&
+              u.quick_scroll == quick_scroll && cr_ui_input(&u) == 0,
+          "submenu back restores quick-menu focus and scroll without resuming the game");
+    u.focus = CR_QUICK_ACHIEVEMENTS;
+    int quick_tab = u.tab;
+    cr_ui_confirm(&u);
+    check(u.page == CR_ACHIEVEMENTS && !cr_ui_running(&u), "quick achievements stays paused");
+    cr_ui_back(&u);
+    check(u.quick && u.focus == CR_QUICK_ACHIEVEMENTS && u.tab == quick_tab,
+          "achievements returns to its quick row and navigation tab");
+    tap(&u, 28, 28);
+    check(!u.quick && cr_ui_running(&u), "quick header back resumes the game");
+    tap(&u, controls.hide.x + controls.hide.w / 2, controls.hide.y + controls.hide.h / 2);
+    check(!u.show_input, "hide target remains reversible after a menu round trip");
+    tap(&u, controls.hide.x + controls.hide.w / 2, controls.hide.y + controls.hide.h / 2);
+    check(u.show_input && saved_show == 1, "hidden controls can be shown again directly");
     const float popup_sizes[][2] = {{360, 640}, {640, 360}, {320, 240}, {640, 240}, {960, 540}, {240, 320}};
     u.message_time = 0;
     for (int system = 0; system < 3; ++system) {
@@ -463,14 +554,12 @@ int main(void) {
             cr_notifications_update(&u.notifications, .8);
             cr_play_layout layout = cr_play_layout_make(u.width, u.height, system, u.engine.width, u.engine.height);
             capture popup = {.layout = &layout, .popup_color = (cr_theme_get(u.theme)->surface & 0xffffffu) | 0xf7000000u};
-            float top = !layout.portrait && layout.count == 10
-                    ? layout.controls[9].area.y + layout.controls[9].area.h + 8 * layout.scale : 0;
-            float bottom = layout.portrait ? layout.panel.y
-                    : fminf(layout.dpad.y, fminf(layout.controls[4].area.y,
-                                               layout.controls[5].area.y)) - 8 * layout.scale;
+            float available_width = layout.portrait ? u.width : layout.video.w;
+            float available_height = layout.portrait ? layout.panel.y : u.height;
             popup.viewport_center = u.width / 2;
-            popup.minimum_badge = 64 * .7f * fmaxf(0, fminf(1, fminf(u.width / 320, (bottom - top) / 104)));
-            cr_painter painter = {&popup, rect, circle, text, measure, icon, NULL, game, NULL, NULL};
+            popup.minimum_badge = 64 * .7f * fmaxf(0, fminf(1,
+                    fminf(available_width / 320, available_height / 104)));
+            cr_painter painter = {&popup, rect, circle, text, measure, icon, NULL, game, NULL, NULL, line};
             cr_ui_draw(&u, &painter);
             check(popup.popup_count > 0, "every phone layout retains a visible notification");
         }

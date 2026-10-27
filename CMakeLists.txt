@@ -96,7 +96,7 @@ include(cmake/Rcheevos.cmake)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 add_library(corvus_frontend STATIC cores/engine.c cores/core_registry.c menu/menu_driver.c
-    menu/theme.c gfx/viewport.c input/play_layout.c gfx/widgets/notifications.c)
+    menu/theme.c gfx/viewport.c input/play_layout.c input/overlay.c gfx/widgets/notifications.c)
 target_link_libraries(corvus_frontend PUBLIC CorvusAPI::CorvusAPI corvus_cheevos ${CMAKE_DL_LIBS} m)
 if(CORVUS_BUNDLED_CORE_TARGETS)
     add_dependencies(corvus_frontend ${CORVUS_BUNDLED_CORE_TARGETS})
@@ -140,7 +140,7 @@ else()
     file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/test-empty/cr_bundled_cores.h"
         "static const char *const cr_bundled_core_modules[] = {0};\n")
     add_executable(native_registry_test "${CORVUS_ROOT}/tests/native_registry_test.c"
-        cores/engine.c cores/core_registry.c menu/menu_driver.c menu/theme.c gfx/viewport.c input/play_layout.c gfx/widgets/notifications.c)
+        cores/engine.c cores/core_registry.c menu/menu_driver.c menu/theme.c gfx/viewport.c input/play_layout.c input/overlay.c gfx/widgets/notifications.c)
     target_include_directories(native_registry_test PRIVATE
         ${CORVUS_INCLUDE_DIRS} "${CMAKE_CURRENT_BINARY_DIR}/test-empty")
     target_link_libraries(native_registry_test PRIVATE CorvusAPI::CorvusAPI corvus_cheevos ${CMAKE_DL_LIBS} m)

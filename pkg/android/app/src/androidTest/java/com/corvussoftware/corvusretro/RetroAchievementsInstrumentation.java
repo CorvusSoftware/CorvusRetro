@@ -29,6 +29,7 @@ import org.json.JSONObject;
 public final class RetroAchievementsInstrumentation extends Instrumentation {
     private String phase;
     private boolean landscape;
+    private int overlaySystem;
     private File fixtures;
     private int checks;
     private volatile int failedAwards, awards, logins, acceptedRequests, imageRequests;
@@ -343,9 +344,114 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
     private void closeContent() throws Exception {
         sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
         state(8, 0, 1, 1);
-        for (int i = 0; i < 5; ++i) sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_DOWN);
+        for (int i = 0; i < 2; ++i) sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_DOWN);
         sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER);
         state(0, 0, 0, 0);
+    }
+    private String prepareOverlayGame(int system) throws Exception {
+        Context context = getTargetContext();
+        String[] names = {"CorvusGB", "CorvusGBC", "CorvusGBA"};
+        String[] ids = {"corvus.gb", "corvus.gbc", "corvus.gba"};
+        for (int i = 0; i < names.length; ++i) {
+            File archive = new File(fixtures, names[i] + "-0.14.1-android-x86_64.zip");
+            JSONObject metadata = new JSONObject().put("id", ids[i]).put("name", names[i]).put("description", "Qualification")
+                    .put("version", "0.14.1").put("abi", "x86_64").put("api_version", 0)
+                    .put("library_name", "libcorvus_" + ids[i].substring(7) + ".so")
+                    .put("size", archive.length()).put("sha256", CoreStore.hash(archive))
+                    .put("archive_url", "https://github.com/CorvusSoftware/CorvusRetro/releases/download/v0.16.0/" + archive.getName());
+            new CoreStore(context).install(new CoreRepository.Core(metadata), archive);
+        }
+        byte[] rom = new byte[system == 2 ? 1024 : 32768];
+        if (system == 2) {
+            // Original ARM program paints a green Mode3 frame and writes one SRAM byte.
+            int[] words = {0xe3a00301, 0xe59f1028, 0xe1c010b0, 0xe3a00406, 0xe3a01e3e, 0xe3a02c96,
+                    0xe0c010b2, 0xe2522001, 0x1afffffc, 0xe3a0040e, 0xe3a0105a, 0xe5c01000, 0xeafffffe, 0x00000403};
+            int branch = 0xea00003e;
+            for (int b = 0; b < 4; ++b) rom[b] = (byte) (branch >>> (b * 8));
+            for (int i = 0; i < words.length; ++i) for (int b = 0; b < 4; ++b) rom[0x100 + i * 4 + b] = (byte) (words[i] >>> (b * 8));
+            rom[0xb2] = (byte) 0x96;
+            System.arraycopy("SRAM_V".getBytes(StandardCharsets.US_ASCII), 0, rom, 0x200, 6);
+        } else {
+            rom[0x100] = (byte) 0xc3; rom[0x101] = 0x50; rom[0x102] = 1;
+            rom[0x150] = 0x18; rom[0x151] = (byte) 0xfe;
+            System.arraycopy("CORVUS OVERLAY".getBytes(StandardCharsets.US_ASCII), 0, rom, 0x134, 14);
+            rom[0x143] = system == 1 ? (byte) 0x80 : 0;
+            int checksum = 0;
+            for (int i = 0x134; i <= 0x14c; ++i) checksum = (checksum - (rom[i] & 255) - 1) & 255;
+            rom[0x14d] = (byte) checksum;
+        }
+        File directory = new File(context.getFilesDir(), "roms");
+        check(directory.isDirectory() || directory.mkdirs(), "overlay private fixture directory");
+        File temporary = File.createTempFile("overlay-", ".part", directory);
+        try (FileOutputStream out = new FileOutputStream(temporary)) { out.write(rom); out.getFD().sync(); }
+        StringBuilder hash = new StringBuilder();
+        for (byte value : java.security.MessageDigest.getInstance("SHA-256").digest(rom)) hash.append(String.format(java.util.Locale.ROOT, "%02x", value & 255));
+        String[] systems = {"nintendo.game_boy", "nintendo.game_boy_color", "nintendo.game_boy_advance"};
+        String id = hash + "-" + system;
+        GameLibrary library = new GameLibrary(context);
+        GameLibrary.Game game = new GameLibrary.Game(id, names[system] + " overlay test", system, 0, ids[system], systems[system]);
+        library.commit(new GameLibrary.Pending(game, temporary), system, ids[system], systems[system]);
+        library.touch(id);
+        return id;
+    }
+    private float[] overlayMetrics(MainActivity activity) {
+        int[] area = activity.safeWindowArea();
+        float density = activity.getResources().getDisplayMetrics().density;
+        float w = (area[0] - area[2] - area[4]) / density, h = (area[1] - area[3] - area[5]) / density;
+        float scale = Math.min(1.4f, Math.max(1, (h >= w ? w : h) / 360));
+        scale = Math.min(scale, Math.min(w / 320, h / (h >= w ? 384 : 320)));
+        return new float[] {w, h, scale};
+    }
+    private void quickOpen(MainActivity activity, int system) throws Exception {
+        float[] m = overlayMetrics(activity); float w = m[0], h = m[1], s = m[2];
+        float x = h >= w ? w / 2 : 128 * s;
+        float y = h >= w ? h - Math.max(h / 2, 276 * s) + 36 * s : 36 * s;
+        tap(activity, x, y); state(8, system, 1, 1);
+    }
+    private void quickRow(int index) {
+        for (int i = 0; i < index; ++i) sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_DOWN);
+        sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER);
+    }
+    private void overlays() throws Exception {
+        check(overlaySystem >= 0 && overlaySystem < 3, "supported overlay console");
+        String id = prepareOverlayGame(overlaySystem);
+        Context context = getTargetContext();
+        context.getSharedPreferences("corvus", Context.MODE_PRIVATE).edit().putInt("achievements_enabled", 0)
+                .putString("theme", "corvus").putInt("show_input", 1).commit();
+        MainActivity activity = (MainActivity) startActivitySync(new Intent(context, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        try {
+            check(getUiAutomation().setRotation(landscape ? android.app.UiAutomation.ROTATION_FREEZE_90 : android.app.UiAutomation.ROTATION_FREEZE_0), "overlay test rotation");
+            waitFor(() -> { int[] area = activity.safeWindowArea(); return area != null && (area[0] > area[1]) == landscape; }, "overlay safe viewport");
+            state(0, -1, 0, 0);
+            tap(activity, 150, 100);
+            for (int i = 0; i < overlaySystem; ++i) sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_DOWN);
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER);
+            state(0, overlaySystem, 0, 0);
+            tab(activity, 1); tap(activity, 150, 100); tap(activity, 150, 100);
+            state(8, overlaySystem, 1, 0); android.os.SystemClock.sleep(700);
+            screenshot("overlay-" + overlaySystem + "-playing");
+            float[] m = overlayMetrics(activity); float w = m[0], h = m[1], s = m[2];
+            float hx = h >= w ? w - 36 * s : 32 * s, hy = h - 36 * s;
+            tap(activity, hx, hy);
+            check(activity.preference("show_input", -1) == 0, "overlay hides without stopping emulation");
+            screenshot("overlay-" + overlaySystem + "-hidden");
+            quickOpen(activity, overlaySystem); screenshot("overlay-" + overlaySystem + "-quick");
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK); state(8, overlaySystem, 1, 0);
+            tap(activity, hx, hy);
+            check(activity.preference("show_input", -1) == 1, "hidden overlay restores with its own button");
+            quickOpen(activity, overlaySystem); quickRow(3); state(18, overlaySystem, 1, 0);
+            screenshot("overlay-" + overlaySystem + "-states");
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER); state(8, overlaySystem, 1, 0);
+            check(new File(context.getFilesDir(), "states/" + id + "-0.14.1.state").length() > 0, "native state file saved by quick submenu");
+            quickOpen(activity, overlaySystem); quickRow(3); state(18, overlaySystem, 1, 0);
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_DOWN);
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER); state(8, overlaySystem, 1, 0);
+            quickOpen(activity, overlaySystem); quickRow(4); state(13, overlaySystem, 1, 0);
+            screenshot("overlay-" + overlaySystem + "-controls");
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK); state(8, overlaySystem, 1, 1);
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK); state(8, overlaySystem, 1, 0);
+            quickOpen(activity, overlaySystem); quickRow(2); state(0, overlaySystem, 0, 0);
+        } finally { runOnMainSync(activity::finish); }
     }
     private void navigation() throws Exception {
         prepareGame();
@@ -508,12 +614,13 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
         super.onCreate(arguments);
         phase = arguments.getString("phase", "credentials");
         landscape = "landscape".equals(arguments.getString("orientation", "portrait"));
+        overlaySystem = Integer.parseInt(arguments.getString("system", "0"));
         fixtures = new File(arguments.getString("fixture_dir", "")); start();
     }
     @Override public void onStart() {
         Bundle result = new Bundle();
         try {
-            if ("navigation".equals(phase)) navigation(); else if ("popups".equals(phase)) popups(); else if ("ui".equals(phase)) ui(); else if ("outbox".equals(phase)) outbox(); else if ("recover".equals(phase)) recover(); else credentials();
+            if ("overlays".equals(phase)) overlays(); else if ("navigation".equals(phase)) navigation(); else if ("popups".equals(phase)) popups(); else if ("ui".equals(phase)) ui(); else if ("outbox".equals(phase)) outbox(); else if ("recover".equals(phase)) recover(); else credentials();
             result.putString("stream", "PASS " + checks + " Android RetroAchievements checks phase=" + phase + " pid=" + android.os.Process.myPid() + "\n");
             finish(Activity.RESULT_OK, result);
         } catch (Throwable failure) {

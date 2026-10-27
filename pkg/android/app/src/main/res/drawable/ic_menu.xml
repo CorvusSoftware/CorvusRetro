@@ -3,5 +3,5 @@
      Copyright (C) 2026 CorvusSoftware
      SPDX-License-Identifier: AGPL-3.0-only -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="32dp" android:height="32dp" android:viewportWidth="32" android:viewportHeight="32">
-    <path android:fillColor="#FFFFFF" android:fillType="evenOdd" android:pathData="M6,4 H26 V28 H6 Z M10,9 V12 H22 V9 Z M10,15 V18 H22 V15 Z M10,21 V24 H18 V21 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M5,7 H27 V10 H5 Z M5,15 H27 V18 H5 Z M5,23 H27 V26 H5 Z" />
 </vector>

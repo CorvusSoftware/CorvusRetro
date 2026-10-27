@@ -27,7 +27,20 @@ enum {
     CR_INFORMATION,
     CR_CORE_INFO,
     CR_CORE_DOWNLOADS,
-    CR_ACHIEVEMENTS
+    CR_ACHIEVEMENTS,
+    CR_SAVESTATES
+};
+/* Stable quick-menu row IDs; unsupported core operations stay disabled. */
+enum {
+    CR_QUICK_RESUME,
+    CR_QUICK_RESTART,
+    CR_QUICK_CLOSE,
+    CR_QUICK_STATES,
+    CR_QUICK_CONTROLS,
+    CR_QUICK_ACHIEVEMENTS,
+    CR_QUICK_CORE_INFO,
+    CR_QUICK_MAIN,
+    CR_QUICK_COUNT
 };
 enum { CR_TOUCH_DOWN, CR_TOUCH_MOVE, CR_TOUCH_UP, CR_TOUCH_CANCEL };
 typedef struct {
@@ -38,8 +51,9 @@ typedef struct {
     unsigned mask;
 } cr_pointer;
 typedef struct {
-    int page, focus, filter;
-    float scroll;
+    int page, focus, filter, tab;
+    float scroll, quick_scroll;
+    bool quick;
 } cr_navigation;
 typedef struct {
     cr_engine engine;

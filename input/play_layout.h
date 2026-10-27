@@ -13,7 +13,7 @@ typedef struct {
     const char *label;
 } cr_control;
 typedef struct {
-    cr_area video, panel, dpad, menu;
+    cr_area video, panel, dpad, menu, hide;
     cr_control controls[10];
     int count;
     float scale;
