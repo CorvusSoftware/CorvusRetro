@@ -32,10 +32,11 @@ Le menu rapide est une liste plein écran qui suspend l'émulation. Il propose :
 2. Redémarrer le contenu.
 3. Fermer le contenu en conservant le cœur chargé.
 4. Sauvegardes d'état, avec sauvegarde et chargement réels.
-5. Commandes, pour l'affichage de la surimpression.
-6. Succès RetroAchievements.
-7. Informations sur le cœur.
-8. Menu principal.
+5. Options du cœur, avec un état vide si aucun réglage n'est disponible.
+6. Commandes, pour l'affichage de la surimpression.
+7. Succès RetroAchievements.
+8. Informations sur le cœur.
+9. Menu principal.
 
 Une opération non disponible pour le cœur est désactivée. Le retour d'un
 sous-menu conserve la pause, la sélection et le défilement du menu rapide.

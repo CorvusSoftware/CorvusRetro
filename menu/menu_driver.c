@@ -73,7 +73,7 @@ static int rows(const cr_ui *u) {
     if (u->quick) return CR_QUICK_COUNT;
     if (u->page == CR_SAVESTATES) return 2;
     if (u->page == CR_MAIN)
-        return 3 + (u->engine.loaded ? 1 : 0);
+        return 3 + (u->engine.loaded ? 1 : 0) + (u->engine.handle ? 1 : 0);
     if (u->page == CR_LISTS)
         return 1;
     if (u->page == CR_CORES)
@@ -115,17 +115,17 @@ static row get_row(const cr_ui *u, int index) {
     if (u->quick) {
         static const char *labels[CR_QUICK_COUNT] = {
             "Reprendre le contenu", "Redémarrer le contenu", "Fermer le contenu",
-            "Sauvegardes d’état", "Commandes", "Succès", "Informations sur le cœur",
+            "Sauvegardes d’état", "Options du cœur", "Commandes", "Succès", "Informations sur le cœur",
             "Menu principal"
         };
         static const char *hints[CR_QUICK_COUNT] = {
             "Retourner au jeu", "Relancer le contenu actuel", "Garder le cœur chargé",
-            "Sauvegarder ou charger l’état du jeu", "Surimpression tactile",
+            "Sauvegarder ou charger l’état du jeu", "Réglages proposés par le cœur", "Surimpression tactile",
             "Compte et succès du jeu", "Version et fonctions disponibles", "Retourner aux menus"
         };
         static const int icons[CR_QUICK_COUNT] = {
             CR_ICON_CONTENT, CR_ICON_CONTENT, CR_ICON_UNLOAD, CR_ICON_FILE,
-            CR_ICON_SETTINGS, CR_ICON_INFO, CR_ICON_CORE, CR_ICON_HOME
+            CR_ICON_CORE, CR_ICON_SETTINGS, CR_ICON_INFO, CR_ICON_CORE, CR_ICON_HOME
         };
         fill(&r, labels[index], hints[index], icons[index], ACT_QUICK_ACTION, index);
         r.disabled = (index == CR_QUICK_RESTART && !u->engine.api.reset) ||
@@ -153,6 +153,9 @@ static row get_row(const cr_ui *u, int index) {
                   "Ouvrir un fichier de jeu compatible"),
                  CR_ICON_CONTENT, ACT_PICK, 0);
         if (index == n - 1) r.disabled = !u->engine.handle;
+        if (u->engine.handle && index == n++)
+            fill(&r, "Configuration du sous-système", "Sous-systèmes du cœur chargé",
+                 CR_ICON_CORE, ACT_PAGE, CR_SUBSYSTEMS);
         if (index == n)
             fill(&r, "Informations", "Application, cœur et licences", CR_ICON_INFO, ACT_PAGE,
                  CR_INFORMATION);
@@ -276,7 +279,8 @@ static row get_row(const cr_ui *u, int index) {
 }
 static void clamp_scroll(cr_ui *u) {
     float content = (float)rows(u) * 76;
-    if (u->page == CR_ABOUT || u->page == CR_LICENSE || u->page == CR_CORE_INFO)
+    if (u->page == CR_ABOUT || u->page == CR_LICENSE || u->page == CR_CORE_INFO ||
+        u->page == CR_SUBSYSTEMS || u->page == CR_CORE_OPTIONS)
         content = fmaxf(400, u->text_height);
     float max = fmaxf(0, content - fmaxf(1, body_bottom(u) - 64));
     u->scroll = fminf(max, fmaxf(0, u->scroll));
@@ -821,6 +825,7 @@ static void quick_action(cr_ui *u, int action) {
         }
         break;
     case CR_QUICK_STATES: push_page(u, CR_SAVESTATES); break;
+    case CR_QUICK_CORE_OPTIONS: push_page(u, CR_CORE_OPTIONS); break;
     case CR_QUICK_CONTROLS: push_page(u, CR_OVERLAY_SETTINGS); break;
     case CR_QUICK_ACHIEVEMENTS: push_page(u, CR_ACHIEVEMENTS); break;
     case CR_QUICK_CORE_INFO: push_page(u, CR_CORE_INFO); break;
@@ -1146,6 +1151,12 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         case CR_SAVESTATES:
             title = "Sauvegardes d’état";
             break;
+        case CR_SUBSYSTEMS:
+            title = "Sous-systèmes";
+            break;
+        case CR_CORE_OPTIONS:
+            title = "Options du cœur";
+            break;
         case CR_ACHIEVEMENTS:
             title = "RetroAchievements";
             break;
@@ -1227,12 +1238,21 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         if (u->page == CR_ABOUT)
             u->text_height = paragraphs(
                 p,
-                "CorvusRetro 0.17.0\n\nFrontend original en C, rendu OpenGL ES et audio "
+                "CorvusRetro 0.17.1\n\nFrontend original en C, rendu OpenGL ES et audio "
                 "AAudio.\n\nCorvusSoftware\nCœurs officiels CorvusCore 0.14.1 : Game Boy, Game "
                 "Boy Color, Game Boy Advance (expérimental).\n\nNavigation inspirée de "
                 "MaterialUI. Thèmes CorvusRetro, ASUS et NVIDIA Shield.\n\nCopyright (C) 2026 "
                 "CorvusSoftware\nSPDX-License-Identifier: AGPL-3.0-only",
                 20, 92, w - 40, 24, fg, u->scroll);
+        if (u->page == CR_SUBSYSTEMS || u->page == CR_CORE_OPTIONS) {
+            const char *empty = !u->engine.handle ? "Aucun cœur chargé." :
+                u->page == CR_SUBSYSTEMS ?
+                    "Aucun sous-système disponible avec ce cœur.\n\n"
+                    "La configuration de plusieurs jeux n’est pas prise en charge par cette version." :
+                    "Aucune option de cœur disponible.\n\n"
+                    "Ce cœur ne fournit aucun réglage modifiable dans cette version.";
+            u->text_height = paragraphs(p, empty, 20, 92, w - 40, 24, fg, u->scroll);
+        }
         if (u->page == CR_CORE_INFO) {
             char info[2048];
             if (u->engine.handle) {

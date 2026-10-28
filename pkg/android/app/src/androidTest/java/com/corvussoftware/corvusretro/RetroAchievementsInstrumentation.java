@@ -428,6 +428,11 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             for (int i = 0; i < overlaySystem; ++i) sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_DOWN);
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER);
             state(0, overlaySystem, 0, 0);
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_DOWN);
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_DOWN);
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER); state(19, overlaySystem, 0, 0);
+            screenshot("overlay-" + overlaySystem + "-subsystems");
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK); state(0, overlaySystem, 0, 0);
             tab(activity, 1); tap(activity, 150, 100); tap(activity, 150, 100);
             state(8, overlaySystem, 1, 0); android.os.SystemClock.sleep(700);
             screenshot("overlay-" + overlaySystem + "-playing");
@@ -447,7 +452,11 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             quickOpen(activity, overlaySystem); quickRow(3); state(18, overlaySystem, 1, 0);
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_DOWN);
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER); state(8, overlaySystem, 1, 0);
-            quickOpen(activity, overlaySystem); quickRow(4); state(13, overlaySystem, 1, 0);
+            quickOpen(activity, overlaySystem); quickRow(4); state(20, overlaySystem, 1, 0);
+            screenshot("overlay-" + overlaySystem + "-core-options");
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK); state(8, overlaySystem, 1, 1);
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK); state(8, overlaySystem, 1, 0);
+            quickOpen(activity, overlaySystem); quickRow(5); state(13, overlaySystem, 1, 0);
             screenshot("overlay-" + overlaySystem + "-controls");
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK); state(8, overlaySystem, 1, 1);
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK); state(8, overlaySystem, 1, 0);

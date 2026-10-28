@@ -1,8 +1,5 @@
-État : DONE, CorvusRetro0.17.0/code20 publié et vérifié.
-Source : tagv0.17.0 surcb30229508ae5ee91181672fdb9054ad1de32662. CI40647479489, buildsigné40647835058 et publication40649001619 SUCCESS pour ce SHA exact.
-Livrable : profils originaux C11 GB/GBC et GBA avec L/R, traits gris et feedback, vidéo native, commandes séparées, menu portrait central/paysage latéral, masquage réversible. Menu rapide plein écran, sous-menu d'états réel, retour conservant pause/focus/scroll/onglet et fermeture gardant le cœur.
-Preuves :9/9 natifs et9/9 ASan/UBSan, corefree ; Gradle Debug/Release/testAPK/lint, archives4/workflows6 PASS. Six parcours GB/GBC/GBA portrait/paysage API35 surb2afc4f,40 contrôles chacun ; correction finale du texte vérifiée en paysage API29 avec40 contrôles supplémentaires. Captures inspectées.
-Notifications API29 :41 contrôles du parcours lancé en portrait et41 du parcours lancé en paysage PASS ; images réelles, absence de corbeau provisoire, progression, succès mémoire, reprise HOME et nettoyage à la fermeture. La reprise suit la rotation choisie par le système. Aucun compte personnel utilisé.
-Distribution : APK public1275716 octets, SHA256 4fdc4c445473f68436590e80e1c7e39c6947b9e412869758a253d713789b8bd9, byte-identique au candidat signé testé. Pin indépendant,0.17.0/code20, zéro moteur et notice MIT vérifiés. Six ZIPs publics validés (hash/taille/ABI/segments16KB/extension mémoire) et identiques aux archives0.16.0 ; aucun catalogue frontend ajouté ou catalogue fournisseur modifié.
-Compatibilité : mise à jour signée depuis0.16.0/code19 acceptée, thèmeASUS et historique Corvus-preserved.gba conservés ; dernière enveloppe signée réinstallée et contrôlée, sans crash applicatif.
-Revue indépendante production et derniers ajustements de synchronisation des tests : aucun finding P1/P2. Quality Gate PASS ; aucun essai sur téléphone physique, runtimeARM64 ou compte réel revendiqué.
+État : ACTIVE.
+Implémentation : pages CR_SUBSYSTEMS19 et CR_CORE_OPTIONS20, entrée main conditionnée par handle, options avant commandes. Tests natifs et Android enrichis, documentation core-menus.md.
+Référence : RetroArch af622105, source actuelle CorvusAPI32bb624 vérifiée sans extensions de configuration.
+Prochaine action : finir tests natifs/build Android, qualifier les pages sur émulateur, revue et publication main/CI.
+Limite : pages vides explicites ; aucune implémentation câble link ou option moteur tant que le contrat public n'existe pas. Utilisateur informé.

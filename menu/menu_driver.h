@@ -28,7 +28,9 @@ enum {
     CR_CORE_INFO,
     CR_CORE_DOWNLOADS,
     CR_ACHIEVEMENTS,
-    CR_SAVESTATES
+    CR_SAVESTATES,
+    CR_SUBSYSTEMS,
+    CR_CORE_OPTIONS
 };
 /* Stable quick-menu row IDs; unsupported core operations stay disabled. */
 enum {
@@ -36,6 +38,7 @@ enum {
     CR_QUICK_RESTART,
     CR_QUICK_CLOSE,
     CR_QUICK_STATES,
+    CR_QUICK_CORE_OPTIONS,
     CR_QUICK_CONTROLS,
     CR_QUICK_ACHIEVEMENTS,
     CR_QUICK_CORE_INFO,

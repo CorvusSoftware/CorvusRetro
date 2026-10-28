@@ -176,9 +176,33 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     snprintf(u->title, sizeof(u->title), "Original GBA test");
     capture c = draw(u);
     check(strstr(c.text, "Menu rapide") && strstr(c.text, "Décharger le cœur") &&
-              !strstr(c.text, "Charger un cœur"),
+              strstr(c.text, "Configuration du sous-système") && !strstr(c.text, "Charger un cœur"),
           "loaded content keeps one core action after the quick menu row");
     void *state_handle = u->engine.handle;
+    for (int landscape = 0; landscape < 2; ++landscape) {
+        cr_ui_size(u, landscape ? 700 : 384, landscape ? 384 : 700);
+        u->page = CR_PLAY; u->quick = true; u->focus = CR_QUICK_CORE_OPTIONS;
+        cr_ui_move(u, 0);
+        float scroll = u->quick_scroll;
+        cr_ui_confirm(u);
+        c = draw(u);
+        check(u->page == CR_CORE_OPTIONS && !u->quick && !cr_ui_running(u) &&
+                  strstr(c.text, "Aucune option de cœur disponible."),
+              "real core without configurable options shows its honest empty state in both orientations");
+        check(!strstr(c.text, "Afficher les commandes") && u->engine.handle == state_handle,
+              "core options are separate from frontend overlay settings and preserve the engine");
+        cr_ui_confirm(u);
+        check(u->page == CR_CORE_OPTIONS && u->engine.loaded,
+              "empty options page has no fabricated actionable setting");
+        cr_ui_back(u);
+        check(u->quick && u->focus == CR_QUICK_CORE_OPTIONS && u->quick_scroll == scroll &&
+                  !cr_ui_running(u) && cr_ui_input(u) == 0,
+              "core options back restores quick focus and scroll while keeping the game paused");
+        cr_ui_back(u);
+        check(cr_ui_running(u), "second back resumes the preserved content");
+    }
+    cr_ui_size(u, 384, 700);
+    u->page = CR_MAIN;
     snprintf(path, sizeof(path), "%s/states", root);
     file = fopen(path, "wb");
     check(file && fclose(file) == 0, "obstruct state storage for the quick submenu");
@@ -253,7 +277,8 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     cr_ui_confirm(u);
     c = draw(u);
     check(u->page == CR_MAIN && u->engine.handle == handle && !u->engine.loaded &&
-              !u->title[0] && strstr(c.text, "Décharger le cœur") && !strstr(c.text, "Menu rapide"),
+              !u->title[0] && strstr(c.text, "Décharger le cœur") &&
+              strstr(c.text, "Configuration du sous-système") && !strstr(c.text, "Menu rapide"),
           "closing content preserves the selected core and returns to the main menu");
     check(!u->notifications.count && !u->notifications.progress.visible && !u->notifications_loaded,
           "content close clears notifications immediately while keeping the core");
@@ -261,7 +286,7 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     c = draw(u);
     check(!u->engine.handle && !u->engine.loaded && !u->title[0] &&
               strstr(c.text, "Charger un cœur") && !strstr(c.text, "Décharger le cœur") &&
-              !strstr(c.text, "Menu rapide"),
+              !strstr(c.text, "Menu rapide") && !strstr(c.text, "Configuration du sous-système"),
           "retry persists the game and restores the single load action");
     cr_ui_update(u, .01);
     check(!u->notifications.count && !u->notifications.progress.visible && !u->notifications_loaded,
@@ -296,7 +321,8 @@ int main(void) {
     capture c = draw(&u);
     check(c.home_tab && c.settings_tab, "navigation uses home and settings icons");
     check(strstr(c.text, "Charger un cœur") && strstr(c.text, "Informations") &&
-              !strstr(c.text, "Historique") && !strstr(c.text, "Décharger le cœur"),
+              !strstr(c.text, "Historique") && !strstr(c.text, "Décharger le cœur") &&
+              !strstr(c.text, "Configuration du sous-système"),
           "main contains loading and information, history lives in playlists");
     row(&u, 0);
     check(u.page == CR_CORES, "core menu opens before downloader");
@@ -361,6 +387,18 @@ int main(void) {
     check(strstr(c.text, "Décharger le cœur") && !strstr(c.text, "Charger un cœur"),
           "the same core row changes from load to unload");
     row(&u, 2);
+    c = draw(&u);
+    check(u.page == CR_SUBSYSTEMS && !cr_ui_running(&u) &&
+              strstr(c.text, "Aucun sous-système disponible avec ce cœur."),
+          "loading a core exposes the subsystem configuration before any content is loaded");
+    void *idle_handle = u.engine.handle;
+    cr_ui_confirm(&u);
+    check(u.page == CR_SUBSYSTEMS && u.engine.handle == idle_handle && !u.engine.loaded,
+          "unsupported subsystem configuration has no fake link action");
+    cr_ui_back(&u);
+    check(u.page == CR_MAIN && u.focus == 2 && u.depth == 0,
+          "subsystem configuration back restores its main menu row");
+    row(&u, 3);
     row(&u, 1);
     c = draw(&u);
     check(u.page == CR_CORE_INFO && strstr(c.text, "CorvusGB") && strstr(c.text, "0.14.1"),
@@ -370,7 +408,8 @@ int main(void) {
     row(&u, 0);
     check(!u.engine.handle, "core unloaded");
     c = draw(&u);
-    check(strstr(c.text, "Charger un cœur") && !strstr(c.text, "Décharger le cœur"),
+    check(strstr(c.text, "Charger un cœur") && !strstr(c.text, "Décharger le cœur") &&
+              !strstr(c.text, "Configuration du sous-système"),
           "successful unload restores the load action");
     loaded_core_lifecycle(&u, root);
     tab(&u, 1);
@@ -503,8 +542,11 @@ int main(void) {
     const char *restart = strstr(c.text, "Redémarrer le contenu");
     const char *close = strstr(c.text, "Fermer le contenu");
     const char *states = strstr(c.text, "Sauvegardes d’état");
-    check(resume && restart && close && states && resume < restart && restart < close && close < states,
-          "quick menu begins with resume, restart, close and the state submenu");
+    const char *options = strstr(c.text, "Options du cœur");
+    const char *commands = strstr(c.text, "Commandes");
+    check(resume && restart && close && states && options && commands &&
+              resume < restart && restart < close && close < states && states < options && options < commands,
+          "quick menu places core options after states and before frontend controls");
     check(!strstr(c.text, "Charger l’état") && !strstr(c.text, "Sauvegarder l’état") &&
               !strstr(c.text, "Shaders") && !strstr(c.text, "Triches"),
           "quick root contains only working menus and nests state actions");

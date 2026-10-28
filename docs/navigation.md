@@ -8,16 +8,16 @@
 - [menu_displaylist.c](https://github.com/libretro/RetroArch/blob/master/menu/menu_displaylist.c) : catégories de réglages et liste d'informations.
 
 Le code CorvusRetro reste original, en C11, avec ses propres palettes et ressources.
-Seules les catégories disposant de fonctions effectives sont proposées.
+Les pages sans capacité déclarée par le cœur affichent leur état indisponible.
 
 ## Rangement
 
 | Chemin | Contenu |
 | --- | --- |
-| Menu principal | Menu rapide si un contenu est chargé, charger/décharger le cœur, charger du contenu, Informations |
+| Menu principal | Menu rapide si un contenu est chargé, charger/décharger le cœur, charger du contenu, configuration du sous-système si un cœur est chargé, Informations |
 | Menu principal > Informations | À propos, informations du cœur chargé, licence et crédits |
 | Listes de lecture | Historique uniquement |
-| Menu rapide | Reprendre, Redémarrer, Fermer, Sauvegardes d'état, Commandes, Succès, Informations sur le cœur, Menu principal |
+| Menu rapide | Reprendre, Redémarrer, Fermer, Sauvegardes d'état, Options du cœur, Commandes, Succès, Informations sur le cœur, Menu principal |
 | Menu rapide > Sauvegardes d'état | Sauvegarder l'état, Charger l'état |
 | Réglages > Interface utilisateur | Thème de l'interface |
 | Réglages > Vidéo | Garder l'écran allumé pendant le jeu |
@@ -28,6 +28,8 @@ Le bouton Retour restaure la page précédente, sa sélection, son filtre et son
 défilement. Les trois onglets restent Menu principal, Listes de lecture, Réglages,
 avec les icônes de maison, de liste et d'engrenage. Le menu rapide suspend le jeu
 et occupe tout l'écran. Fermer le contenu conserve le cœur chargé.
+Les [menus du cœur](core-menus.md) décrivent les états disponibles et les
+limites actuelles de CorvusAPI pour les options et les sous-systèmes.
 
 ## Réaction au toucher
 
