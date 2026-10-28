@@ -13,10 +13,10 @@ on:
         type: string
         required: false
       tag:
-        description: "Existing tag at the current tested main commit, e.g. v0.17.0"
+        description: "Existing tag at the current tested main commit, e.g. v0.18.0"
         type: string
         required: true
-        default: v0.17.0
+        default: v0.18.0
 
 permissions:
   contents: write
@@ -203,12 +203,13 @@ jobs:
         run: |
           release_base="$RUNNER_TEMP/CorvusRetro-${CORVUS_TAG#v}-base-release.apk"
           cp "$RUNNER_TEMP/signed-core-apks/CorvusRetro-base-release.apk" "$release_base"
+          core_version=$(PYTHONPATH=tools python3 -c 'from build_core_archives import provider_version; print(provider_version())')
           gh release create "$CORVUS_TAG" \
             "$release_base" \
             "$RUNNER_TEMP/native-cores/"*.zip \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --verify-tag --prerelease \
-            --title "CorvusRetro $CORVUS_TAG - Console overlays and quick menu" \
-            --notes "Signed Android release with outlined per-console touch overlays, centered native-aspect video, reversible overlay hiding, a full-screen quick menu with real save/load submenus, the Corvus raven launcher logo, explicit core selection before game launch, history-only playlists, content closing that keeps the core loaded, refined switches and home/settings icons, a single game launch popup that waits for its artwork, centered game launch and achievement popups with descending icons and expanding titles, plus measured progress notifications, official game icons and badges, asynchronous image caching, automatic provider catalog discovery and RetroAchievements in normal mode. Includes official CorvusCore 0.14.1 native ZIPs for ARM64 and x86_64; open the in-app core downloader to install a core. Android 8.0+."
+            --title "CorvusRetro $CORVUS_TAG - Options du cœur et câble link" \
+            --notes "Version Android signée avec options du cœur persistantes, palettes GB/GBC, réglages de sauvegarde et d'horloge GBA, configuration de deux jeux pour le câble link local, écrans côte à côte, commandes séparées et batteries distinctes même avec la même ROM deux fois. Fermer le contenu conserve le cœur chargé. La base ne contient aucun moteur ; installez ou actualisez les modules CorvusCore $core_version dans le téléchargeur de cœurs. Les six ZIP officiels ARM64 et x86_64 sont fournis séparément. Les états groupés et les succès RetroAchievements sont indisponibles pendant le link ; le mode solo conserve ses sauvegardes et les succès en mode normal. GBA expérimental. Android 8.0+."
 
       - name: Upload catalog metadata for CorvusRepository review
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

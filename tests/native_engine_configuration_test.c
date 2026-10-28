@@ -11,6 +11,16 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+/* Android private storage denies hard links. Apply the same restriction to
+ * this test executable so repeated option edits cannot depend on link(). */
+static unsigned denied_links;
+int link(const char *existing, const char *created) {
+    (void)existing; (void)created;
+    ++denied_links;
+    errno = EPERM;
+    return -1;
+}
+
 #ifdef CR_TEST_WRAP_FSYNC
 static unsigned fail_sync_after, fail_sync_count;
 int __real_fsync(int fd);
@@ -92,20 +102,32 @@ static void fixture_tests(const char *modules[4]) {
     check(!rmdir(backup) && cr_engine_close(&e) && cr_engine_select(&e, system) &&
           cr_engine_option_value(&e, "accuracy") == 1,
           "restart after failed backup cleanup retains previous durable choice", &e);
+    check(cr_engine_set_option(&e, "accuracy", 0) && cr_engine_set_option(&e, "accuracy", 1) &&
+          !denied_links && cr_engine_close(&e) && cr_engine_select(&e, system) &&
+          cr_engine_option_value(&e, "accuracy") == 1,
+          "repeated option edits persist when hard links are forbidden", &e);
     check(cr_engine_close(&e), "close after backup failure recovery", &e);
 #ifdef CR_TEST_WRAP_FSYNC
-    for (unsigned sync = 3; sync <= 4; ++sync) {
+    for (unsigned sync = 1; sync <= 5; ++sync) {
         check(cr_engine_select(&e, system), "select before injected commit sync failure", &e);
         fail_sync_after = sync;
         check(!cr_engine_set_option(&e, "accuracy", 0) && cr_engine_option_value(&e, "accuracy") == 1,
-              "post-publication fsync failure restores old runtime choice", &e);
+              "config fsync failure retains old runtime choice", &e);
         check(!fail_sync_after && cr_engine_close(&e) && cr_engine_select(&e, system) &&
               cr_engine_option_value(&e, "accuracy") == 1,
-              "restart after commit or backup-cleanup sync failure restores old disk choice", &e);
+              "restart after staging, commit or backup-cleanup sync failure restores old disk choice", &e);
+        check(access(backup, F_OK) != 0, "failed commit leaves no partial recovery copy", &e);
         check(cr_engine_close(&e), "close sync failure recovery", &e);
     }
+    char staged_backup[4096]; path(staged_backup, root, "options/test.configuration.cfg.bak.new");
+    const char partial_backup[] = "CORVUS_OPTIONS_1\naccuracy=acc";
+    write_bytes(staged_backup, partial_backup, sizeof(partial_backup) - 1);
+    check(cr_engine_select(&e, system) && cr_engine_option_value(&e, "accuracy") == 1 &&
+          cr_engine_set_option(&e, "accuracy", 1) && access(staged_backup, F_OK) != 0,
+          "startup ignores interrupted partial backup and next edit replaces it safely", &e);
+    check(cr_engine_close(&e), "close partial backup recovery", &e);
     check(cr_engine_select(&e, system), "select before recovery sync failure", &e);
-    fail_sync_after = 3; fail_sync_count = 2;
+    fail_sync_after = 4; fail_sync_count = 2;
     check(!cr_engine_set_option(&e, "accuracy", 0) && cr_engine_option_value(&e, "accuracy") == 1 &&
           strstr(e.error, "non garantie"), "failed recovery sync reports uncertain durability explicitly", &e);
     check(cr_engine_close(&e) && cr_engine_select(&e, system) && cr_engine_option_value(&e, "accuracy") == 1,

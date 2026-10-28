@@ -427,9 +427,10 @@ static bool stage_config(cr_engine *engine, const char *path, const uint8_t *byt
     return ok || fail(engine, "Écriture des options impossible");
 }
 static bool write_config(cr_engine *engine, const char *path, const uint8_t *bytes, size_t size) {
-    char temporary[4096], backup[4096], parent[4096];
+    char temporary[4096], backup[4096], backup_temporary[4096], parent[4096];
     if (!sibling(engine, temporary, path, ".new") ||
-        !sibling(engine, backup, path, ".bak")) return false;
+        !sibling(engine, backup, path, ".bak") ||
+        !sibling(engine, backup_temporary, backup, ".new")) return false;
     memcpy(parent, path, strlen(path) + 1);
     char *last = strrchr(parent, '/');
     if (!last) return fail(engine, "Dossier des options invalide");
@@ -440,7 +441,7 @@ static bool write_config(cr_engine *engine, const char *path, const uint8_t *byt
      * Keep raw old bytes for rollback even after backup cleanup has begun. */
     bool ok = remove_config_backup(engine, backup);
     struct stat status;
-    bool existed = false, linked = false;
+    bool existed = false, backed_up = false;
     if (ok && lstat(path, &status) == 0) {
         existed = true;
         if (!S_ISREG(status.st_mode)) ok = fail(engine, "Fichier des options invalide");
@@ -450,8 +451,10 @@ static bool write_config(cr_engine *engine, const char *path, const uint8_t *byt
     if (ok && existed) ok = read_file(engine, path, MAX_CONFIG, false, &previous, &previous_size);
     if (ok) ok = stage_config(engine, temporary, bytes, size);
     if (ok && existed) {
-        linked = link(path, backup) == 0;
-        if (!linked) ok = fail(engine, "Protection des anciennes options impossible");
+        /* A partial backup must never become visible to startup recovery. */
+        backed_up = stage_config(engine, backup_temporary, previous, previous_size) &&
+            rename(backup_temporary, backup) == 0;
+        if (!backed_up) ok = fail(engine, "Protection des anciennes options impossible");
     }
     if (ok && !sync_fd(parent_fd)) ok = fail(engine, "Synchronisation des options impossible");
     bool published = false;
@@ -460,24 +463,24 @@ static bool write_config(cr_engine *engine, const char *path, const uint8_t *byt
         if (!published) ok = fail(engine, "Écriture des options impossible");
     }
     if (ok && !sync_fd(parent_fd)) ok = false;
-    if (ok && linked) {
-        if (unlink(backup) == 0) linked = false;
+    if (ok && backed_up) {
+        if (unlink(backup) == 0) backed_up = false;
         else ok = false;
     }
     if (ok && !sync_fd(parent_fd)) ok = false;
     if (published && !ok) {
         bool restored;
         if (!existed) restored = unlink(path) == 0;
-        else if (linked && rename(backup, path) == 0) { restored = true; linked = false; }
+        else if (backed_up && rename(backup, path) == 0) { restored = true; backed_up = false; }
         else restored = stage_config(engine, temporary, previous, previous_size) && rename(temporary, path) == 0;
-        if (restored && linked) {
+        if (restored && backed_up) {
             restored = unlink(backup) == 0;
-            if (restored) linked = false;
+            if (restored) backed_up = false;
         }
         bool durable = restored && sync_fd(parent_fd);
         /* A filesystem that rejects recovery cannot promise either durable
          * outcome. Retain a recovery copy when possible for read_file(). */
-        if (!durable && existed && !linked) {
+        if (!durable && existed && !backed_up) {
             if (stage_config(engine, temporary, previous, previous_size) && rename(temporary, backup) == 0)
                 sync_fd(parent_fd);
         }
@@ -486,7 +489,8 @@ static bool write_config(cr_engine *engine, const char *path, const uint8_t *byt
     }
     if (!published) {
         unlink(temporary);
-        if (linked) unlink(backup);
+        unlink(backup_temporary);
+        if (backed_up) unlink(backup);
     }
     free(previous);
     close(parent_fd);
