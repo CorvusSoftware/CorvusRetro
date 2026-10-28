@@ -1,7 +1,7 @@
 # CorvusRetro
 
 Frontend Android original C11 : NativeActivity, EGL/OpenGL ES2, AAudio. Java fournit uniquement les services OS.
-Version publiée 0.16.0/code19 ; cible35/min26 ; NDK27.2 ; JDK17+ ; Gradle8.13/AGP8.9.1.
+Version publiée 0.17.0/code20 ; cible35/min26 ; NDK27.2 ; JDK17+ ; Gradle8.13/AGP8.9.1.
 Sources : menu/, cores/, gfx/drivers/gl2, gfx/widgets/notifications, audio/drivers/aaudio, input/, frontend/drivers/, tasks/, cheevos/.
 Android sous pkg/android/, wrapper Gradle racine délégué ; dépendances sous deps/.
 Base sans moteur ; six modules CorvusAPI distincts, exclus de l'APK, distribués en archives individuelles vérifiées.
@@ -22,3 +22,7 @@ Publication autorisée sur main et APK signé durable. Les nouveaux catalogues s
 Cycle contenu : frontend exige cœur sélectionné compatible avant pick/import/historique. cr_engine_unload_game sauvegarde puis ferme seulement le contenu en gardant handle/module/output/API/system ; cr_engine_close reste unload complet. Refus batterie sans mutation, RA/notifications nettoyés seulement après fermeture réussie.
 UI : Listes de lecture=Historique seul ; navbar maison/engrenage, switches natifs arrondis. Logo launcher adaptatif blanc/fond noir sous res/drawable-nodpi/corvus_logo.png.
 Instrumentation navigation : attendre focus fenêtre et état active=1 après rotation ; lire préférences via activity.preference (thème String/audio Boolean). Vérifier une vraie frame vidéo avant d'analyser le popup.
+
+Interface0.17 : input/play_layout et input/overlay calculent et dessinent les profils GB/GBC8 contrôles et GBA10. Traits gris, feedback clair, hide réversible ; vidéo native au-dessus en portrait et entre les gouttières en paysage. Menu portrait centré, paysage au-dessus de la croix gauche. Menu rapide plein écran, CR_SAVESTATES pour save/load réels ; retour restaure pause/focus/scroll/onglet.
+Qualification UI : attendre la confirmation asynchrone des préférences et le focus + état natif actif après HOME. Libérer la réponse image dès capture du bitmap immuable, avant encodagePNG ; le lancement dispose de3s d'attente image puis de sa descente. Une capture de1.8s ne couvre pas ce budget.
+Livraison0.17 : tagv0.17.0 surcb30229508ae5ee91181672fdb9054ad1de32662, CI40647479489, buildsigné40647835058, publication40649001619 SUCCESS. APK public identique au candidat qualifié, signature durable ; six archives0.14.1 identiques à0.16.0, donc catalogues existants conservés.

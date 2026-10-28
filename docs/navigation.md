@@ -16,16 +16,18 @@ Seules les catégories disposant de fonctions effectives sont proposées.
 | --- | --- |
 | Menu principal | Menu rapide si un contenu est chargé, charger/décharger le cœur, charger du contenu, Informations |
 | Menu principal > Informations | À propos, informations du cœur chargé, licence et crédits |
-| Listes de lecture | Historique, Game Boy, Game Boy Color, Game Boy Advance |
+| Listes de lecture | Historique uniquement |
+| Menu rapide | Reprendre, Redémarrer, Fermer, Sauvegardes d'état, Commandes, Succès, Informations sur le cœur, Menu principal |
+| Menu rapide > Sauvegardes d'état | Sauvegarder l'état, Charger l'état |
 | Réglages > Interface utilisateur | Thème de l'interface |
 | Réglages > Vidéo | Garder l'écran allumé pendant le jeu |
 | Réglages > Audio | Activer le son |
-| Réglages > Affichage à l'écran > Surimpression tactile | Afficher les appuis |
+| Réglages > Affichage à l'écran > Surimpression tactile | Afficher les commandes |
 
 Le bouton Retour restaure la page précédente, sa sélection, son filtre et son
 défilement. Les trois onglets restent Menu principal, Listes de lecture, Réglages,
-dans l'ordre de la barre de navigation MaterialUI. Le thème sombre supprimé reste
-retiré ; le nom MaterialUI désigne ici la référence de navigation.
+avec les icônes de maison, de liste et d'engrenage. Le menu rapide suspend le jeu
+et occupe tout l'écran. Fermer le contenu conserve le cœur chargé.
 
 ## Réaction au toucher
 
@@ -34,21 +36,23 @@ retiré ; le nom MaterialUI désigne ici la référence de navigation.
 - Menus : fondu de sélection sur environ 200 ms tant que le doigt reste immobile sur la ligne.
 - Tap inférieur à 200 ms : action au relâchement sur la même cible.
 - Maintien de 200 ms à moins d'une seconde : sélection sans validation.
-- Appui d'au moins une seconde sur Audio, Garder l'écran allumé ou Afficher les appuis : restauration de la valeur par défaut activée. Les entrées de navigation restent en sélection.
+- Appui d'au moins une seconde sur Audio, Garder l'écran allumé ou Afficher les commandes : restauration de la valeur par défaut activée. Les entrées de navigation restent en sélection.
 - Glissement : défilement, sans valider de ligne. Annulation, perte de focus ou rotation : entrées et feedback réinitialisés.
 
 Les menus utilisent un doigt ; les commandes de jeu conservent le multitouch.
 La durée des gestes repose sur les timestamps Android des événements et reste
-indépendante de la cadence du rendu. Le bouton central de menu conserve le geste
-de la version 0.8 : ouverture au relâchement, glissement ou annulation sans action.
+indépendante de la cadence du rendu. Le bouton de menu s'ouvre au relâchement ;
+un glissement ou une annulation ne valide aucune action.
 
-L'option **Afficher les appuis** conserve les entrées du moteur et leur réactivité ;
-elle règle uniquement leur affichage. Le choix est sauvegardé dans les préférences.
+L'option **Afficher les commandes** masque ou rétablit la surimpression et relâche
+les entrées en cours. Les commandes de jeu tactiles sont inactives lorsqu'elles
+sont masquées ; le menu et la flèche restent accessibles. Le clavier et la
+manette restent utilisables. Le choix est sauvegardé dans les préférences.
 
 ## Vérification
 
 `native_menu` teste l'arbre des menus, le retour avec sélection conservée, les
 informations d'un vrai cœur, les gestes tap/maintien/reset, une frame lente, le
 menu à un doigt, l'opacité dessinée d'un tap bref, son fondu et la désactivation
-du feedback sans perte d'entrée. Voir [la validation Android](validation-android.md)
+des commandes tactiles. Voir [l'interface de jeu](game-interface.md) et [la validation Android](validation-android.md)
 pour les essais et captures sur émulateur.
