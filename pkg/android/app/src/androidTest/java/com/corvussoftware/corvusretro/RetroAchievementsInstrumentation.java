@@ -571,7 +571,8 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
                     "pause to exercise native window lifecycle");
             android.os.SystemClock.sleep(500);
             context.startActivity(new Intent(context, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
-            android.os.SystemClock.sleep(1000);
+            waitFor(activity::hasWindowFocus, "game window focused after resume");
+            state(8, 0, 1, 0);
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BUTTON_B);
             capturePopup("unlocked", UNLOCK_COLOR);
             waitFor(() -> awards == 1, "actual core memory unlocked one achievement with decoded images");
