@@ -41,6 +41,11 @@ Un appui sur le bouton de menu dessiné met le jeu en pause et relâche toutes
 les entrées. Glisser depuis ce bouton ne déclenche aucune commande de jeu.
 Le retour Android permet toujours d'ouvrir et de fermer le menu rapide.
 
+Pendant une partie locale à deux joueurs, le menu rapide choisit le joueur
+contrôlé par le tactile et le clavier. Deux manettes physiques peuvent commander
+les consoles indépendamment. Leurs touches sont relâchées lors d'une pause,
+d'une perte de focus ou de leur déconnexion.
+
 ## Vérification
 
 `native_controls` vérifie les ratios, limites et séparations des cibles pour

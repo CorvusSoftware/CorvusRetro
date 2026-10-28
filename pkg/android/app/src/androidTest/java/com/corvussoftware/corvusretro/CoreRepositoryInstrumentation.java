@@ -43,12 +43,12 @@ public final class CoreRepositoryInstrumentation extends Instrumentation {
         checks++;
     }
     private File archive(String id) {
-        return new File(fixtures, "Corvus" + id.toUpperCase(java.util.Locale.ROOT) + "-0.14.1-android-x86_64.zip");
+        return new File(fixtures, "Corvus" + id.toUpperCase(java.util.Locale.ROOT) + "-0.15.0-android-x86_64.zip");
     }
     private JSONObject core(String id) throws Exception {
         File file = archive(id);
         return new JSONObject().put("id", "corvus." + id).put("name", "Corvus" + id.toUpperCase(java.util.Locale.ROOT))
-                .put("description", "Official core test fixture").put("version", "0.14.1")
+                .put("description", "Official core test fixture").put("version", "0.15.0")
                 .put("abi", "x86_64").put("sha256", CoreStore.hash(file)).put("size", file.length())
                 .put("archive_url", "https://github.com/CorvusSoftware/CorvusRetro/releases/download/v0.13.0/" + file.getName())
                 .put("library_name", "libcorvus_" + id + ".so").put("api_version", 0);
@@ -82,7 +82,7 @@ public final class CoreRepositoryInstrumentation extends Instrumentation {
         CoreRepository.Catalog catalog = CoreRepository.parseCatalog(feed(core("gb"), core("gba")
                 .put("abi", "arm64-v8a")), "x86_64");
         check(catalog.cores.size() == 1 && catalog.cores.containsKey("corvus.gb"), "ABI filter");
-        check(Arrays.equals(catalog.records, new String[] {"corvus.gb", "CorvusGB", "0.14.1", "corvus.gb", "x86_64"}), "JNI fields");
+        check(Arrays.equals(catalog.records, new String[] {"corvus.gb", "CorvusGB", "0.15.0", "corvus.gb", "x86_64"}), "JNI fields");
         try {
             CoreRepository.parseCatalog(feed(core("gb"), core("gb")), "x86_64");
             throw new AssertionError("duplicate core accepted");

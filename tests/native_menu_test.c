@@ -187,13 +187,19 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
         cr_ui_confirm(u);
         c = draw(u);
         check(u->page == CR_CORE_OPTIONS && !u->quick && !cr_ui_running(u) &&
-                  strstr(c.text, "Aucune option de cœur disponible."),
-              "real core without configurable options shows its honest empty state in both orientations");
+                  strstr(c.text, "Type de sauvegarde") && strstr(c.text, "Horloge de cartouche") &&
+                  strstr(c.text, "Son du câble link"),
+              "real GBA configuration options are visible in both orientations");
         check(!strstr(c.text, "Afficher les commandes") && u->engine.handle == state_handle,
               "core options are separate from frontend overlay settings and preserve the engine");
         cr_ui_confirm(u);
-        check(u->page == CR_CORE_OPTIONS && u->engine.loaded,
-              "empty options page has no fabricated actionable setting");
+        c = draw(u);
+        check(u->page == CR_CORE_OPTION_VALUES && u->engine.loaded && strstr(c.text, "Automatique") &&
+                  strstr(c.text, "SRAM") && !cr_ui_running(u),
+              "core option opens provider values while keeping the content paused");
+        cr_ui_back(u);
+        check(u->page == CR_CORE_OPTIONS && u->focus == 0 && !cr_ui_running(u),
+              "option values back restores the options row without resuming");
         cr_ui_back(u);
         check(u->quick && u->focus == CR_QUICK_CORE_OPTIONS && u->quick_scroll == scroll &&
                   !cr_ui_running(u) && cr_ui_input(u) == 0,
@@ -342,7 +348,7 @@ int main(void) {
     c = draw(&u);
     check(!u.catalog_loading && strstr(c.text, "CorvusGB") && strstr(c.text, "mise à jour"),
           "individual core with a different version is presented as an update");
-    snprintf(catalog.packs[0].version, sizeof(catalog.packs[0].version), "0.14.1");
+    snprintf(catalog.packs[0].version, sizeof(catalog.packs[0].version), "0.15.0");
     cr_ui_catalog(&u, &catalog);
     c = draw(&u);
     check(strstr(c.text, "Installé") && !strstr(c.text, "mise à jour"),
@@ -389,19 +395,23 @@ int main(void) {
     row(&u, 2);
     c = draw(&u);
     check(u.page == CR_SUBSYSTEMS && !cr_ui_running(&u) &&
-              strstr(c.text, "Aucun sous-système disponible avec ce cœur."),
+              strstr(c.text, "Deux joueurs (câble link)"),
           "loading a core exposes the subsystem configuration before any content is loaded");
     void *idle_handle = u.engine.handle;
     cr_ui_confirm(&u);
-    check(u.page == CR_SUBSYSTEMS && u.engine.handle == idle_handle && !u.engine.loaded,
-          "unsupported subsystem configuration has no fake link action");
+    c = draw(&u);
+    check(u.page == CR_SUBSYSTEM_CONFIG && u.engine.handle == idle_handle && !u.engine.loaded &&
+              strstr(c.text, "Joueur 1") && strstr(c.text, "Joueur 2"),
+          "real link configuration exposes two ordered content slots before loading");
+    cr_ui_back(&u);
+    check(u.page == CR_SUBSYSTEMS && u.focus == 0, "link configuration back restores subsystem row");
     cr_ui_back(&u);
     check(u.page == CR_MAIN && u.focus == 2 && u.depth == 0,
           "subsystem configuration back restores its main menu row");
     row(&u, 3);
     row(&u, 1);
     c = draw(&u);
-    check(u.page == CR_CORE_INFO && strstr(c.text, "CorvusGB") && strstr(c.text, "0.14.1"),
+    check(u.page == CR_CORE_INFO && strstr(c.text, "CorvusGB") && strstr(c.text, "0.15.0"),
           "real core information is reachable");
     cr_ui_back(&u);
     cr_ui_back(&u);
@@ -608,7 +618,10 @@ int main(void) {
     }
     u.engine.loaded = false;
     cr_ui_destroy(&u);
-    rmdir(root);
+    char options_folder[4096];
+    snprintf(options_folder, sizeof(options_folder), "%s/options", root);
+    check(rmdir(options_folder) == 0, "remove empty core-options directory");
+    check(rmdir(root) == 0, "remove menu test storage");
     puts("PASS menu hierarchy, touch feedback, event timing, saved settings and game opacity");
     return 0;
 }

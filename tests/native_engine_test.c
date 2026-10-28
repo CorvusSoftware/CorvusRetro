@@ -145,7 +145,7 @@ int main(void) {
               "closing absent content preserves an idle selected core", &engine);
         corvus_core_info info = {.struct_size = sizeof(info)};
         check(engine.api.get_info(&info) && info.version &&
-                  strcmp(info.version, CR_CORE_VERSION) == 0,
+                  strcmp(info.version, "0.15.0") == 0,
               "pinned core version via CorvusAPI", &engine);
         check(!cr_engine_step(&engine, 0), "idle frame rejected", &engine);
         const uint32_t consoles[] = {4, 6, 5};
@@ -320,6 +320,8 @@ int main(void) {
     check(rmdir(folder) == 0, "remove test state directory", NULL);
     snprintf(folder, sizeof(folder), "%s/saves", root);
     check(rmdir(folder) == 0, "remove test battery directory", NULL);
+    snprintf(folder, sizeof(folder), "%s/options", root);
+    check(rmdir(folder) == 0, "remove test options directory", NULL);
     check(rmdir(root) == 0, "remove test storage", NULL);
     return 0;
 }

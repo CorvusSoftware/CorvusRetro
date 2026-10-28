@@ -138,6 +138,8 @@ int main(void) {
     u.page = CR_PLAY;
     u.engine.loaded = true;
     u.engine.system = 2;
+    u.engine.handle = &u;
+    u.engine.players = 1;
     /* This test drives the menu without loading a real game core. */
     u.engine.api.reset = fixture_reset;
     u.engine.api.serialize_size = fixture_state_size;
@@ -209,7 +211,8 @@ int main(void) {
     u.focus = CR_QUICK_RESUME;
     cr_ui_confirm(&u);
     check(cr_ui_running(&u) && cr_ui_input(&u) == 0, "explicit resume releases menu input");
-    // No engine handle is attached to this input-only test state.
+    // Detach the opaque input-only fixture before normal engine teardown.
+    u.engine.handle = NULL;
     u.engine.loaded = false;
     cr_ui_destroy(&u);
     rmdir(root);

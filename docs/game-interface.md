@@ -37,12 +37,15 @@ Le menu rapide est une liste plein écran qui suspend l'émulation. Il propose :
 7. Succès RetroAchievements.
 8. Informations sur le cœur.
 9. Menu principal.
+10. Joueur des commandes tactiles et du clavier, pendant une session à deux joueurs.
 
 Une opération non disponible pour le cœur est désactivée. Le retour d'un
 sous-menu conserve la pause, la sélection et le défilement du menu rapide.
 Une sauvegarde impossible laisse le contenu chargé et affiche l'erreur.
 Les fichiers d'état restent associés au contenu et à la version du cœur,
-sans changement du format ou des chemins existants.
+sans changement du format ou des chemins solo existants. Les modules officiels
+désactivent les états pendant le câble link, car ils ne sérialisent pas encore
+la session complète. Voir [les menus du cœur](core-menus.md).
 
 ## Vérification
 

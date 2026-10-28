@@ -33,10 +33,49 @@ static pthread_mutex_t text_mutex = PTHREAD_MUTEX_INITIALIZER;
 static char text_value[513];
 static int text_field;
 static bool text_ready, text_accepted;
+static pthread_mutex_t controller_mutex = PTHREAD_MUTEX_INITIALIZER;
+static cr_controller_device controller_devices[CR_CONTROLLER_DEVICE_CAP];
+static size_t controller_count;
+static bool controller_ready;
 static void wake_frontend(void) {
     pthread_mutex_lock(&import_mutex);
     if (import_looper) ALooper_wake(import_looper);
     pthread_mutex_unlock(&import_mutex);
+}
+
+JNIEXPORT void JNICALL Java_com_corvussoftware_corvusretro_MainActivity_controllerDevicesChanged(
+    JNIEnv *env, jclass cls, jintArray devices, jlongArray generations) {
+    (void)cls;
+    if (!devices || !generations) return;
+    jsize count = (*env)->GetArrayLength(env, devices);
+    if (count < 0 || count > CR_CONTROLLER_DEVICE_CAP ||
+        (*env)->GetArrayLength(env, generations) != count) return;
+    jint next[CR_CONTROLLER_DEVICE_CAP];
+    jlong epochs[CR_CONTROLLER_DEVICE_CAP];
+    if (count) (*env)->GetIntArrayRegion(env, devices, 0, count, next);
+    if ((*env)->ExceptionCheck(env)) return;
+    if (count) (*env)->GetLongArrayRegion(env, generations, 0, count, epochs);
+    if ((*env)->ExceptionCheck(env)) return;
+    pthread_mutex_lock(&controller_mutex);
+    controller_count = (size_t)count;
+    for (jsize i = 0; i < count; ++i) {
+        controller_devices[i].id = next[i];
+        controller_devices[i].generation = (uint64_t)epochs[i];
+    }
+    controller_ready = true;
+    pthread_mutex_unlock(&controller_mutex);
+    wake_frontend();
+}
+bool cr_android_controller_devices(cr_controller_device devices[CR_CONTROLLER_DEVICE_CAP], size_t *count) {
+    pthread_mutex_lock(&controller_mutex);
+    bool ready = controller_ready;
+    if (ready) {
+        *count = controller_count;
+        memcpy(devices, controller_devices, controller_count * sizeof(*devices));
+        controller_ready = false;
+    }
+    pthread_mutex_unlock(&controller_mutex);
+    return ready;
 }
 
 JNIEXPORT void JNICALL Java_com_corvussoftware_corvusretro_MainActivity_achievementImageReady(
@@ -325,6 +364,10 @@ bool cr_android_init(cr_android *p, struct android_app *app) {
     if (import_ready)
         ALooper_wake(import_looper);
     pthread_mutex_unlock(&import_mutex);
+    pthread_mutex_lock(&controller_mutex);
+    bool controllers_pending = controller_ready;
+    pthread_mutex_unlock(&controller_mutex);
+    if (controllers_pending) wake_frontend();
     return true;
 }
 void cr_android_destroy(cr_android *p) {
@@ -337,6 +380,10 @@ void cr_android_destroy(cr_android *p) {
     import_looper = NULL;
     import_ready = false;
     pthread_mutex_unlock(&import_mutex);
+    pthread_mutex_lock(&controller_mutex);
+    controller_ready = false;
+    controller_count = 0;
+    pthread_mutex_unlock(&controller_mutex);
     if (p->env && p->cls)
         (*p->env)->DeleteGlobalRef(p->env, p->cls);
     if (p->attached)

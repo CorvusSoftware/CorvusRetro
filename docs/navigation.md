@@ -28,8 +28,8 @@ Le bouton Retour restaure la page précédente, sa sélection, son filtre et son
 défilement. Les trois onglets restent Menu principal, Listes de lecture, Réglages,
 avec les icônes de maison, de liste et d'engrenage. Le menu rapide suspend le jeu
 et occupe tout l'écran. Fermer le contenu conserve le cœur chargé.
-Les [menus du cœur](core-menus.md) décrivent les états disponibles et les
-limites actuelles de CorvusAPI pour les options et les sous-systèmes.
+Les [menus du cœur](core-menus.md) décrivent les options persistantes,
+la sélection de deux jeux pour le câble link et les capacités des sessions.
 
 ## Réaction au toucher
 

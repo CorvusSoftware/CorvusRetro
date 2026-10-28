@@ -18,7 +18,12 @@ static void check(bool ok, const char *message) {
     }
 }
 static const char hash[] = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-static bool committed;
+static bool committed, picker_requested;
+static void pick(void *ctx, int system) {
+    (void)ctx;
+    check(system == 0, "picker receives the selected runtime GBA index");
+    picker_requested = true;
+}
 static bool finish(void *ctx, bool valid, int system, const char *core_id,
                    const char *system_id, char *error, size_t capacity) {
     (void)ctx;
@@ -80,13 +85,16 @@ int main(int argc, char **argv) {
     snprintf(path, sizeof(path), "%s/roms/%s.rom", root, id);
     original_gba(path);
     cr_ui ui;
-    cr_ui_init(&ui, (cr_platform){.games = games, .finish_import = finish}, root);
+    cr_ui_init(&ui, (cr_platform){.games = games, .pick = pick, .finish_import = finish}, root);
     check(ui.game_count == 3 && ui.games[0].system == -1 && ui.games[1].system == -1 &&
               ui.games[2].system == 0,
           "games whose cores are absent stay in the library without reassignment");
     cr_ui_confirm(&ui);
     cr_ui_confirm(&ui);
     check(ui.engine.handle && ui.engine.system == 0, "select the installed GBA core");
+    ui.focus = 1;
+    cr_ui_confirm(&ui);
+    check(picker_requested && ui.importing, "start a picker request for the selected core");
     cr_import incoming = {.system = 0};
     snprintf(incoming.id, sizeof(incoming.id), "%s", wrong_id);
     snprintf(incoming.title, sizeof(incoming.title), "Original.GBA");
@@ -137,6 +145,8 @@ int main(int argc, char **argv) {
     snprintf(path, sizeof(path), "%s/saves/%s.sav", root, id);
     check(access(path, F_OK) == 0 && unlink(path) == 0, "historical GBA battery was persisted");
     snprintf(directory, sizeof(directory), "%s/saves", root);
+    check(rmdir(directory) == 0, "remove private battery directory");
+    snprintf(directory, sizeof(directory), "%s/options", root);
     check(rmdir(directory) == 0 && rmdir(root) == 0, "remove private test state");
     puts("PASS installed core discovery, partial catalog, stable saves and imports");
     return 0;

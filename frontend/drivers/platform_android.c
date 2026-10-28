@@ -17,6 +17,8 @@ typedef struct {
     cr_gl gl;
     cr_ui ui;
     cr_audio audio;
+    cr_controller_ports controllers;
+    bool controllers_running;
     bool window, resumed, focused, was_running, audio_warning, applied_awake;
     int applied_theme;
     double deadline, battery_time, last_draw;
@@ -29,6 +31,33 @@ static double now(void) {
 static void save(application *a) {
     if (!cr_engine_save_battery(&a->ui.engine))
         cr_ui_message(&a->ui, a->ui.engine.error);
+}
+static void controller_devices(application *a) {
+    cr_controller_device devices[CR_CONTROLLER_DEVICE_CAP];
+    size_t count;
+    if (cr_android_controller_devices(devices, &count)) {
+        unsigned removed = cr_controller_ports_sync(&a->controllers, devices, count);
+        for (unsigned p = 0; p < CR_CONTROLLER_PORT_COUNT; ++p)
+            if (removed & (1u << p)) cr_ui_release_player(&a->ui, p);
+    }
+}
+static void controller_mode(application *a) {
+    bool running = cr_ui_running(&a->ui);
+    if (running != a->controllers_running) {
+        cr_controller_ports_clear(&a->controllers);
+        for (unsigned p = 0; p < CR_CONTROLLER_PORT_COUNT; ++p)
+            cr_ui_release_player(&a->ui, p);
+        a->controllers_running = running;
+    }
+}
+static void controller_apply(application *a, unsigned port, unsigned previous) {
+    unsigned current = cr_controller_mask(&a->controllers, port);
+    cr_ui_player_key(&a->ui, port, previous & ~current, false);
+    cr_ui_player_key(&a->ui, port, current & ~previous, true);
+}
+static bool controller_source(int source) {
+    return (source & AINPUT_SOURCE_GAMEPAD) == AINPUT_SOURCE_GAMEPAD ||
+           (source & AINPUT_SOURCE_JOYSTICK) == AINPUT_SOURCE_JOYSTICK;
 }
 static void command(struct android_app *app, int32_t cmd) {
     application *a = app->userData;
@@ -53,6 +82,7 @@ static void command(struct android_app *app, int32_t cmd) {
         a->window = false;
         cr_audio_pause(&a->audio);
         cr_ui_clear_input(&a->ui);
+        cr_controller_ports_clear(&a->controllers);
         save(a);
         break;
     case APP_CMD_RESUME:
@@ -61,6 +91,7 @@ static void command(struct android_app *app, int32_t cmd) {
             if (pending && !a->ui.installing) {
                 save(a);
                 cr_ui_clear_input(&a->ui);
+                cr_controller_ports_clear(&a->controllers);
             }
             a->ui.installing = pending;
         }
@@ -72,6 +103,7 @@ static void command(struct android_app *app, int32_t cmd) {
         a->resumed = false;
         cr_audio_pause(&a->audio);
         cr_ui_clear_input(&a->ui);
+        cr_controller_ports_clear(&a->controllers);
         save(a);
         break;
     case APP_CMD_GAINED_FOCUS:
@@ -82,10 +114,12 @@ static void command(struct android_app *app, int32_t cmd) {
         a->focused = false;
         cr_audio_pause(&a->audio);
         cr_ui_clear_input(&a->ui);
+        cr_controller_ports_clear(&a->controllers);
         save(a);
         break;
     case APP_CMD_CONFIG_CHANGED:
         cr_ui_clear_input(&a->ui);
+        cr_controller_ports_clear(&a->controllers);
         break;
     default:
         break;
@@ -124,6 +158,13 @@ static int button(int key) {
 static int32_t input(struct android_app *app, AInputEvent *event) {
     application *a = app->userData;
     cr_ui *u = &a->ui;
+    controller_devices(a);
+    controller_mode(a);
+    int source = AInputEvent_getSource(event);
+    int port = cr_controller_port(&a->controllers, AInputEvent_getDeviceId(event));
+    bool controller = cr_controller_input(&a->controllers, AInputEvent_getDeviceId(event),
+                                          controller_source(source),
+                                          (source & AINPUT_SOURCE_DPAD) == AINPUT_SOURCE_DPAD);
     if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_KEY) {
         if (a->ui.ra_editing) return 0;
         int key = AKeyEvent_getKeyCode(event), action = AKeyEvent_getAction(event);
@@ -136,7 +177,13 @@ static int32_t input(struct android_app *app, AInputEvent *event) {
         if (cr_ui_running(u)) {
             int b = button(key);
             if (b >= 0) {
-                cr_ui_key(u, 1u << b, down);
+                if (controller) {
+                    if (port >= 0) {
+                        unsigned previous = cr_controller_mask(&a->controllers, (unsigned)port);
+                        cr_controller_button(&a->controllers, (unsigned)port, 1u << b, down);
+                        controller_apply(a, (unsigned)port, previous);
+                    }
+                } else cr_ui_key(u, 1u << b, down);
                 return 1;
             }
         } else if (down) {
@@ -161,11 +208,37 @@ static int32_t input(struct android_app *app, AInputEvent *event) {
         return button(key) >= 0 ? 1 : 0;
     }
     if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION) {
+        if (controller) {
+            if (port < 0) return 1;
+            unsigned previous = cr_controller_mask(&a->controllers, (unsigned)port);
+            unsigned directions = 0;
+            if ((AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK) != AMOTION_EVENT_ACTION_CANCEL &&
+                AMotionEvent_getPointerCount(event)) {
+                float x = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_X, 0);
+                float y = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_Y, 0);
+                float hat_x = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_HAT_X, 0);
+                float hat_y = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_HAT_Y, 0);
+                if (y < -.5f || hat_y < -.5f) directions |= 1u << 0;
+                if (y > .5f || hat_y > .5f) directions |= 1u << 1;
+                if (x < -.5f || hat_x < -.5f) directions |= 1u << 2;
+                if (x > .5f || hat_x > .5f) directions |= 1u << 3;
+            }
+            cr_controller_axes(&a->controllers, (unsigned)port, directions);
+            if (cr_ui_running(u)) controller_apply(a, (unsigned)port, previous);
+            else if (!u->ra_editing) {
+                unsigned pressed = directions & ~previous;
+                if (pressed & (1u << 0)) cr_ui_move(u, -1);
+                if (pressed & (1u << 1)) cr_ui_move(u, 1);
+            }
+            return 1;
+        }
+        if (!(source & AINPUT_SOURCE_CLASS_POINTER)) return 0;
         int action = AMotionEvent_getAction(event), kind = action & AMOTION_EVENT_ACTION_MASK,
             index = (action & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >>
                     AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;
         if (kind == AMOTION_EVENT_ACTION_CANCEL) {
             cr_ui_clear_input(u);
+            cr_controller_ports_clear(&a->controllers);
             return 1;
         }
         size_t count = AMotionEvent_getPointerCount(event);
@@ -199,6 +272,7 @@ void android_main(struct android_app *app) {
         return;
     }
     app->userData = a;
+    cr_controller_ports_init(&a->controllers);
     if (!cr_android_init(&a->platform, app)) {
         __android_log_write(ANDROID_LOG_ERROR, "CorvusRetro", "Services Android indisponibles");
         cr_android_destroy(&a->platform);
@@ -215,6 +289,7 @@ void android_main(struct android_app *app) {
     a->last_draw = now();
     a->applied_theme = -1;
 #ifndef NDEBUG
+    unsigned last_players = ~0u, last_controlled = ~0u;
     int last_page = -1, last_core = -2, last_content = -1, last_quick = -1, last_theme = -1,
         last_active = -1, last_show_input = -1, last_installing = -1;
 #endif
@@ -234,6 +309,8 @@ void android_main(struct android_app *app) {
             source->process(app, source);
         if (app->destroyRequested)
             break;
+        controller_devices(a);
+        controller_mode(a);
         cr_achievement_response response;
         while (cr_achievement_response_pop(&response)) {
             cr_cheevos_response(a->ui.achievements, response.id, response.status, response.body, response.size);
@@ -274,11 +351,12 @@ void android_main(struct android_app *app) {
         if (last_page != a->ui.page || last_core != a->ui.engine.system ||
             last_content != a->ui.engine.loaded || last_quick != a->ui.quick ||
             last_theme != a->ui.theme || last_active != active || last_show_input != a->ui.show_input ||
-            last_installing != a->ui.installing) {
+            last_installing != a->ui.installing || last_players != a->ui.engine.players ||
+            last_controlled != a->ui.input_player) {
             __android_log_print(ANDROID_LOG_DEBUG, "CorvusRetro",
-                                "frontend page=%d core=%d content=%d quick=%d theme=%d active=%d show_input=%d installing=%d",
+                                "frontend page=%d core=%d content=%d quick=%d theme=%d active=%d show_input=%d installing=%d players=%u controlled=%u",
                                 a->ui.page, a->ui.engine.system, a->ui.engine.loaded, a->ui.quick,
-                                a->ui.theme, active, a->ui.show_input, a->ui.installing);
+                                a->ui.theme, active, a->ui.show_input, a->ui.installing, a->ui.engine.players, a->ui.input_player);
             last_page = a->ui.page;
             last_core = a->ui.engine.system;
             last_content = a->ui.engine.loaded;
@@ -287,6 +365,8 @@ void android_main(struct android_app *app) {
             last_active = active;
             last_show_input = a->ui.show_input;
             last_installing = a->ui.installing;
+            last_players = a->ui.engine.players;
+            last_controlled = a->ui.input_player;
         }
 #endif
         if (running != a->was_running) {
@@ -298,7 +378,9 @@ void android_main(struct android_app *app) {
             a->was_running = running;
         }
         if (running && time >= a->deadline) {
-            if (cr_engine_step(&a->ui.engine, cr_ui_input(&a->ui))) {
+            unsigned masks[2];
+            cr_ui_inputs(&a->ui, masks);
+            if (cr_engine_step_players(&a->ui.engine, masks)) {
                 cr_ui_achievement_frame(&a->ui);
                 if (a->ui.audio) {
                     if (cr_audio_start(&a->audio, a->ui.engine.rate)) {
@@ -315,6 +397,7 @@ void android_main(struct android_app *app) {
                 cr_ui_message(&a->ui, a->ui.engine.error);
                 a->ui.quick = true;
                 cr_ui_clear_input(&a->ui);
+                cr_controller_ports_clear(&a->controllers);
                 cr_audio_pause(&a->audio);
             }
             a->deadline += 1.0 / a->ui.engine.fps;

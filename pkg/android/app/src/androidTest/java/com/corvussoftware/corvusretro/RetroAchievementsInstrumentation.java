@@ -225,9 +225,9 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
     }
     private void prepareGame() throws Exception {
         Context context = getTargetContext();
-        File archive = new File(fixtures, "CorvusGB-0.14.1-android-x86_64.zip");
+        File archive = new File(fixtures, "CorvusGB-0.15.0-android-x86_64.zip");
         JSONObject core = new JSONObject().put("id", "corvus.gb").put("name", "CorvusGB").put("description", "Qualification")
-                .put("version", "0.14.1").put("abi", "x86_64").put("api_version", 0).put("library_name", "libcorvus_gb.so")
+                .put("version", "0.15.0").put("abi", "x86_64").put("api_version", 0).put("library_name", "libcorvus_gb.so")
                 .put("size", archive.length()).put("sha256", CoreStore.hash(archive))
                 .put("archive_url", "https://github.com/CorvusSoftware/CorvusRetro/releases/download/v0.13.0/" + archive.getName());
         new CoreStore(context).install(new CoreRepository.Core(core), archive);
@@ -354,9 +354,9 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
         String[] names = {"CorvusGB", "CorvusGBC", "CorvusGBA"};
         String[] ids = {"corvus.gb", "corvus.gbc", "corvus.gba"};
         for (int i = 0; i < names.length; ++i) {
-            File archive = new File(fixtures, names[i] + "-0.14.1-android-x86_64.zip");
+            File archive = new File(fixtures, names[i] + "-0.15.0-android-x86_64.zip");
             JSONObject metadata = new JSONObject().put("id", ids[i]).put("name", names[i]).put("description", "Qualification")
-                    .put("version", "0.14.1").put("abi", "x86_64").put("api_version", 0)
+                    .put("version", "0.15.0").put("abi", "x86_64").put("api_version", 0)
                     .put("library_name", "libcorvus_" + ids[i].substring(7) + ".so")
                     .put("size", archive.length()).put("sha256", CoreStore.hash(archive))
                     .put("archive_url", "https://github.com/CorvusSoftware/CorvusRetro/releases/download/v0.16.0/" + archive.getName());
@@ -412,6 +412,115 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
     private void quickRow(int index) {
         for (int i = 0; i < index; ++i) sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_DOWN);
         sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER);
+    }
+    private void configurationKey(MainActivity activity, int key) throws Exception {
+        waitFor(activity::hasWindowFocus, "configuration activity owns its input window");
+        sendKeyDownUpSync(key);
+        android.os.SystemClock.sleep(80);
+    }
+    private void configurationRow(MainActivity activity, int index) throws Exception {
+        for (int i = 0; i < index; ++i) configurationKey(activity, android.view.KeyEvent.KEYCODE_DPAD_DOWN);
+        configurationKey(activity, android.view.KeyEvent.KEYCODE_DPAD_CENTER);
+    }
+    private void configurationPlayers(int players, int controlled) throws Exception {
+        waitFor(() -> { String current = frontendState(); return current.contains(" players=" + players + " controlled=" + controlled)
+                && current.contains(" active=1 "); }, "native paired players and selected input port " + players + "/" + controlled);
+    }
+    private String configurationFile(File file) throws Exception {
+        if (!file.exists()) return "";
+        check(file.isFile() && file.length() <= 128 * 1024, "bounded native options file");
+        try (InputStream in = new java.io.FileInputStream(file); ByteArrayOutputStream bytes = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[4096]; int size;
+            while ((size = in.read(buffer)) != -1) {
+                check(bytes.size() + size <= 128 * 1024, "native options read remains bounded");
+                bytes.write(buffer, 0, size);
+            }
+            return new String(bytes.toByteArray(), StandardCharsets.UTF_8);
+        }
+    }
+    private void configuration() throws Exception {
+        check(overlaySystem >= 0 && overlaySystem < 3, "supported configuration console");
+        String id = prepareOverlayGame(overlaySystem);
+        Context context = getTargetContext();
+        String coreId = new String[] {"corvus.gb", "corvus.gbc", "corvus.gba"}[overlaySystem];
+        File options = new File(context.getFilesDir(), "options/" + coreId + ".cfg");
+        String prefix = "configuration-" + overlaySystem + (landscape ? "-landscape" : "-portrait");
+        context.getSharedPreferences("corvus", Context.MODE_PRIVATE).edit().putInt("achievements_enabled", 0)
+                .putString("theme", "corvus").putInt("show_input", 1).putBoolean("audio", true).commit();
+        MainActivity activity = (MainActivity) startActivitySync(new Intent(context, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        try {
+            check(getUiAutomation().setRotation(landscape ? android.app.UiAutomation.ROTATION_FREEZE_90 : android.app.UiAutomation.ROTATION_FREEZE_0), "configuration test rotation");
+            waitFor(() -> { int[] area = activity.safeWindowArea(); return area != null && (area[0] > area[1]) == landscape; }, "configuration safe viewport");
+            state(0, -1, 0, 0);
+            configurationRow(activity, 0); state(3, -1, 0, 0);
+            configurationRow(activity, overlaySystem); state(0, overlaySystem, 0, 0);
+            configurationPlayers(0, 0);
+            configurationRow(activity, 2); state(19, overlaySystem, 0, 0);
+            screenshot(prefix + "-subsystems");
+            configurationRow(activity, 0); state(22, overlaySystem, 0, 0);
+            configurationRow(activity, 2);
+            android.os.SystemClock.sleep(200);
+            state(22, overlaySystem, 0, 0); configurationPlayers(0, 0);
+            configurationKey(activity, android.view.KeyEvent.KEYCODE_DPAD_DOWN);
+            configurationRow(activity, 0); state(23, overlaySystem, 0, 0);
+            String[] games = activity.games(); int row = 1, selectedRow = -1;
+            for (int i = 0; i < games.length; i += 6) {
+                if (!coreId.equals(games[i + 4])) continue;
+                if (id.equals(games[i])) selectedRow = row;
+                row++;
+            }
+            check(selectedRow > 0, "private synthetic game appears in its core's slot selector");
+            configurationRow(activity, selectedRow); state(22, overlaySystem, 0, 0);
+            configurationRow(activity, 1); state(23, overlaySystem, 0, 0);
+            configurationRow(activity, selectedRow); state(22, overlaySystem, 0, 0);
+            screenshot(prefix + "-both-slots");
+            configurationRow(activity, 1); state(8, overlaySystem, 1, 0); configurationPlayers(2, 0);
+            android.os.SystemClock.sleep(700); screenshot(prefix + "-playing");
+            quickOpen(activity, overlaySystem); screenshot(prefix + "-quick");
+            configurationRow(activity, 3);
+            android.os.SystemClock.sleep(200); state(8, overlaySystem, 1, 1);
+            configurationKey(activity, android.view.KeyEvent.KEYCODE_BACK); state(8, overlaySystem, 1, 0);
+            quickOpen(activity, overlaySystem); configurationRow(activity, 4); state(20, overlaySystem, 1, 0);
+            screenshot(prefix + "-options");
+            String key = overlaySystem == 0 ? "gb.palette" : overlaySystem == 1 ? "gbc.colors" : "gba.save_type";
+            String[] values = overlaySystem == 0 ? new String[] {"green", "gray", "amber"} : overlaySystem == 1 ?
+                    new String[] {"auto", "gray", "up", "a_up", "b_up", "left", "a_left", "b_left", "down", "a_down", "b_down", "right", "a_right", "b_right"} :
+                    new String[] {"auto", "none", "sram", "flash_64k", "flash_128k", "eeprom_512", "eeprom_8k"};
+            String currentOptions = configurationFile(options); int current = 0;
+            for (int i = 0; i < values.length; ++i)
+                if (currentOptions.contains("\n" + key + "=" + values[i] + "\n")) current = i;
+            int preferred = overlaySystem == 2 ? 2 : 1;
+            int target = current == preferred ? 0 : preferred;
+            configurationRow(activity, 0); state(21, overlaySystem, 1, 0);
+            screenshot(prefix + "-values");
+            configurationRow(activity, (target - current + values.length) % values.length);
+            state(20, overlaySystem, 1, 0);
+            check(configurationFile(options).contains("\n" + key + "=" + values[target] + "\n"), "native option selection is durably persisted by stable value ID");
+            configurationKey(activity, android.view.KeyEvent.KEYCODE_BACK); state(8, overlaySystem, 1, 1);
+            configurationKey(activity, android.view.KeyEvent.KEYCODE_BACK); state(8, overlaySystem, 1, 0);
+            quickOpen(activity, overlaySystem); configurationRow(activity, 1);
+            state(8, overlaySystem, 1, 0); configurationPlayers(2, 0);
+            android.os.SystemClock.sleep(700);
+            quickOpen(activity, overlaySystem); configurationRow(activity, 9);
+            state(8, overlaySystem, 1, 1); configurationPlayers(2, 1);
+            screenshot(prefix + "-player-two");
+            configurationKey(activity, android.view.KeyEvent.KEYCODE_BACK); state(8, overlaySystem, 1, 0);
+            quickOpen(activity, overlaySystem); configurationRow(activity, 2);
+            state(0, overlaySystem, 0, 0); configurationPlayers(0, 0);
+            check(configurationFile(options).contains("\n" + key + "=" + values[target] + "\n"), "closing content preserves its core options");
+            if (overlaySystem == 2) {
+                check(new File(context.getFilesDir(), "saves/" + id + ".sav").length() == 32 * 1024, "player one keeps the historic SRAM path");
+                check(new File(context.getFilesDir(), "saves/" + id + "-link-p2.sav").length() == 32 * 1024, "same-ROM player two has independent SRAM storage");
+            }
+            configurationRow(activity, 2); state(19, overlaySystem, 0, 0);
+            configurationKey(activity, android.view.KeyEvent.KEYCODE_BACK); state(0, overlaySystem, 0, 0);
+            configurationKey(activity, android.view.KeyEvent.KEYCODE_DPAD_UP);
+            configurationKey(activity, android.view.KeyEvent.KEYCODE_DPAD_UP);
+            configurationRow(activity, 0); state(0, -1, 0, 0); configurationPlayers(0, 0);
+            configurationRow(activity, 2); state(14, -1, 0, 0);
+            screenshot(prefix + "-unloaded-information");
+            configurationKey(activity, android.view.KeyEvent.KEYCODE_BACK); state(0, -1, 0, 0);
+        } finally { runOnMainSync(activity::finish); }
     }
     private void overlays() throws Exception {
         check(overlaySystem >= 0 && overlaySystem < 3, "supported overlay console");
@@ -633,7 +742,7 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
     @Override public void onStart() {
         Bundle result = new Bundle();
         try {
-            if ("overlays".equals(phase)) overlays(); else if ("navigation".equals(phase)) navigation(); else if ("popups".equals(phase)) popups(); else if ("ui".equals(phase)) ui(); else if ("outbox".equals(phase)) outbox(); else if ("recover".equals(phase)) recover(); else credentials();
+            if ("configuration".equals(phase)) configuration(); else if ("overlays".equals(phase)) overlays(); else if ("navigation".equals(phase)) navigation(); else if ("popups".equals(phase)) popups(); else if ("ui".equals(phase)) ui(); else if ("outbox".equals(phase)) outbox(); else if ("recover".equals(phase)) recover(); else credentials();
             result.putString("stream", "PASS " + checks + " Android RetroAchievements checks phase=" + phase + " pid=" + android.os.Process.myPid() + "\n");
             finish(Activity.RESULT_OK, result);
         } catch (Throwable failure) {

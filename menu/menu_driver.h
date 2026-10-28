@@ -30,7 +30,10 @@ enum {
     CR_ACHIEVEMENTS,
     CR_SAVESTATES,
     CR_SUBSYSTEMS,
-    CR_CORE_OPTIONS
+    CR_CORE_OPTIONS,
+    CR_CORE_OPTION_VALUES,
+    CR_SUBSYSTEM_CONFIG,
+    CR_SUBSYSTEM_CONTENTS
 };
 /* Stable quick-menu row IDs; unsupported core operations stay disabled. */
 enum {
@@ -43,6 +46,7 @@ enum {
     CR_QUICK_ACHIEVEMENTS,
     CR_QUICK_CORE_INFO,
     CR_QUICK_MAIN,
+    CR_QUICK_PLAYER,
     CR_QUICK_COUNT
 };
 enum { CR_TOUCH_DOWN, CR_TOUCH_MOVE, CR_TOUCH_UP, CR_TOUCH_CANCEL };
@@ -74,6 +78,13 @@ typedef struct {
     bool catalog_loading;
     int page, filter, theme, focus, tab, menu_pointer, feedback_target;
     bool quick, audio, awake, importing, show_input, installing;
+    unsigned input_player;
+    unsigned hardware_keys[2], hardware_pulses[2];
+    uint64_t core_revision, import_revision;
+    bool import_link;
+    int link_slot, import_slot;
+    char option_key[96], subsystem_id[96], import_subsystem_id[96];
+    char link_ids[2][96], link_titles[2][512];
     float width, height, scroll, quick_scroll, text_height;
     float feedback_alpha, control_feedback[10];
     cr_navigation history[8];
@@ -95,6 +106,9 @@ void cr_ui_back(cr_ui *);
 void cr_ui_confirm(cr_ui *);
 void cr_ui_move(cr_ui *, int);
 void cr_ui_key(cr_ui *, unsigned, bool);
+void cr_ui_player_key(cr_ui *, unsigned, unsigned, bool);
+void cr_ui_release_player(cr_ui *, unsigned);
+void cr_ui_inputs(cr_ui *, unsigned[2]);
 void cr_ui_clear_input(cr_ui *);
 unsigned cr_ui_input(cr_ui *);
 bool cr_ui_running(const cr_ui *);
