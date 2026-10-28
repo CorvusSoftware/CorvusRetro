@@ -17,6 +17,10 @@ typedef struct cr_engine {
     struct cr_engine_output *output;
     corvus_core_api api;
     corvus_achievements_api achievements;
+    corvus_options_api options;
+    corvus_subsystem_api subsystems;
+    struct cr_engine_options *saved_options;
+    unsigned players;
     int system;
     bool loaded;
     int width, height, rate;
@@ -24,17 +28,29 @@ typedef struct cr_engine {
     uint32_t *pixels;
     int16_t audio[4096];
     size_t audio_count;
-    char id[96], root[4096], error[256];
+    char id[96], second_id[96], subsystem_id[96], root[4096], module_path[4096], error[256];
 } cr_engine;
 
 /* All operations for an engine run on its owning frontend thread. */
 void cr_engine_init(cr_engine *engine, const char *root);
 bool cr_game_id_valid(const char *id);
 bool cr_engine_select(cr_engine *engine, int system);
+bool cr_engine_core_info(const cr_engine *engine, corvus_core_info *out);
 bool cr_engine_open(cr_engine *engine, int system, const char *id, const char *path);
+bool cr_engine_open_subsystem(cr_engine *engine, int system, const char *subsystem_id,
+                              const char *ids[2], const char *paths[2]);
+size_t cr_engine_option_count(const cr_engine *engine);
+bool cr_engine_option(const cr_engine *engine, size_t index, corvus_core_option *out);
+uint32_t cr_engine_option_value(const cr_engine *engine, const char *key);
+bool cr_engine_set_option(cr_engine *engine, const char *key, uint32_t value);
+size_t cr_engine_subsystem_count(const cr_engine *engine);
+bool cr_engine_subsystem(const cr_engine *engine, size_t index, corvus_subsystem_info *out);
+bool cr_engine_can_reset(const cr_engine *engine);
+bool cr_engine_can_state(const cr_engine *engine);
 bool cr_engine_check(cr_engine *engine, int system, const char *path);
 size_t cr_engine_read_achievement_memory(void *, uint32_t, uint8_t *, size_t);
 bool cr_engine_step(cr_engine *engine, unsigned mask);
+bool cr_engine_step_players(cr_engine *engine, const unsigned masks[2]);
 bool cr_engine_reset(cr_engine *engine);
 bool cr_engine_save_state(cr_engine *engine);
 bool cr_engine_load_state(cr_engine *engine);

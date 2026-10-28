@@ -4,6 +4,7 @@
 #ifndef CORVUS_ANDROID_BACKEND_H
 #define CORVUS_ANDROID_BACKEND_H
 #include "render.h"
+#include "controller_ports.h"
 #include <android_native_app_glue.h>
 #include <jni.h>
 typedef struct {
@@ -26,5 +27,6 @@ bool cr_android_core_catalog(cr_core_catalog *);
 bool cr_android_update_modules(void);
 bool cr_android_core_status(char *, size_t, bool *);
 bool cr_android_text_result(int *, char *, size_t, bool *);
+bool cr_android_controller_devices(cr_controller_device devices[CR_CONTROLLER_DEVICE_CAP], size_t *count);
 bool cr_android_clear_error(cr_android *);
 #endif

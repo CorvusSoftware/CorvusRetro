@@ -15,9 +15,14 @@ import android.graphics.Insets;
 import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
+import android.hardware.input.InputManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.SparseLongArray;
 import android.view.DisplayCutout;
+import android.view.InputDevice;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowManager;
@@ -55,6 +60,23 @@ public final class MainActivity extends NativeActivity {
     private int pickerSystem;
     // Immutable snapshot published by the UI thread, read by the native render thread.
     private volatile int[] windowArea;
+    private InputManager inputManager;
+    private final SparseLongArray controllerGenerations = new SparseLongArray();
+    private long controllerGeneration;
+    private final InputManager.InputDeviceListener controllerListener = new InputManager.InputDeviceListener() {
+        @Override public void onInputDeviceAdded(int deviceId) {
+            controllerGenerations.delete(deviceId);
+            publishControllerDevices();
+        }
+        @Override public void onInputDeviceRemoved(int deviceId) {
+            controllerGenerations.delete(deviceId);
+            publishControllerDevices();
+        }
+        @Override public void onInputDeviceChanged(int deviceId) {
+            controllerGenerations.delete(deviceId);
+            publishControllerDevices();
+        }
+    };
 
     private static native void imported(String id, String title, int system, String path, String error);
     static native void achievementResponse(long id, int status, byte[] body);
@@ -63,6 +85,29 @@ public final class MainActivity extends NativeActivity {
     static native void coreCatalogUpdated(String[] packages, String error);
     static native void coreModulesUpdated(String[] paths);
     static native void coreInstallStatus(String message, boolean finished);
+    private static native void controllerDevicesChanged(int[] deviceIds, long[] generations);
+
+    private void publishControllerDevices() {
+        if (destroyed || inputManager == null) return;
+        // Bound the service snapshot; devices outside this bound remain unassigned.
+        int[] controllers = new int[64];
+        long[] generations = new long[64];
+        int count = 0;
+        for (int id : inputManager.getInputDeviceIds()) {
+            InputDevice device = inputManager.getInputDevice(id);
+            if (device == null || (!device.supportsSource(InputDevice.SOURCE_GAMEPAD)
+                    && !device.supportsSource(InputDevice.SOURCE_JOYSTICK))) continue;
+            if (count == controllers.length) break;
+            long generation = controllerGenerations.get(id);
+            if (generation == 0) {
+                generation = ++controllerGeneration;
+                controllerGenerations.put(id, generation);
+            }
+            controllers[count] = id;
+            generations[count++] = generation;
+        }
+        controllerDevicesChanged(Arrays.copyOf(controllers, count), Arrays.copyOf(generations, count));
+    }
 
     @Override public void onCreate(Bundle state) {
         // NativeActivity starts android_main in super.onCreate. Services must already exist.
@@ -71,6 +116,11 @@ public final class MainActivity extends NativeActivity {
         achievements = new RetroAchievementsService(this);
         achievementImages = new RetroAchievementsImages(this, MainActivity::achievementImageReady);
         textInput = new NativeTextInput(this);
+        inputManager = getSystemService(InputManager.class);
+        if (inputManager != null) {
+            inputManager.registerInputDeviceListener(controllerListener, new Handler(Looper.getMainLooper()));
+            publishControllerDevices();
+        }
         if (state != null) {
             pickerOpen = state.getBoolean("picker", false);
             pickerSystem = state.getInt("picker_system", 0);
@@ -127,6 +177,7 @@ public final class MainActivity extends NativeActivity {
         achievements.resumeAwards();
     }
     @Override protected void onDestroy() {
+        if (inputManager != null) inputManager.unregisterInputDeviceListener(controllerListener);
         synchronized (importLock) {
             destroyed = true;
             if (pending != null) { pending.discard(); pending = null; }
