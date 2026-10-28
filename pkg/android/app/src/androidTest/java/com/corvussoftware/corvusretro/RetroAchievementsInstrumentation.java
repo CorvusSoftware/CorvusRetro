@@ -276,7 +276,8 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
         return false;
     }
     private void capturePopup(String name, int color) throws Exception {
-        long deadline = android.os.SystemClock.uptimeMillis() + 1800;
+        // Launch artwork may use the three-second image wait before its descent.
+        long deadline = android.os.SystemClock.uptimeMillis() + ("launch".equals(name) ? 4500 : 1800);
         android.graphics.Bitmap bitmap = null;
         do {
             if (bitmap != null) bitmap.recycle();
@@ -501,7 +502,8 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             tab(activity, 0); screenshot("main");
         } finally { runOnMainSync(activity::finish); }
     }
-    private void noLaunchPlaceholder(MainActivity activity, String stage) throws Exception {
+    private void noLaunchPlaceholder(MainActivity activity, String stage,
+                                     java.util.concurrent.CountDownLatch captured) throws Exception {
         android.graphics.Bitmap screen = null;
         long deadline = android.os.SystemClock.uptimeMillis() + 5000;
         do {
@@ -509,6 +511,8 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             android.os.SystemClock.sleep(100);
             screen = getUiAutomation().takeScreenshot();
         } while ((screen == null || !hasColor(screen, 0xffe0f8d0)) && android.os.SystemClock.uptimeMillis() < deadline);
+        // The screenshot is immutable; image delivery need not wait for PNG encoding.
+        if (screen != null && captured != null) captured.countDown();
         check(screen != null && hasColor(screen, 0xffe0f8d0), stage + " shows an actual GB video frame");
         int[] area = activity.safeWindowArea();
         int height = Math.min((int) (120 * activity.getResources().getDisplayMetrics().density), screen.getHeight() - area[3]);
@@ -554,11 +558,10 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             tap(activity, 150, 100); tap(activity, 150, 100);
             state(8, 0, 1, 0);
             waitFor(() -> metadataRequested, "game identification is pending");
-            noLaunchPlaceholder(activity, "waiting-metadata");
+            noLaunchPlaceholder(activity, "waiting-metadata", null);
             metadataRelease.countDown();
             waitFor(() -> gameImageRequested, "game image requested after identification");
-            noLaunchPlaceholder(activity, "waiting-image");
-            gameImageRelease.countDown();
+            noLaunchPlaceholder(activity, "waiting-image", gameImageRelease);
             capturePopup("launch", GAME_COLOR);
             android.os.SystemClock.sleep(4500);
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BUTTON_A);
