@@ -433,12 +433,12 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             float[] m = overlayMetrics(activity); float w = m[0], h = m[1], s = m[2];
             float hx = h >= w ? w - 36 * s : 32 * s, hy = h - 36 * s;
             tap(activity, hx, hy);
-            check(activity.preference("show_input", -1) == 0, "overlay hides without stopping emulation");
+            waitFor(() -> activity.preference("show_input", -1) == 0, "overlay hides without stopping emulation");
             screenshot("overlay-" + overlaySystem + "-hidden");
             quickOpen(activity, overlaySystem); screenshot("overlay-" + overlaySystem + "-quick");
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK); state(8, overlaySystem, 1, 0);
             tap(activity, hx, hy);
-            check(activity.preference("show_input", -1) == 1, "hidden overlay restores with its own button");
+            waitFor(() -> activity.preference("show_input", -1) == 1, "hidden overlay restores with its own button");
             quickOpen(activity, overlaySystem); quickRow(3); state(18, overlaySystem, 1, 0);
             screenshot("overlay-" + overlaySystem + "-states");
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER); state(8, overlaySystem, 1, 0);
