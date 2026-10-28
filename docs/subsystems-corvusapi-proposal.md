@@ -57,9 +57,12 @@ Les callbacks restent synchrones et appartiennent au thread frontend.
 1. CorvusCore expose le sous-système via l'extension publique acceptée, avec
    deux emplacements obligatoires et l'identifiant stable de son fournisseur.
    Il encapsule son hub, ses deux machines et leur destruction ordonnée.
-2. CorvusRetro affiche « Sous-systèmes » seulement si le cœur chargé annonce
-   au moins un sous-système accepté. `max_players` ou le nom du cœur ne
-   remplacent jamais cette déclaration. Sans cœur, l'entrée disparaît.
+2. CorvusRetro affiche « Configuration du sous-système » dès qu'un cœur est
+   chargé, à la demande de l'utilisateur. Sans cœur, l'entrée disparaît.
+   Dans la version0.17.1, cette page indique l'indisponibilité de la fonction.
+   Après ajout du contrat public, seuls les sous-systèmes réellement déclarés
+   et acceptés pourront être configurés. `max_players` ou le nom du cœur ne
+   remplacent jamais cette déclaration.
 3. « Deux joueurs (câble link) » ouvre la sélection de Jeu 1, Jeu 2 et Démarrer.
    Une annulation conserve la session active. Une sélection est invalidée si
    le cœur est déchargé ou remplacé, y compris pendant le sélecteur Android.

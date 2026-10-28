@@ -1,7 +1,7 @@
 # CorvusRetro
 
 Frontend Android original C11 : NativeActivity, EGL/OpenGL ES2, AAudio. Java fournit uniquement les services OS.
-Version publiée 0.17.0/code20 ; cible35/min26 ; NDK27.2 ; JDK17+ ; Gradle8.13/AGP8.9.1.
+Version publiée 0.17.1/code21 ; cible35/min26 ; NDK27.2 ; JDK17+ ; Gradle8.13/AGP8.9.1.
 Sources : menu/, cores/, gfx/drivers/gl2, gfx/widgets/notifications, audio/drivers/aaudio, input/, frontend/drivers/, tasks/, cheevos/.
 Android sous pkg/android/, wrapper Gradle racine délégué ; dépendances sous deps/.
 Base sans moteur ; six modules CorvusAPI distincts, exclus de l'APK, distribués en archives individuelles vérifiées.
@@ -25,4 +25,7 @@ Instrumentation navigation : attendre focus fenêtre et état active=1 après ro
 
 Interface0.17 : input/play_layout et input/overlay calculent et dessinent les profils GB/GBC8 contrôles et GBA10. Traits gris, feedback clair, hide réversible ; vidéo native au-dessus en portrait et entre les gouttières en paysage. Menu portrait centré, paysage au-dessus de la croix gauche. Menu rapide plein écran, CR_SAVESTATES pour save/load réels ; retour restaure pause/focus/scroll/onglet.
 Qualification UI : attendre la confirmation asynchrone des préférences et le focus + état natif actif après HOME. Libérer la réponse image dès capture du bitmap immuable, avant encodagePNG ; le lancement dispose de3s d'attente image puis de sa descente. Une capture de1.8s ne couvre pas ce budget.
-Livraison0.17 : tagv0.17.0 surcb30229508ae5ee91181672fdb9054ad1de32662, CI40647479489, buildsigné40647835058, publication40649001619 SUCCESS. APK public identique au candidat qualifié, signature durable ; six archives0.14.1 identiques à0.16.0, donc catalogues existants conservés.
+Livraison0.17.1 : tagv0.17.1 surbfbf7b5666c2b2c5dcd2b23f3b21d57332571495, CI40686561237, buildsigné40687009888, publication40688881844 SUCCESS. APK public identique au candidat qualifié, signature durable ; six archives0.14.1 identiques à0.16.0, donc catalogues existants conservés.
+
+Menus0.17.1 : CR_SUBSYSTEMS19 visible via main dès engine.handle, maintenu après fermeture contenu, absent après unload complet. CR_CORE_OPTIONS20 via menu rapide au rang4, commandes désormais5 ; pages sans capacités déclarées explicitement indisponibles. CorvusAPI public sans extensions de sous-systèmes/options : aucun link ou réglage moteur inventé, ne pas appeler le SDK privé. Référence RetroArch af622105/menu/menu_displaylist.c ; choix utilisateur de présence dès cœur chargé documenté dans docs/core-menus.md.
+Qualification0.17.1 :9/9 natifs +9/9 ASan/UBSan, corefree, Gradle Debug/Release/lint/testAPK ; API29debug49 contrôles portrait +49 paysage avec module officiel. Mise à jour signée0.17.0->0.17.1 acceptée ; ASUS et historique conservés sur runtime sans cœur. Fermer uniquement les alertes système confirmées par capture avant les tests ; transport ADB de qualification doit couvrir la durée complète du runner.

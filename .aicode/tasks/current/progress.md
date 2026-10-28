@@ -1,5 +1,7 @@
-État : ACTIVE.
-Implémentation : pages CR_SUBSYSTEMS19 et CR_CORE_OPTIONS20, entrée main conditionnée par handle, options avant commandes. Tests natifs et Android enrichis, documentation core-menus.md.
-Référence : RetroArch af622105, source actuelle CorvusAPI32bb624 vérifiée sans extensions de configuration.
-Prochaine action : finir tests natifs/build Android, qualifier les pages sur émulateur, revue et publication main/CI.
-Limite : pages vides explicites ; aucune implémentation câble link ou option moteur tant que le contrat public n'existe pas. Utilisateur informé.
+État : DONE, menus du cœur0.17.1/code21 publiés. Quality Gate PASS pour le périmètre UI, sans nouvelle capacité moteur.
+Source : tagv0.17.1 surbfbf7b5666c2b2c5dcd2b23f3b21d57332571495. CI40686561237, buildsigné40687009888, publication40688881844 SUCCESS pour ce SHA exact.
+Comportement : configuration du sous-système visible dès cœur chargé, avant contenu et après fermeture du jeu, masquée au déchargement complet. Options du cœur avant Commandes dans le menu rapide ; retour conservant pause/focus/scroll/onglet. Pages indisponibles explicites avec les modules actuels.
+Preuves : natifs9/9 +ASan/UBSan9/9, corefree PASS ; Gradle Debug/Release/lint/testAPK PASS ; outils archives4/workflows6 PASS ; émulateur API29debug49 contrôles portrait et49 paysage avec module officiel, captures inspectées. Revue indépendante sans P1/P2.
+Distribution : APK public1276332 octets, SHA256352e27a9c0ffaab8f10e0278b78384f1e8c89c825c670c340d17f6a16764e5b7, byte-identique au candidat signé ; signature durable indépendante,0.17.1/code21, zéro cœur et noticeMIT vérifiés. Six ZIPs publics qualifiés ABI/16KB/hash/taille et identiques à0.17.0 ; catalogues fournisseurs inchangés.
+Compatibilité : update signé20->21 accepté ; runtime sans cœur, ASUS et historiqueCorvus-preserved.gba préservés. Ce profil signé n'avait aucun module ; ne pas revendiquer de moteur exécuté dessus. La qualification moteur/menu réelle appartient au debug de même source et aux tests natifs GB/GBA.
+Limite fonctionnelle : CorvusAPI ne possède aucun contrat public de sous-systèmes/options. Cette version ajoute les entrées et états vides ; elle n'active pas le câble link ni des réglages de moteur. Contrat public à définir avant extension fournisseur/frontend ; proposition documentée, aucun sous-module modifié.
