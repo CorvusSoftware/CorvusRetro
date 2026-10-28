@@ -1,12 +1,12 @@
 # CorvusRetro
 
 Frontend Android original C11 : NativeActivity, EGL/OpenGL ES2, AAudio. Java fournit uniquement les services OS.
-Version publiée 0.17.1/code21 ; cible35/min26 ; NDK27.2 ; JDK17+ ; Gradle8.13/AGP8.9.1.
+Version publiée 0.18.0/code22 ; cible35/min26 ; NDK27.2 ; JDK17+ ; Gradle8.13/AGP8.9.1.
 Sources : menu/, cores/, gfx/drivers/gl2, gfx/widgets/notifications, audio/drivers/aaudio, input/, frontend/drivers/, tasks/, cheevos/.
 Android sous pkg/android/, wrapper Gradle racine délégué ; dépendances sous deps/.
 Base sans moteur ; six modules CorvusAPI distincts, exclus de l'APK, distribués en archives individuelles vérifiées.
 Les catalogues JSON ont été volontairement retirés du frontend : découverte de CorvusRepository/catalog/*.json, validation par fournisseur et architecture. Ne pas réintroduire les anciens endpoints.
-CorvusCore0.14.1 pin2d7bdd2020894fa27d153cbecd421da47bcb37f4, CorvusAPI bfdbed337ed7bc7334ed2d8e1f510ab503fa475d, header public unique corvusapi.h, extension mémoire facultative, ABI0 inchangée.
+CorvusCore0.15.0 pin063cf1f674788aa5913cebe184457a10b5946edd, CorvusAPI39c927c5a1a55b78ab55758a41cd16b0971c4684, header public corvusapi.h, extensions mémoire/options/sous-systèmes facultatives, ABI0 inchangée.
 rcheevos MIT pin1433173220a7eaede6a9ed7a18e94117be1821e0 ; frontend original AGPL-3.0-only.
 Succès en mode normal ; hash à l'ouverture, évaluation après chaque frame émulée ; token et file d'envois AES-GCM Keystore, aucun mot de passe persisté.
 Notifications C : file8 ; cartes en haut au centre, descente/ouverture/repli/remontée330ms chacune, maintien4s, total5.32s ; progression mesurée2s ; callbacks copiés, clear à la fermeture et HIDE/reset.
@@ -25,7 +25,9 @@ Instrumentation navigation : attendre focus fenêtre et état active=1 après ro
 
 Interface0.17 : input/play_layout et input/overlay calculent et dessinent les profils GB/GBC8 contrôles et GBA10. Traits gris, feedback clair, hide réversible ; vidéo native au-dessus en portrait et entre les gouttières en paysage. Menu portrait centré, paysage au-dessus de la croix gauche. Menu rapide plein écran, CR_SAVESTATES pour save/load réels ; retour restaure pause/focus/scroll/onglet.
 Qualification UI : attendre la confirmation asynchrone des préférences et le focus + état natif actif après HOME. Libérer la réponse image dès capture du bitmap immuable, avant encodagePNG ; le lancement dispose de3s d'attente image puis de sa descente. Une capture de1.8s ne couvre pas ce budget.
-Livraison0.17.1 : tagv0.17.1 surbfbf7b5666c2b2c5dcd2b23f3b21d57332571495, CI40686561237, buildsigné40687009888, publication40688881844 SUCCESS. APK public identique au candidat qualifié, signature durable ; six archives0.14.1 identiques à0.16.0, donc catalogues existants conservés.
-
-Menus0.17.1 : CR_SUBSYSTEMS19 visible via main dès engine.handle, maintenu après fermeture contenu, absent après unload complet. CR_CORE_OPTIONS20 via menu rapide au rang4, commandes désormais5 ; pages sans capacités déclarées explicitement indisponibles. CorvusAPI public sans extensions de sous-systèmes/options : aucun link ou réglage moteur inventé, ne pas appeler le SDK privé. Référence RetroArch af622105/menu/menu_displaylist.c ; choix utilisateur de présence dès cœur chargé documenté dans docs/core-menus.md.
-Qualification0.17.1 :9/9 natifs +9/9 ASan/UBSan, corefree, Gradle Debug/Release/lint/testAPK ; API29debug49 contrôles portrait +49 paysage avec module officiel. Mise à jour signée0.17.0->0.17.1 acceptée ; ASUS et historique conservés sur runtime sans cœur. Fermer uniquement les alertes système confirmées par capture avant les tests ; transport ADB de qualification doit couvrir la durée complète du runner.
+Menus0.18 : sous-systèmes19 dès engine.handle, options20 au rang4 du menu rapide, valeurs21, configuration2jeux22, sélection23. Valeurs persistées par core/key/valueID ; palettes et audio immédiats, matériel GBA au prochain chargement/reset. Référence RetroArch dda31fef/menu/menu_displaylist.c, code original et frontière CorvusAPI publique.
+Session corvus.link.two_player : deux ROMs, écrans côte à côte, commandes séparées ; P1 conserve son .sav, P2 utilise -link-p2.sav même avec la même ROM. États et mémoire des succès indisponibles pour le link officiel ; compte et envois conservés. Le menu rapide choisit le joueur tactile/clavier ; deux premières manettes à ports distincts.
+Persistance : copier les backups options dans .bak.new et fsync avant rename en .bak, jamais de hard link refusé par SELinux. Une copie partielle ne doit jamais être promue. Garder CR_CORE_VERSION0.14.1 comme suffixe historique du format solo ; les états groupés de fournisseurs compatibles ont une identité distincte par paire et sous-système.
+Mise à jour de module : garder l'ancien handle jusqu'à sélection explicite ; le fastpath idle compare aussi le chemin ouvert. Les informations du cœur utilisent le module ouvert, pas le remplacement dans le registre.
+Livraison0.18.0 : tagv0.18.0 sur67385be702dbf146f18b4e529b8559c9e38d0b32, CI40740763674, buildsigné40741288414, publication40742906577 SUCCESS. APK et six ZIP0.15 publics comparés aux octets qualifiés, signature durable et 16Ko vérifiés.
+Qualification :12/12 natifs +12/12 ASan/UBSan, corefree, Gradle Debug/Release/lint/testAPK ; API29x86_64 six parcours configuration GB/GBC/GBA portrait/paysage,782 contrôles. Mise à jour signée0.17.1->0.18.0 acceptée ; ASUS et historique conservés sur profil sans cœur. Fermer uniquement les alertes système identifiées par capture ; transport ADB couvrant toute la durée du runner. Aucun téléphone physique ou runtime ARM64 revendiqué.

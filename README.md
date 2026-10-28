@@ -9,13 +9,13 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/CorvusSoftware/CorvusRetro/releases/tag/v0.17.1"><img alt="Version 0.17.1" src="https://img.shields.io/badge/version-0.17.1-7057c9?style=flat-square"></a>
+  <a href="https://github.com/CorvusSoftware/CorvusRetro/releases/tag/v0.18.0"><img alt="Version 0.18.0" src="https://img.shields.io/badge/version-0.18.0-7057c9?style=flat-square"></a>
   <a href="https://github.com/CorvusSoftware/CorvusRetro/actions/workflows/android.yml"><img alt="Android CI" src="https://github.com/CorvusSoftware/CorvusRetro/actions/workflows/android.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="Licence AGPL-3.0-only" src="https://img.shields.io/badge/licence-AGPL--3.0--only-555555?style=flat-square"></a>
 </p>
 
 <p align="center">
-  <strong><a href="https://github.com/CorvusSoftware/CorvusRetro/releases/download/v0.17.1/CorvusRetro-0.17.1-base-release.apk">Télécharger l'APK</a></strong>
+  <strong><a href="https://github.com/CorvusSoftware/CorvusRetro/releases/download/v0.18.0/CorvusRetro-0.18.0-base-release.apk">Télécharger l'APK</a></strong>
   &nbsp;·&nbsp;
   <a href="https://github.com/CorvusSoftware/CorvusRetro/releases">Toutes les versions</a>
   &nbsp;·&nbsp;
@@ -28,14 +28,16 @@
 
 L'application propose une bibliothèque de jeux, des commandes tactiles, plusieurs thèmes, des sauvegardes et l'intégration RetroAchievements. **L'APK de base ne contient aucun moteur ni aucun jeu.**
 
-> **Version actuelle : 0.17.1 (préversion).** Les cœurs officiels sont distribués séparément en version 0.14.1. L'émulation GBA et l'ABI CorvusAPI 0 restent expérimentales.
+> **Version actuelle : 0.18.0 (préversion).** Les cœurs officiels sont distribués séparément en version 0.15.0. L'émulation GBA et l'ABI CorvusAPI 0 restent expérimentales.
 
 ## Installation
 
-1. [Télécharger CorvusRetro v0.17.1](https://github.com/CorvusSoftware/CorvusRetro/releases/download/v0.17.1/CorvusRetro-0.17.1-base-release.apk) et installer l'APK sur un appareil compatible **Android 8.0 ou plus**.
+1. [Télécharger CorvusRetro v0.18.0](https://github.com/CorvusSoftware/CorvusRetro/releases/download/v0.18.0/CorvusRetro-0.18.0-base-release.apk) et installer l'APK sur un appareil compatible **Android 8.0 ou plus**.
 2. Dans l'application, ouvrir **Charger un cœur > Téléchargeur de cœurs**.
 3. Télécharger le moteur souhaité, puis le sélectionner dans **Charger un cœur**.
 4. Importer et ouvrir un jeu que vous possédez légalement.
+
+Pour une mise à jour, installez le nouvel APK par-dessus l'ancienne version, puis actualisez les cœurs dans le téléchargeur pour activer les options et le câble link.
 
 Le téléchargement installe un module natif vérifié dans le stockage privé de l'application. **Aucun autre APK et aucun redémarrage ne sont nécessaires.** Un cœur déchargé reste installé pour une prochaine utilisation.
 
@@ -56,7 +58,8 @@ Les modules officiels sont disponibles pour **arm64-v8a** et **x86_64**.
 - **Interface entièrement native :** menus et navigation en C11, sans interface d'émulation Java.
 - **Commandes tactiles :** contours discrets, profils GB/GBC et GBA avec L/R, portrait et paysage, multitouch et masquage réversible.
 - **Menu rapide plein écran :** reprise, redémarrage, fermeture du jeu, sauvegarde et chargement d’état, commandes et succès.
-- **Menus du cœur :** configuration du sous-système visible avec un cœur chargé et options du cœur dans le menu rapide ; états indisponibles expliqués pour les modules actuels.
+- **Options du cœur :** palettes GB/GBC, sauvegarde et horloge GBA, valeurs persistantes et application différée indiquée.
+- **Câble link local :** deux jeux, écrans côte à côte, commandes et batteries séparées ; configuration visible tant que le cœur reste chargé.
 - **Historique et sauvegardes :** historique seul dans les listes de lecture, sauvegardes batterie et états instantanés selon le moteur.
 - **Gestion du contenu :** cœur compatible chargé avant le jeu ; fermer le contenu conserve le cœur chargé.
 - **Thèmes :** CorvusRetro, NVIDIA Shield et ASUS.
@@ -64,7 +67,7 @@ Les modules officiels sont disponibles pour **arm64-v8a** et **x86_64**.
 - **RetroAchievements :** identification des jeux et suivi des succès dans le mode normal.
 - **Notifications natives :** icône du jeu au lancement, badges des succès et progression mesurée, avec chargement des images en arrière-plan.
 
-Le **mode Hardcore** de RetroAchievements n'est pas encore pris en charge. Les jetons de connexion et les succès en attente sont protégés par Android Keystore ; les mots de passe ne sont pas conservés.
+Les états instantanés groupés et les succès RetroAchievements sont indisponibles pendant le câble link dans les modules officiels. Le **mode Hardcore** de RetroAchievements n'est pas encore pris en charge. Les jetons de connexion et les succès en attente sont protégés par Android Keystore ; les mots de passe ne sont pas conservés.
 
 [Interface et navigation](docs/navigation.md) · [Commandes](docs/controls.md) · [Thèmes](docs/themes.md) · [RetroAchievements](docs/retroachievements.md)
 
@@ -128,7 +131,7 @@ Ces commandes couvrent les tests natifs, les vérifications mémoire et le proje
 
 Les catalogues sont maintenus dans **[CorvusRepository/catalog](https://github.com/CorvusSoftware/CorvusRepository/tree/main/catalog)**. CorvusRetro découvre automatiquement chaque JSON publié dans ce dossier et affiche ses cœurs compatibles, après validation stricte. Aucune liste de fichiers n'est intégrée dans le frontend.
 
-> **Compatibilité :** les anciens catalogues ont été supprimés. Les APK qui utilisaient leurs anciennes URL doivent être mis à jour. La version 0.17.1 découvre les catalogues de fournisseurs dans CorvusRepository.
+> **Compatibilité :** les anciens catalogues ont été supprimés. Les APK qui utilisaient leurs anciennes URL doivent être mis à jour. La version 0.18.0 découvre les catalogues de fournisseurs dans CorvusRepository.
 
 ---
 

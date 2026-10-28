@@ -71,3 +71,58 @@ Le publisher exige une CI réussie du commit exact, la provenance des dépendanc
 les empreintes de tous les fichiers et le tag correspondant à la version APK.
 Il réutilise ces fichiers qualifiés, publie les vraies archives puis prépare
 leur catalogue pour revue. Vérifier les octets publics avant promotion du catalogue.
+
+## Qualification 0.18.0
+
+La [release v0.18.0](https://github.com/CorvusSoftware/CorvusRetro/releases/tag/v0.18.0)
+correspond au frontend `67385be702dbf146f18b4e529b8559c9e38d0b32`, à CorvusCore
+`063cf1f674788aa5913cebe184457a10b5946edd` et à CorvusAPI
+`39c927c5a1a55b78ab55758a41cd16b0971c4684`.
+
+- 12 tests natifs, puis 12 tests ASan/UBSan réussis, et frontend sans cœur.
+- Build debug/release, lint et APK d'instrumentation réussis pour ARM64 et x86_64.
+- Six parcours `configuration` sur émulateur Android 10/API29 x86_64 :
+  GB/GBC/GBA en portrait et paysage, 782 contrôles. Ils couvrent les deux jeux,
+  le lancement lié, les options mémorisées, le reset, les états désactivés,
+  le joueur contrôlé et la fermeture gardant le cœur.
+- Mise à jour signée 0.17.1/code21 vers 0.18.0/code22 acceptée sans
+  désinstallation : même UID, thème ASUS et historique conservés, sans crash
+  applicatif observé. Ce profil signé ne contient aucun cœur installé.
+- APK public et six ZIP téléchargés et comparés aux fichiers qualifiés :
+  signature durable, version, empreintes, bibliothèques, ABIs et segments de
+  16 Ko contrôlés. La base contient uniquement le frontend.
+- Les trois ZIP x86_64 publics ont aussi été installés par le service de test ;
+  le parcours GBA en paysage a été rejoué avec ces modules de production :
+  134 contrôles supplémentaires réussis.
+
+CI exacte [40740763674](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/40740763674),
+build signé [40741288414](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/40741288414),
+publication [40742906577](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/40742906577).
+APK public : 1 302 756 octets ; SHA-256 :
+
+```text
+ea0d3a5f7b0b027cc99b65c5d17df6ba9d723a6914df68b36063b9e950477821
+```
+
+Construire l'instrumentation avec
+`-PcorvusTestRunner=com.corvussoftware.corvusretro.RetroAchievementsInstrumentation`,
+installer la base et son APK de test, puis fournir les trois ZIP x86_64 dans
+le dossier de fixtures du terminal :
+
+```sh
+adb shell am instrument -w -e phase configuration -e system 0 \
+  -e orientation portrait -e fixture_dir /chemin/fixtures \
+  com.corvussoftware.corvusretro.test/com.corvussoftware.corvusretro.RetroAchievementsInstrumentation
+```
+
+Répéter avec `system` 1 et 2, puis `orientation landscape`. Les fixtures sont
+des programmes originaux ; aucun jeu commercial ni BIOS n'est distribué.
+Les alertes ANR de démarrage de System UI/Quickstep ont été identifiées et
+capturées avant reprise des essais. Le refus SELinux de `link()` lors d'une
+édition d'options a été reproduit et corrigé par une copie synchronisée puis
+un renommage atomique. Les tests reproduisent cette interdiction et les
+erreurs de synchronisation, y compris après publication du fichier.
+
+Les états groupés et les succès pendant le link sont indisponibles dans les
+modules officiels. Le link GBA reste expérimental. Aucun runtime ARM64,
+appareil physique ou compte RetroAchievements personnel n'est revendiqué.
