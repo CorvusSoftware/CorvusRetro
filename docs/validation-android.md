@@ -152,5 +152,9 @@ ni nouvel ANR pendant les essais.
 La séparation côté frontend a passé huit tests de publication, Gradle
 Debug/Release/lint/testAPK et les contrôles de base sans moteur. La CI
 `40801908523` et la qualification signée APK seul `40802221654` sont réussies.
-Aucun nouvel APK public n'est requis pour ces téléchargements. Ces preuves
-ne revendiquent aucun essai sur téléphone physique ni runtime ARM64.
+Ces preuves couvraient les archives installées directement par fixtures, pas
+le parcours de lecture du catalogue officiel. Le filtre supplémentaire du
+client 0.18.0 a ensuite été identifié comme incompatible avec les URL centrales.
+Le flux historique est restauré ; 0.18.1 corrige ce filtre et découvre
+`catalog/v1/`. Les régressions exécutent maintenant le vrai lecteur Java.
+Aucun essai sur téléphone physique ni runtime ARM64 n'est revendiqué.

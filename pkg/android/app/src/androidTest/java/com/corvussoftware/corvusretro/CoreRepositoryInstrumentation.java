@@ -34,6 +34,8 @@ import org.json.JSONObject;
 public final class CoreRepositoryInstrumentation extends Instrumentation {
     private int checks;
     private File fixtures;
+    private boolean publicCatalogOnly, capturePublicUi;
+    private final java.util.Set<String> catalogRequests = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
     private boolean truncated;
     private String requestedCore = "";
     private volatile java.util.concurrent.CountDownLatch transferStarted;
@@ -55,7 +57,7 @@ public final class CoreRepositoryInstrumentation extends Instrumentation {
     }
     private JSONObject item(String name) throws Exception {
         return new JSONObject().put("type", "file").put("name", name)
-                .put("path", "catalog/" + name).put("size", 4096)
+                .put("path", "catalog/v1/" + name).put("size", 4096)
                 .put("download_url", CoreCatalogDiscovery.RAW + name);
     }
     private String listing() throws Exception {
@@ -137,6 +139,110 @@ public final class CoreRepositoryInstrumentation extends Instrumentation {
                     .toString());
             throw new AssertionError("malicious catalog URL accepted");
         } catch (IOException expected) { checks++; }
+    }
+    private String frozen(String name) throws IOException {
+        File file = new File(fixtures, name);
+        if (!file.isFile() || file.length() > 96 * 1024)
+            throw new IOException("missing or oversized frozen public catalog fixture");
+        try (InputStream input = new FileInputStream(file)) {
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            byte[] bytes = new byte[4096];
+            int count;
+            while ((count = input.read(bytes)) != -1) output.write(bytes, 0, count);
+            return output.toString(java.nio.charset.StandardCharsets.UTF_8.name());
+        }
+    }
+    private void frozenPublicCatalogs() throws Exception {
+        String[] files = {"official-legacy-root.json", "official-central-v1.json"};
+        String[] origins = {"https://github.com/CorvusSoftware/CorvusRetro/releases/download/",
+                "https://github.com/CorvusSoftware/CorvusRepository/releases/download/"};
+        for (int fixture = 0; fixture < files.length; fixture++) {
+            String payload = frozen(files[fixture]);
+            JSONArray entries = new JSONObject(payload).getJSONArray("cores");
+            check(entries.length() == 6, "frozen public provider contains six real archives");
+            for (int i = 0; i < entries.length(); i++)
+                check(entries.getJSONObject(i).getString("archive_url").startsWith(origins[fixture]),
+                        "frozen public catalog provenance matches its expected publisher");
+            for (String abi : new String[] {"arm64-v8a", "x86_64"}) {
+                CoreRepository.Catalog catalog = CoreRepository.parseCatalog(payload, abi);
+                check(catalog.cores.size() == 3 && catalog.records.length == 15,
+                        files[fixture] + " yields three cores and fifteen JNI fields for " + abi);
+                for (String id : new String[] {"corvus.gb", "corvus.gbc", "corvus.gba"}) {
+                    check(catalog.cores.containsKey(id) && abi.equals(catalog.cores.get(id).abi),
+                            "real public catalog exposes the requested core and architecture");
+                }
+            }
+        }
+        JSONObject central = new JSONObject(frozen(files[1])).getJSONArray("cores").getJSONObject(0);
+        reject(new JSONObject(central.toString()).put("archive_url",
+                "https://github.com/OtherOrg/CorvusRepository/releases/download/v0.15.1/CorvusGB.zip"));
+        reject(new JSONObject(central.toString()).put("archive_url",
+                "https://github.com/CorvusSoftware/OtherRepository/releases/download/v0.15.1/CorvusGB.zip"));
+        check(CoreCatalogDiscovery.DIRECTORY.equals(
+                "https://api.github.com/repos/CorvusSoftware/CorvusRepository/contents/catalog/v1?ref=main"),
+                "production discovery selects the versioned catalog directory");
+        check(CoreCatalogDiscovery.RAW.equals(
+                "https://raw.githubusercontent.com/CorvusSoftware/CorvusRepository/main/catalog/v1/"),
+                "production raw catalog origin is versioned");
+        java.util.List<String> sources = CoreCatalogDiscovery.sources(frozen("contents-v1.json"));
+        check(sources.contains(CoreCatalogDiscovery.FALLBACK), "actual public Contents listing discovers the official provider");
+        for (String source : sources)
+            check(source.startsWith(CoreCatalogDiscovery.RAW), "discovered provider stays in catalog/v1");
+        try {
+            CoreCatalogDiscovery.sources(new JSONArray().put(item("corvuscore.json")
+                    .put("path", "catalog/corvuscore.json")).toString());
+            throw new AssertionError("unversioned catalog path accepted by new discovery");
+        } catch (IOException expected) { checks++; }
+    }
+    private void frozenPublicTransport() {
+        URL.setURLStreamHandlerFactory(protocol -> "https".equals(protocol) ? new URLStreamHandler() {
+            @Override protected URLConnection openConnection(URL url) {
+                return new HttpsURLConnection(url) {
+                    @Override public int getResponseCode() { return 200; }
+                    @Override public InputStream getInputStream() throws IOException {
+                        String address = url.toString();
+                        String file;
+                        if (CoreCatalogDiscovery.DIRECTORY.equals(address)) file = "contents-v1.json";
+                        else if (CoreCatalogDiscovery.FALLBACK.equals(address)) file = "official-central-v1.json";
+                        else throw new IOException("unexpected request in frozen public catalog transport");
+                        catalogRequests.add(address);
+                        return new ByteArrayInputStream(frozen(file).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    }
+                    @Override public void disconnect() { }
+                    @Override public boolean usingProxy() { return false; }
+                    @Override public void connect() { }
+                    @Override public String getCipherSuite() { return "frozen-public-response"; }
+                    @Override public Certificate[] getLocalCertificates() { return null; }
+                    @Override public Certificate[] getServerCertificates() { return null; }
+                };
+            }
+        } : null);
+    }
+    private void publicCatalogUi() throws Exception {
+        frozenPublicTransport();
+        MainActivity activity = (MainActivity) startActivitySync(new Intent(getTargetContext(), MainActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        try {
+            android.os.SystemClock.sleep(800);
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER);
+            for (int i = 0; i < 33; i++) sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_DOWN);
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER);
+            long deadline = android.os.SystemClock.uptimeMillis() + 15000;
+            while (!catalogRequests.contains(CoreCatalogDiscovery.FALLBACK) &&
+                    android.os.SystemClock.uptimeMillis() < deadline)
+                android.os.SystemClock.sleep(100);
+            check(catalogRequests.contains(CoreCatalogDiscovery.DIRECTORY) &&
+                    catalogRequests.contains(CoreCatalogDiscovery.FALLBACK),
+                    "actual downloader requested versioned discovery and official public feed");
+            android.os.SystemClock.sleep(1500);
+            android.graphics.Bitmap screen = getUiAutomation().takeScreenshot();
+            check(screen != null, "public source fixture downloader UI captured");
+            try (FileOutputStream output = new FileOutputStream(new File(activity.getFilesDir(),
+                    "test-public-catalog181-downloader.png"))) {
+                screen.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, output);
+            }
+            screen.recycle();
+        } finally { runOnMainSync(activity::finish); }
     }
     private void store() throws Exception {
         Context target = getTargetContext();
@@ -315,13 +421,26 @@ public final class CoreRepositoryInstrumentation extends Instrumentation {
     @Override public void onCreate(Bundle arguments) {
         super.onCreate(arguments);
         fixtures = new File(arguments.getString("fixture_dir", ""));
+        publicCatalogOnly = "public_catalogs".equals(arguments.getString("phase", ""));
+        capturePublicUi = "true".equals(arguments.getString("capture_ui", "false"));
         start();
     }
     @Override public void onStart() {
         Bundle result = new Bundle();
         try {
-            catalogs(); discovery(); store(); downloader();
-            result.putString("stream", "PASS " + checks + " native core catalog/store/downloader checks\n");
+            if (publicCatalogOnly) {
+                frozenPublicCatalogs();
+                if (capturePublicUi) publicCatalogUi();
+            } else {
+                catalogs(); discovery(); store(); downloader();
+            }
+            result.putString("stream", "PASS " + checks + (publicCatalogOnly
+                    ? " public catalog parser/discovery checks\n"
+                    : " native core catalog/store/downloader checks\n"));
+            if (publicCatalogOnly) {
+                result.putString("transport", capturePublicUi ? "frozen-public-responses" : "none");
+                result.putString("catalog_requests", String.join(", ", catalogRequests));
+            }
             finish(Activity.RESULT_OK, result);
         } catch (Throwable failure) {
             result.putString("stream", "FAIL " + failure + "\n");
