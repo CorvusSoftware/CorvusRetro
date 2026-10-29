@@ -614,6 +614,7 @@ void cr_ui_clear_input(cr_ui *u) {
     u->feedback_pulses = 0;
     u->menu_pointer = u->feedback_target = -1;
     u->feedback_alpha = 0;
+    u->scroll_velocity = 0;
     memset(u->control_feedback, 0, sizeof(u->control_feedback));
 }
 unsigned cr_ui_input(cr_ui *u) {
@@ -644,6 +645,22 @@ void cr_ui_update(cr_ui *u, double seconds) {
     u->time += dt;
     cr_notifications_update(&u->notifications, dt);
     u->message_time = fmax(0, u->message_time - dt);
+    if (u->scroll_velocity != 0 && u->menu_pointer < 0 && !cr_ui_running(u)) {
+        float speed = u->scroll_velocity;
+        float decay = expf(-8.f * dt);
+        float distance = speed * (1.f - decay) / 8.f;
+        float before = u->quick ? u->quick_scroll : u->scroll;
+        if (u->quick) {
+            u->quick_scroll += distance;
+            quick_clamp(u);
+        } else {
+            u->scroll += distance;
+            clamp_scroll(u);
+        }
+        float moved = (u->quick ? u->quick_scroll : u->scroll) - before;
+        u->scroll_velocity = fabsf(moved - distance) > .5f || fabsf(speed * decay) < 25.f
+                                ? 0 : speed * decay;
+    }
     unsigned held = u->keys | u->feedback_pulses | u->hardware_keys[u->input_player == 1 ? 1 : 0];
     bool feedback = false;
     for (int i = 0; i < 32; i++) {
@@ -1189,13 +1206,15 @@ void cr_ui_touch_at(cr_ui *u, int id, int phase, float x, float y, double event_
     if (phase == CR_TOUCH_DOWN) {
         if (!cr_ui_running(u) && u->menu_pointer >= 0)
             return;
+        u->scroll_velocity = 0;
         *p = (cr_pointer){.active = true,
                           .x = x,
                           .y = y,
                           .last_x = x,
                           .last_y = y,
                           .target = target(u, x, y),
-                          .started = event_time};
+                          .started = event_time,
+                          .last_event = event_time};
         if (cr_ui_running(u)) {
             p->mask = button_at(u, x, y);
             u->pulses |= p->mask;
@@ -1223,21 +1242,33 @@ void cr_ui_touch_at(cr_ui *u, int id, int phase, float x, float y, double event_
             p->mask = mask;
             return;
         }
-        if (p->dragged && u->quick && p->target >= 10000) {
-            u->quick_scroll += p->last_y - y;
-            quick_clamp(u);
-        }
-        if (p->dragged && p->target >= -1 && !u->quick && u->page != CR_PLAY) {
-            u->scroll += p->last_y - y;
-            clamp_scroll(u);
+        bool scrolling = p->dragged && ((u->quick && p->target >= 10000) ||
+                         (!u->quick && p->target >= -1 && u->page != CR_PLAY));
+        if (scrolling) {
+            float shift = p->last_y - y;
+            double elapsed = event_time - p->last_event;
+            p->velocity = elapsed > 0 && elapsed <= .15
+                            ? fmaxf(-4000, fminf(4000, shift / (float)elapsed)) : 0;
+            if (u->quick) {
+                u->quick_scroll += shift;
+                quick_clamp(u);
+            } else {
+                u->scroll += shift;
+                clamp_scroll(u);
+            }
         }
         p->last_x = x;
         p->last_y = y;
+        p->last_event = event_time;
         return;
     }
     if (phase == CR_TOUCH_UP) {
         int t = p->target;
         bool click = !p->dragged && target(u, x, y) == t;
+        if (p->dragged && event_time >= p->last_event &&
+            event_time - p->last_event <= .12 &&
+            ((u->quick && t >= 10000) || (!u->quick && t >= -1 && u->page != CR_PLAY)))
+            u->scroll_velocity = p->velocity;
         p->active = false;
         p->mask = 0;
         if (u->menu_pointer == id)
