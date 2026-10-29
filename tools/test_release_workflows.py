@@ -7,11 +7,16 @@ import hashlib
 import json
 import os
 import subprocess
+import struct
 import sys
 import tempfile
 import textwrap
 import unittest
+import warnings
+import zipfile
 from pathlib import Path
+
+from check_core_apks import verify_base_libraries, verify_frontend_elf
 
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = "CorvusSoftware/CorvusRetro"
@@ -113,25 +118,28 @@ class WorkflowGates(unittest.TestCase):
             self.assertNotEqual(self.run_gate("publish-core-archives.yml", step).returncode, 0)
 
 
-    def test_publisher_exports_corvuscore_metadata_only(self):
-        source = (ROOT / ".github/workflows/publish-core-archives.yml").read_text(
-            encoding="utf-8")
-        self.assertIn('--catalog "$RUNNER_TEMP/catalog/corvuscore.json"', source)
-        self.assertIn(
-            'python3 tools/validate_core_archives.py "$RUNNER_TEMP/catalog/corvuscore.json"',
-            source)
-        self.assertIn('path: ${{ runner.temp }}/catalog/corvuscore.json', source)
-        self.assertNotIn('--catalog core-repository/', source)
-        self.assertNotIn('git add core-repository/cores-v3.json', source)
-        self.assertNotIn('git push origin "HEAD:refs/heads/$branch"', source)
+    def test_frontend_build_and_publisher_do_not_distribute_cores(self):
+        workflow = ROOT / ".github/workflows"
+        publisher = (workflow / "publish-core-archives.yml").read_text(encoding="utf-8")
+        preview = (workflow / "build-core-release.yml").read_text(encoding="utf-8")
+        ci = (workflow / "android.yml").read_text(encoding="utf-8")
+        gradle = (ROOT / "pkg/android/app/build.gradle").read_text(encoding="utf-8")
+        self.assertIn("targets 'corvusretro'", gradle)
+        self.assertNotIn("'corvusretro', 'corvus_gb'", gradle)
+        for source in (publisher, preview, ci):
+            self.assertNotIn('tools/build_core_archives.py', source)
+            self.assertNotIn('native-cores/', source)
+        self.assertNotIn('*.zip', publisher)
+        self.assertNotIn('catalog/corvuscore.json', publisher)
+        self.assertIn('gh release create "$CORVUS_TAG" "$release_base"', publisher)
+        self.assertIn('sha256sum *.apk source.json', preview)
+        self.assertNotIn('build/signed-preview/*.so', preview)
 
     def test_artifact_bytes_and_source_provenance_are_checked(self):
         step = "Download only the matching signed artifact"
-        folder = self.temp / "signed-core-apks"
+        folder = self.temp / "signed-base"
         folder.mkdir()
-        names = ["CorvusRetro-base-release.apk"] + [
-            "libcorvus_" + core + "-" + abi + ".so"
-            for core in ("gb", "gbc", "gba") for abi in ("arm64-v8a", "x86_64")]
+        names = ["CorvusRetro-base-release.apk"]
         for name in names:
             (folder / name).write_bytes(b"original test fixture")
         def revision(path):
@@ -151,21 +159,79 @@ class WorkflowGates(unittest.TestCase):
             checksums()
         provenance(source)
         self.assertEqual(self.run_gate("publish-core-archives.yml", step).returncode, 0)
-        original = (folder / "libcorvus_gb-arm64-v8a.so").read_bytes()
-        (folder / "libcorvus_gb-arm64-v8a.so").write_bytes(b"modified fixture")
+        original = (folder / "CorvusRetro-base-release.apk").read_bytes()
+        (folder / "CorvusRetro-base-release.apk").write_bytes(b"modified fixture")
         self.assertNotEqual(self.run_gate("publish-core-archives.yml", step).returncode, 0)
-        (folder / "libcorvus_gb-arm64-v8a.so").write_bytes(original)
+        (folder / "CorvusRetro-base-release.apk").write_bytes(original)
         for key in source:
             provenance(dict(source, **{key: "b" * 40}))
             with self.subTest(key=key):
                 self.assertNotEqual(self.run_gate("publish-core-archives.yml", step).returncode, 0)
         provenance(source)
+        extra = folder / "libcorvus_gb-arm64-v8a.so"
+        extra.write_bytes(b"core must not be a qualification input")
+        self.assertNotEqual(self.run_gate("publish-core-archives.yml", step).returncode, 0)
+        extra.unlink()
         checksum_file = folder / "SHA256SUMS"
         valid_checksums = checksum_file.read_text()
         for invalid in (valid_checksums + valid_checksums.splitlines()[0] + "\n",
                         "a" * 64 + "  ../../unrelated\n", ""):
             checksum_file.write_text(invalid)
             self.assertNotEqual(self.run_gate("publish-core-archives.yml", step).returncode, 0)
+
+
+def frontend_elf(abi="arm64-v8a"):
+    data = bytearray(256)
+    data[:6] = b"\x7fELF\x02\x01"
+    struct.pack_into("<HH", data, 16, 3, 183 if abi == "arm64-v8a" else 62)
+    struct.pack_into("<Q", data, 32, 64)
+    struct.pack_into("<HH", data, 54, 56, 1)
+    struct.pack_into("<I", data, 64, 1)
+    struct.pack_into("<QQ", data, 96, len(data), len(data))
+    struct.pack_into("<Q", data, 112, 16384)
+    return data
+
+
+class BaseLayout(unittest.TestCase):
+    def test_wrong_abi_truncation_and_small_pages_are_rejected(self):
+        original = frontend_elf()
+        verify_frontend_elf(original, "arm64-v8a")
+        verify_frontend_elf(frontend_elf("x86_64"), "x86_64")
+        with self.assertRaises(ValueError):
+            verify_frontend_elf(original, "x86_64")
+        for offset, pattern, value in ((112, "<Q", 4096), (112, "<Q", 24576),
+                                       (72, "<Q", 1), (96, "<Q", 257),
+                                       (54, "<H", 8), (56, "<H", 0),
+                                       (32, "<Q", len(original))):
+            changed = bytearray(original)
+            struct.pack_into(pattern, changed, offset, value)
+            with self.subTest(offset=offset, value=value), self.assertRaises(ValueError):
+                verify_frontend_elf(changed, "arm64-v8a")
+        with self.assertRaises(ValueError):
+            verify_frontend_elf(original[:63], "arm64-v8a")
+
+    def test_base_requires_both_frontends_and_rejects_bundled_or_duplicate_cores(self):
+        with tempfile.TemporaryDirectory() as directory:
+            apk = Path(directory) / "base.apk"
+            def write(entries):
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", UserWarning)
+                    with zipfile.ZipFile(apk, "w") as target:
+                        for name, data in entries:
+                            target.writestr(name, data)
+            libraries = [("lib/" + abi + "/libcorvusretro.so", frontend_elf(abi))
+                         for abi in ("arm64-v8a", "x86_64")]
+            write(libraries)
+            verify_base_libraries(apk)
+            for entries in (libraries[:1], libraries + [libraries[0]],
+                            libraries + [("lib/arm64-v8a/libcorvus_gb.so", b"unexpected")],
+                            libraries + [("lib/armeabi-v7a/libother.so", b"unexpected")]):
+                write(entries)
+                with self.assertRaises(ValueError):
+                    verify_base_libraries(apk)
+            write([(libraries[0][0], frontend_elf("x86_64")), libraries[1]])
+            with self.assertRaises(ValueError):
+                verify_base_libraries(apk)
 
 
 if __name__ == "__main__":

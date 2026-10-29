@@ -35,7 +35,7 @@ Les nouveaux enregistrements Android sauvegardent explicitement
 compatibilité avec les anciennes versions et n'est plus utilisé
 comme identité durable du cœur lors de l'affichage.
 
-Lorsqu'un cœur communautaire disparaît de l'APK, son jeu reste
+Lorsqu'un cœur communautaire n'est plus installé, son jeu reste
 dans l'index et dans l'historique. Son ouverture affiche
 un message demandant le retour du cœur, sans effacer les données.
 Les anciens contenus communautaires sans `coreId` fiable sont
@@ -74,7 +74,10 @@ La bibliothèque pourra alors regrouper plusieurs cœurs autour
 d'un système et offrir un cœur préféré par jeu. Les menus et
 le contrat public de CorvusAPI restent indépendants.
 
-La distribution communautaire demeure limitée aux cœurs
-empaquetés dans l'APK et validés par son distributeur.
-Aucun exécutable tiers téléchargé directement sur Android
-n'est chargé automatiquement.
+Les fournisseurs communautaires sont revus dans
+[CorvusRepository](https://github.com/CorvusSoftware/CorvusRepository/blob/main/CONTRIBUTING.md).
+Leurs modules compatibles sont distribués par les catalogues approuvés,
+indépendamment de l'APK. Le téléchargeur valide l'origine, l'ABI,
+la taille, le SHA-256 et la bibliothèque avant installation privée.
+Cette ouverture du catalogue ne change ni les identifiants de contenu
+ni les sauvegardes existantes.

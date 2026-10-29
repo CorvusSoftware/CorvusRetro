@@ -26,11 +26,11 @@ set(CORVUS_EXTRA_CORE_DIRECTORIES "" CACHE STRING
     "Semicolon-separated additional core source directories, absolute or relative to repository root")
 set(CORVUS_EXTRA_CORE_TARGETS "" CACHE STRING
     "Semicolon-separated native shared library targets provided by those directories")
-# The base APK contains NO emulators. Native core builders explicitly
+# The base APK contains NO emulators. Host regression tests explicitly
 # enable one or several official engines with -D CORVUS_OFFICIAL_CORES=...
 # Use comma-separated IDs so Gradle can pass it safely as one CMake argument.
 set(CORVUS_OFFICIAL_CORES "" CACHE STRING
-    "Comma-separated official cores bundled in an APK pack: gb,gbc,gba")
+    "Comma-separated official cores in the host test catalog: gb,gbc,gba")
 string(REPLACE "," ";" _corvus_official_list "${CORVUS_OFFICIAL_CORES}")
 set(CORVUS_BUNDLED_CORE_TARGETS "")
 foreach(core IN LISTS _corvus_official_list)
@@ -76,19 +76,6 @@ file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/generated/cr_bundled_cores.h"
     CONTENT "${_corvus_catalog}")
 
 option(CORVUS_SANITIZE "Instrument the original portable C code" OFF)
-if(ANDROID)
-    set(CORVUS_CORE_OUTPUT_DIR "${CMAKE_BINARY_DIR}/native-cores" CACHE PATH "Native archive build outputs")
-    # Android release builds use RelWithDebInfo while archive consumers use Release.
-    set(_corvus_archive_build_type "${CMAKE_BUILD_TYPE}")
-    if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo" OR CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
-        set(_corvus_archive_build_type "Release")
-    endif()
-    foreach(core gb gbc gba)
-        set_target_properties(corvus_${core} PROPERTIES LIBRARY_OUTPUT_DIRECTORY
-            "${CORVUS_CORE_OUTPUT_DIR}/${_corvus_archive_build_type}/${ANDROID_ABI}")
-        target_link_options(corvus_${core} PRIVATE "-Wl,-z,max-page-size=16384")
-    endforeach()
-endif()
 set(CORVUS_INCLUDE_DIRS "${CORVUS_ROOT}/menu" "${CORVUS_ROOT}/cores"
     "${CORVUS_ROOT}/frontend" "${CORVUS_ROOT}/frontend/drivers"
     "${CORVUS_ROOT}/gfx" "${CORVUS_ROOT}/gfx/drivers" "${CORVUS_ROOT}/input" "${CORVUS_ROOT}/audio/drivers" "${CORVUS_ROOT}/tasks" "${CORVUS_ROOT}/gfx/widgets")

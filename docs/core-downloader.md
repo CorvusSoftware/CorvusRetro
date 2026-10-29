@@ -40,10 +40,15 @@ dans le dépôt officiel.
 
 ## Publication
 
-CorvusRetro produit les archives qualifiées et un catalogue temporaire
-dans ses artefacts GitHub Actions. Après publication et vérification des
-archives, les métadonnées peuvent être proposées dans CorvusRepository,
-dont la CI vérifie l'ensemble des JSON de `catalog/`.
+CorvusRepository construit les modules officiels depuis une révision qualifiée
+de CorvusCore, ou importe les archives d'un fournisseur approuvé. Il publie
+les ZIP dans ses propres releases, vérifie les fichiers publics puis propose
+le catalogue par pull request. Sa CI valide tous les JSON de `catalog/`.
+
+Les mises à jour des cœurs ne nécessitent ni build de CorvusRetro, ni nouvel
+APK, ni clé de signature Android. CorvusRetro publie uniquement sa base signée.
+Les versions 0.18.0 acceptent déjà les archives de CorvusRepository ; les
+anciennes URL de releases CorvusRetro restent reconnues pour compatibilité.
 
 Les anciens flux de CorvusRetro ont été retirés à la demande du
 mainteneur ; les APK v0.13.0 et antérieurs qui utilisaient leurs anciennes

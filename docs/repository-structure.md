@@ -22,13 +22,17 @@ Les en-têtes restent proches de leur composant. Le code d'émulation demeure
 fourni par CorvusCore via CorvusAPI, avec un sous-module identique avant et après
 le déplacement vers `deps/CorvusCore`.
 
-Le build Android produit directement des `.so` pour les archives. Il ne construit
-plus d'APK de cœur. La base exclut tous les moteurs et conserve uniquement son
-frontend. Le catalogue des moteurs est désormais hébergé dans
-[CorvusRepository](https://github.com/CorvusSoftware/CorvusRepository),
-à l'emplacement `catalog/corvuscore.json`. Les anciens JSON ont été
-supprimés de CorvusRetro. Les anciens scripts de packs et projets
-dynamic-feature ont également été retirés.
+Le build Android compile seulement le frontend `libcorvusretro.so` pour les
+deux ABIs. La base ne contient aucun moteur. La construction des modules,
+les archives ZIP, leurs releases et les catalogues par fournisseur appartiennent
+à [CorvusRepository](https://github.com/CorvusSoftware/CorvusRepository),
+indépendamment du build et de la signature APK. Une mise à jour de cœur
+n'exige aucune nouvelle release de l'application.
+
+Le sous-module CorvusCore reste épinglé pour les en-têtes CorvusAPI et les tests
+hôtes avec les moteurs réels. Le catalogue distribué est découvert dans
+`CorvusRepository/catalog/*.json` ; aucun JSON de catalogue, ancien pack APK
+ou projet dynamic-feature n'est maintenu dans le frontend.
 
 Les noms de composants servent à retrouver les responsabilités réelles. Les
 plateformes absentes ne reçoivent pas de répertoires vides.

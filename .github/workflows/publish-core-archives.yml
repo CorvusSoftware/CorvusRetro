@@ -1,7 +1,7 @@
 # CorvusRetro - CorvusSoftware
 # Copyright (C) 2026 CorvusSoftware
 # SPDX-License-Identifier: AGPL-3.0-only
-name: Publish native Corvus cores
+name: Publish signed CorvusRetro APK
 
 on:
   push:
@@ -24,7 +24,7 @@ permissions:
 
 jobs:
   publish:
-    name: Publish tested base and native core archives
+    name: Publish the tested Android base
     if: >-
       github.repository == 'CorvusSoftware/CorvusRetro' &&
       ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
@@ -40,7 +40,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          [[ "$CORVUS_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid individual-core release tag"; exit 1; }
+          [[ "$CORVUS_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid Android release tag"; exit 1; }
           [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid release revision"; exit 1; }
           if test -n "$REQUESTED_SOURCE_RUN"; then
             [[ "$REQUESTED_SOURCE_RUN" =~ ^[1-9][0-9]*$ ]] || { echo "Invalid signed build run ID"; exit 1; }
@@ -80,7 +80,7 @@ jobs:
             exit 1
           fi
 
-      - name: Checkout the tested source and registry tools
+      - name: Checkout the tested source and APK tools
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           submodules: recursive
@@ -104,14 +104,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
-            --name "CorvusRetro-signed-$GITHUB_SHA" --dir "$RUNNER_TEMP/signed-core-apks"
+            --name "CorvusRetro-signed-$GITHUB_SHA" --dir "$RUNNER_TEMP/signed-base"
           python3 - <<'PY'
           import hashlib, json, os, subprocess
           from pathlib import Path
-          root = Path(os.environ['RUNNER_TEMP']) / 'signed-core-apks'
+          root = Path(os.environ['RUNNER_TEMP']) / 'signed-base'
           expected = {'CorvusRetro-base-release.apk', 'source.json'}
-          expected.update('libcorvus_' + core + '-' + abi + '.so'
-                          for core in ('gb', 'gbc', 'gba') for abi in ('arm64-v8a', 'x86_64'))
+          if {path.name for path in root.iterdir()} != expected | {'SHA256SUMS'}:
+              raise SystemExit('Unexpected qualification artifact files')
           lines = (root / 'SHA256SUMS').read_text().splitlines()
           checks = {}
           for line in lines:
@@ -134,15 +134,7 @@ jobs:
               raise SystemExit('Qualification artifact source provenance mismatch')
           PY
           mkdir -p pkg/android/app/build/outputs/apk/release
-          cp "$RUNNER_TEMP/signed-core-apks/CorvusRetro-base-release.apk" pkg/android/app/build/outputs/apk/release/app-release.apk
-          for core in gb gbc gba; do
-            for abi in arm64-v8a x86_64; do
-              mkdir -p "pkg/android/app/build/native-cores/Release/$abi"
-              cp "$RUNNER_TEMP/signed-core-apks/libcorvus_$core-$abi.so" \
-                "pkg/android/app/build/native-cores/Release/$abi/libcorvus_$core.so"
-            done
-          done
-
+          cp "$RUNNER_TEMP/signed-base/CorvusRetro-base-release.apk" pkg/android/app/build/outputs/apk/release/app-release.apk
       - name: Set up Java 21
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
@@ -187,41 +179,17 @@ jobs:
           if os.environ['CORVUS_TAG'] != 'v' + info.get('versionName', ''):
               raise SystemExit('Release tag does not match the qualified app version')
           if int(info['versionCode']) < 13:
-              raise SystemExit('Native core releases require base versionCode 13 or newer')
+              raise SystemExit('This APK publication flow requires base versionCode 13 or newer')
           PY
 
-      - name: Generate and validate the six native core archives
-        run: |
-          python3 tools/build_core_archives.py --variant release --tag "$CORVUS_TAG" \
-            --output "$RUNNER_TEMP/native-cores" --catalog "$RUNNER_TEMP/catalog/corvuscore.json"
-          python3 tools/validate_core_archives.py "$RUNNER_TEMP/catalog/corvuscore.json"
-          python3 tools/test_core_archives.py
-
-      - name: Publish the exact qualified base and six immutable native archives
+      - name: Publish the exact qualified APK
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           release_base="$RUNNER_TEMP/CorvusRetro-${CORVUS_TAG#v}-base-release.apk"
-          cp "$RUNNER_TEMP/signed-core-apks/CorvusRetro-base-release.apk" "$release_base"
-          core_version=$(PYTHONPATH=tools python3 -c 'from build_core_archives import provider_version; print(provider_version())')
-          gh release create "$CORVUS_TAG" \
-            "$release_base" \
-            "$RUNNER_TEMP/native-cores/"*.zip \
+          cp "$RUNNER_TEMP/signed-base/CorvusRetro-base-release.apk" "$release_base"
+          gh release create "$CORVUS_TAG" "$release_base" \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --verify-tag --prerelease \
-            --title "CorvusRetro $CORVUS_TAG - Options du cœur et câble link" \
-            --notes "Version Android signée avec options du cœur persistantes, palettes GB/GBC, réglages de sauvegarde et d'horloge GBA, configuration de deux jeux pour le câble link local, écrans côte à côte, commandes séparées et batteries distinctes même avec la même ROM deux fois. Fermer le contenu conserve le cœur chargé. La base ne contient aucun moteur ; installez ou actualisez les modules CorvusCore $core_version dans le téléchargeur de cœurs. Les six ZIP officiels ARM64 et x86_64 sont fournis séparément. Les états groupés et les succès RetroAchievements sont indisponibles pendant le link ; le mode solo conserve ses sauvegardes et les succès en mode normal. GBA expérimental. Android 8.0+."
-
-      - name: Upload catalog metadata for CorvusRepository review
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: CorvusRepository-CorvusCore-${{ github.sha }}
-          path: ${{ runner.temp }}/catalog/corvuscore.json
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Explain catalog promotion
-        run: |
-          echo "New native archives are published; the generated catalog is a workflow artifact." >> "$GITHUB_STEP_SUMMARY"
-          echo "Verify release asset sizes and hashes before proposing catalog/corvuscore.json" >> "$GITHUB_STEP_SUMMARY"
-          echo "in CorvusSoftware/CorvusRepository. No catalog is kept in CorvusRetro." >> "$GITHUB_STEP_SUMMARY"
-
+            --title "CorvusRetro $CORVUS_TAG" \
+            --notes "Base Android signée sans moteur embarqué. Installer ou actualiser les cœurs séparément dans le téléchargeur, depuis les catalogues de CorvusRepository. Les versions des cœurs sont indépendantes de l'APK. Android 8.0+."
+          echo "APK published. Native modules and provider catalogs are released independently by CorvusRepository." >> "$GITHUB_STEP_SUMMARY"

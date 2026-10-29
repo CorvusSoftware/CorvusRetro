@@ -19,10 +19,23 @@ Les tests hôtes peuvent ajouter des sources CorvusAPI via les options CMake
 être une bibliothèque partagée exportant `corvus_get_api`. Le catalogue généré
 permet de découvrir ses métadonnées sans modifier les tableaux des menus.
 
-Le catalogue de distribution Android accepte actuellement les trois identités
-officielles. L'ajout d'un autre fournisseur implique une revue de son origine,
-de sa licence, de ses métadonnées et de la compatibilité de ses bibliothèques.
-L'existence du mécanisme d'extension CMake ne contourne pas ces contrôles.
+Un fournisseur peut contribuer un catalogue `catalog/fournisseur.json` dans
+[CorvusRepository](https://github.com/CorvusSoftware/CorvusRepository), avec ses
+propres identifiants permanents `fournisseur.identifiant`. Les archives sont
+centralisées dans les releases de ce dépôt. L'ajout du fournisseur, de ses
+sources, de sa licence et de ses modules est revu avant publication ; le client
+ne charge pas des URL exécutables arbitraires soumises depuis l'application.
+
+Chaque entrée précise le cœur, sa version, l'ABI Android, CorvusAPI0, la
+bibliothèque attendue, la taille et le SHA-256. Le workflow du distributeur
+vérifie l'archive à une seule bibliothèque, son format ELF, ses exports et ses
+segments de 16 Ko avant de préparer la promotion du catalogue. Une empreinte
+valide ne remplace pas la revue d'un nouveau fournisseur.
+
+CorvusRetro découvre automatiquement chaque catalogue approuvé. Aucune liste
+de fournisseurs, modification du menu ou nouvelle version APK n'est nécessaire.
+Voir le [guide de contribution](https://github.com/CorvusSoftware/CorvusRepository/blob/main/CONTRIBUTING.md).
+L'extension CMake des tests hôtes ne contourne pas les contrôles de distribution.
 
 ## Identités et sauvegardes
 

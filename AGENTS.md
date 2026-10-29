@@ -18,8 +18,8 @@ CorvusRetro itself is AGPL-3.0-only.
 - Java is for Android OS services: SAF, storage, preferences, fonts, networking and verified archive storage.
   Do not implement a parallel Java emulator, renderer or application menu.
 - The base Android APK ships with ZERO emulation cores. This is intentional.
-- Native archive inputs are built directly as standalone CorvusAPI shared libraries.
-  Host tests explicitly enable their bundled test catalog. Android always ships a core-free base.
+- Core builds, archive publication and provider catalogs belong to CorvusRepository.
+  Host tests explicitly enable their bundled test catalog. Android builds only the core-free base.
 - RetroArch/libretro are architectural and UX references. Do not copy their source,
   artwork, wording or branding. Keep the CorvusSoftware identity.
 
@@ -62,8 +62,9 @@ Keep a change spanning UI, Java, C ABI or persistence consistent across all affe
 
 ## Core downloader and distribution
 
-- The base APK contains zero emulation modules. NDK builds six native libraries
-  directly (three engines, two ABIs); Gradle excludes them from the base package.
+- The base APK contains zero emulation modules. Gradle builds only corvusretro
+  for the two Android ABIs. CorvusRepository builds and publishes native cores
+  independently, without Gradle, an APK or the application signing identity.
 - The current downloader fetches single-core, single-ABI ZIP archives from official
   HTTPS releases. CorvusCore.json (format 3) describes archive size/hash, native library
   name, permanent core ID, architecture and CorvusAPI version0. No base version lock.
@@ -83,11 +84,11 @@ Keep a change spanning UI, Java, C ABI or persistence consistent across all affe
   or launching Android PackageInstaller. Unloading destroys the engine, not its file.
 - Preserve legacy OS-installed split discovery when relevant, and all games and saves.
   The old JSON catalog URLs have been retired by maintainer decision.
-- Release-sign the base with the existing durable signer. Verify native ELF layouts
-  and six archive inputs. Generate new catalog metadata in a temporary workflow
-  artifact for CorvusRepository/CorvusCore, not a JSON under the frontend tree.
-  Publish actual immutable assets before promoting their real metadata. Never
-  invent URLs, hashes or certificates.
+- Release-sign the base with the existing durable signer. Verify the two frontend
+  ELF layouts and APK alignment. The frontend publishes only the APK and retains
+  source provenance; it does not build core archive inputs or generate catalogs.
+  Core archives and metadata are qualified in CorvusRepository. Never invent URLs,
+  hashes or certificates, and do not overwrite historical release assets.
 
 ## RetroAchievements
 
@@ -142,7 +143,7 @@ Native development (all engines enabled solely for regression tests):
 - make test CMAKE=<cmake-3.22-path>
 - make test SANITIZE=ON CMAKE=<cmake-3.22-path>
 
-Android base and individual cores:
+Android base:
 - ./gradlew --no-daemon :app:assembleDebug :app:lintDebug
 - Unzip the APK and verify NO libcorvus_gb.so, libcorvus_gbc.so or libcorvus_gba.so.
 - Confirm menu and library function with registry_count == 0.
@@ -153,15 +154,16 @@ Native archive installation:
 - Exercise truncated/bad-hash/foreign-ABI/traversal archives and service recreation.
 - Check immediate native list refresh and replacement while an old module is loaded.
 
-Catalog validation:
-- python3 tools/test_core_archives.py (builder and schema regression tests)
-- python3 tools/validate_core_archives.py build/release-core-check.json (generated catalog)
-- The public catalog CI runs in CorvusRepository/CorvusCore.
+APK publication gates:
+- python3 tools/test_release_workflows.py
+- python3 tools/check_core_apks.py (package, signer, zero cores and frontend ELF layouts)
+- Catalog, provider and core archive validation runs independently in CorvusRepository.
 
 Always inspect GitHub Actions results for the exact commit before merging.
 Differentiate host tests, compiled APK checks, emulator tests and physical-device tests.
 A compiled APK does NOT prove native archive loading works on hardware.
-Before a public release, require a tested, permanently release-signed base and real native archives in GitHub Releases.
+Before a public APK release, require a tested, permanently release-signed base.
+Core archive qualification and publication are separate CorvusRepository responsibilities.
 
 ## Never commit generated artifacts
 
