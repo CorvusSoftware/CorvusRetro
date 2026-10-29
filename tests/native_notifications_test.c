@@ -191,6 +191,8 @@ static void draw_tests(void) {
     cr_notifications_draw(&n, &p, 360, 640, cr_theme_get(CR_THEME_CORVUS));
     check(c.images == 2 && c.icons == 0 && c.measured_text,
           "ready images draw normally without any crow fallback");
+    check(c.clips > 0 && c.clip_x == 0 && c.clip_y == 0 && c.clip_w == 360 && c.clip_h == 640,
+          "card text clipping restores the supplied region");
     cr_notifications no_art = {0};
     cr_notifications_progress(&no_art, 6, "5/10", "", 50);
     c = (capture){.width = 360, .bottom = 640};
@@ -206,8 +208,6 @@ static void draw_tests(void) {
     cr_notifications_draw(&no_art, &p, 360, 640, cr_theme_get(CR_THEME_CORVUS));
     check(c.icons == 0 && c.images == 1 && c.measured_text,
           "a subsequently loaded progress badge appears without fallback");
-    check(c.clips > 0 && c.clip_x == 0 && c.clip_y == 0 && c.clip_w == 360 && c.clip_h == 640,
-          "card text clipping restores the supplied region");
     const float sizes[][2] = {{240, 320}, {360, 640}, {720, 320}, {100, 100}, {320, 48}, {32, 24}};
     const double times[] = {.01, .1, .33, .495, .66, 2, 4.825, 4.99, 5.2, 5.319};
     for (int theme = 0; theme < CR_THEME_COUNT; ++theme)
