@@ -182,14 +182,30 @@ static void draw_tests(void) {
     cr_painter p = painter(&c);
     cr_notifications_prepare(&n, &p);
     cr_notifications_draw(&n, &p, 360, 640, cr_theme_get(CR_THEME_CORVUS));
-    check(c.images == 1 && c.icons == 1 && c.measured_text && n.elapsed == 0,
-          "progress stays independent while the card waits for its image");
+    check(c.images == 0 && c.icons == 0 && c.measured_text && n.elapsed == 0,
+          "progress text remains visible without a crow while artwork is pending");
     c = (capture){.width = 360, .bottom = 640, .ready = true};
     cr_notifications_prepare(&n, &p);
     cr_notifications_update(&n, 0);
     cr_notifications_update(&n, .8);
     cr_notifications_draw(&n, &p, 360, 640, cr_theme_get(CR_THEME_CORVUS));
-    check(c.images == 2 && c.icons == 0 && c.measured_text, "ready images start the card directly without a visible fallback");
+    check(c.images == 2 && c.icons == 0 && c.measured_text,
+          "ready images draw normally without any crow fallback");
+    cr_notifications no_art = {0};
+    cr_notifications_progress(&no_art, 6, "5/10", "", 50);
+    c = (capture){.width = 360, .bottom = 640};
+    cr_notifications_draw(&no_art, &p, 360, 640, cr_theme_get(CR_THEME_CORVUS));
+    check(c.icons == 0 && c.images == 0 && c.measured_text,
+          "missing progress badge produces a text-only popup, not a crow");
+    cr_notifications_progress(&no_art, 6, "5/10", "delayed-badge", 50);
+    c = (capture){.width = 360, .bottom = 640};
+    cr_notifications_draw(&no_art, &p, 360, 640, cr_theme_get(CR_THEME_CORVUS));
+    check(c.icons == 0 && c.images == 0 && c.measured_text,
+          "an unavailable progress badge never flashes a crow");
+    c.ready = true;
+    cr_notifications_draw(&no_art, &p, 360, 640, cr_theme_get(CR_THEME_CORVUS));
+    check(c.icons == 0 && c.images == 1 && c.measured_text,
+          "a subsequently loaded progress badge appears without fallback");
     check(c.clips > 0 && c.clip_x == 0 && c.clip_y == 0 && c.clip_w == 360 && c.clip_h == 640,
           "card text clipping restores the supplied region");
     const float sizes[][2] = {{240, 320}, {360, 640}, {720, 320}, {100, 100}, {320, 48}, {32, 24}};
