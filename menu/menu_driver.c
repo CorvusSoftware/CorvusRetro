@@ -773,7 +773,8 @@ static void show_core_downloader(cr_ui *u) {
 static void activate(cr_ui *u, row r) {
     if (r.disabled && r.action == ACT_QUICK_ACTION) return;
     if (u->import_folder && (r.action == ACT_SELECT || r.action == ACT_UNLOAD ||
-                             r.action == ACT_GAME || r.action == ACT_PICK)) {
+                             r.action == ACT_GAME || r.action == ACT_PICK ||
+                             r.action == ACT_QUICK)) {
         cr_ui_message(u, "Importation du dossier en cours");
         return;
     }
@@ -1161,6 +1162,10 @@ void cr_ui_back(cr_ui *u) {
         return;
     }
     if (u->engine.loaded) {
+        if (u->import_folder) {
+            cr_ui_message(u, "Importation du dossier en cours");
+            return;
+        }
         page(u, CR_PLAY);
         return;
     }
