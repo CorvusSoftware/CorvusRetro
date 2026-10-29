@@ -25,7 +25,7 @@ typedef struct {
     float minimum_badge;
     float viewport_center;
     bool home_tab, settings_tab;
-    unsigned switch_ends, games_drawn;
+    unsigned switch_ends, games_drawn, header_crows, row_icons;
     bool full_width_selection;
     float switch_thumb, toggle_text_end;
 } capture;
@@ -86,6 +86,8 @@ static float measure(void *ctx, const char *s, float size) {
 }
 static void icon(void *ctx, int kind, float x, float y, float size, uint32_t color) {
     capture *c = ctx;
+    if (kind == CR_ICON_CROW && y == 16) ++c->header_crows;
+    if (x == 20 && size == 32) ++c->row_icons;
     if (y > 600 && kind == CR_ICON_HOME) c->home_tab = true;
     if (y > 600 && kind == CR_ICON_SETTINGS) c->settings_tab = true;
     if (c->layout && kind == CR_ICON_CROW) {
@@ -326,6 +328,27 @@ int main(void) {
     cr_ui_size(&u, 384, 700);
     capture c = draw(&u);
     check(c.home_tab && c.settings_tab, "navigation uses home and settings icons");
+    check(c.header_crows == 0, "menu header no longer draws the crow icon");
+    cr_game *long_history = calloc(1200, sizeof(*long_history));
+    check(long_history != NULL, "allocate long history fixture");
+    for (size_t i = 0; i < 1200; ++i) {
+        long_history[i].played = 1;
+        snprintf(long_history[i].title, sizeof(long_history[i].title), "Scroll item %zu", i);
+    }
+    u.games = long_history;
+    u.game_count = 1200;
+    u.page = CR_GAMES;
+    u.scroll = 1000 * 76;
+    capture scrolled = draw(&u);
+    check(scrolled.row_icons > 0 && scrolled.row_icons <= 10 &&
+          strstr(scrolled.text, "Scroll item 1000") != NULL &&
+          strstr(scrolled.text, "Scroll item 0\n") == NULL,
+          "long history only renders on-screen rows around the scroll position");
+    u.games = NULL;
+    u.game_count = 0;
+    u.page = CR_MAIN;
+    u.scroll = 0;
+    free(long_history);
     check(strstr(c.text, "Charger un cœur") && strstr(c.text, "Informations") &&
               !strstr(c.text, "Historique") && !strstr(c.text, "Décharger le cœur") &&
               !strstr(c.text, "Configuration du sous-système"),
