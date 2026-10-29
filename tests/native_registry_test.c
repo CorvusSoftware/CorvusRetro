@@ -105,6 +105,21 @@ int main(int argc, char **argv) {
     check(committed && ui.engine.loaded && strcmp(ui.engine.id, id) == 0 &&
               cr_engine_step(&ui.engine, 0),
           "GBA import at runtime index zero reuses historical SHA-2 ROM and battery paths");
+    ui.page = CR_LIBRARY;
+    ui.importing = true;
+    ui.import_folder = true;
+    ui.import_revision = ui.core_revision;
+    committed = false;
+    cr_ui_import(&ui, &incoming);
+    check(committed && ui.importing && ui.import_folder && ui.page == CR_LIBRARY &&
+              ui.engine.loaded && strcmp(ui.engine.id, id) == 0,
+          "folder batch checks and commits the ROM without auto-launch or ending the batch");
+    cr_import batch_finished = {.system = -1};
+    snprintf(batch_finished.error, sizeof(batch_finished.error), "1 jeu(x) importé(s)");
+    cr_ui_import(&ui, &batch_finished);
+    check(!ui.importing && !ui.import_folder && ui.page == CR_LIBRARY,
+          "folder batch completion clears import state and keeps the library open");
+    ui.page = CR_PLAY;
     cr_play_layout layout = cr_play_layout_make(384, 700, 2, 240, 160);
     cr_area shoulder = layout.controls[8].area;
     cr_ui_size(&ui, 384, 700);
