@@ -41,6 +41,7 @@ import java.util.concurrent.Executors;
 public final class MainActivity extends NativeActivity {
     static { System.loadLibrary("corvusretro"); }
     private static final int OPEN_CONTENT = 10;
+    private static final int OPEN_FOLDER = 11;
     private static final int[] EXTRA_GLYPHS = {0x153, 0x152, 0x2190, 0x2191, 0x2192, 0x2193, 0x2026, 0x2018, 0x2019};
     private static final int[] ICONS = {R.drawable.ic_core, R.drawable.ic_corvus, R.drawable.ic_content,
             R.drawable.ic_library, R.drawable.ic_settings, R.drawable.ic_history, R.drawable.ic_info,
@@ -58,6 +59,9 @@ public final class MainActivity extends NativeActivity {
     private boolean pickerOpen;
     private boolean copying;
     private int pickerSystem;
+    private String folderExtensions = "";
+    private List<android.net.Uri> folderFiles;
+    private int folderIndex, folderImported, folderFailed;
     // Immutable snapshot published by the UI thread, read by the native render thread.
     private volatile int[] windowArea;
     private InputManager inputManager;
@@ -124,6 +128,7 @@ public final class MainActivity extends NativeActivity {
         if (state != null) {
             pickerOpen = state.getBoolean("picker", false);
             pickerSystem = state.getInt("picker_system", 0);
+            folderExtensions = state.getString("folder_extensions", "");
         }
         super.onCreate(state);
         View decor = getWindow().getDecorView();
@@ -170,6 +175,7 @@ public final class MainActivity extends NativeActivity {
     public int[] safeWindowArea() { return windowArea; }
     @Override protected void onSaveInstanceState(Bundle state) {
         state.putBoolean("picker", pickerOpen); state.putInt("picker_system", pickerSystem);
+        state.putString("folder_extensions", folderExtensions);
         super.onSaveInstanceState(state);
     }
     @Override protected void onResume() {
@@ -181,6 +187,7 @@ public final class MainActivity extends NativeActivity {
         synchronized (importLock) {
             destroyed = true;
             if (pending != null) { pending.discard(); pending = null; }
+            folderFiles = null;
         }
         textInput.cancel();
         achievements.close();
@@ -265,7 +272,7 @@ public final class MainActivity extends NativeActivity {
     }
     public void pickContent(int system) {
         runOnUiThread(() -> {
-            synchronized (importLock) { if (destroyed || pickerOpen || copying || pending != null) return; }
+            synchronized (importLock) { if (destroyed || pickerOpen || copying || pending != null || folderFiles != null) return; }
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE);
             try {
                 pickerSystem = system; pickerOpen = true;
@@ -276,8 +283,59 @@ public final class MainActivity extends NativeActivity {
             }
         });
     }
+    public void pickFolder(int system, String extensions) {
+        runOnUiThread(() -> {
+            synchronized (importLock) {
+                if (destroyed || pickerOpen || copying || pending != null || folderFiles != null) return;
+            }
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            try {
+                pickerSystem = system;
+                folderExtensions = extensions == null ? "" : extensions;
+                pickerOpen = true;
+                startActivityForResult(intent, OPEN_FOLDER);
+            } catch (android.content.ActivityNotFoundException error) {
+                pickerOpen = false;
+                notifyError("Sélecteur de dossiers indisponible");
+            }
+        });
+    }
     @Override protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
+        if (request == OPEN_FOLDER) {
+            pickerOpen = false;
+            if (result != RESULT_OK || data == null || data.getData() == null) {
+                notifyError("");
+                return;
+            }
+            synchronized (importLock) {
+                if (destroyed) return;
+                if (copying || pending != null || folderFiles != null) {
+                    notifyError("Importation déjà en cours");
+                    return;
+                }
+                copying = true;
+            }
+            android.net.Uri tree = data.getData();
+            String allowed = folderExtensions;
+            io.execute(() -> {
+                try {
+                    List<android.net.Uri> files = library.folderGames(tree, allowed);
+                    synchronized (importLock) {
+                        copying = false;
+                        if (destroyed) return;
+                        folderFiles = files;
+                        folderIndex = folderImported = folderFailed = 0;
+                    }
+                    nextFolderGame();
+                } catch (Exception error) {
+                    synchronized (importLock) { copying = false; folderFiles = null; }
+                    notifyError(error.getMessage() == null ? "Dossier illisible" : error.getMessage());
+                }
+            });
+            return;
+        }
         if (request != OPEN_CONTENT) return;
         pickerOpen = false;
         if (result != RESULT_OK || data == null || data.getData() == null) {
@@ -306,15 +364,65 @@ public final class MainActivity extends NativeActivity {
     private void notifyError(String message) {
         synchronized (importLock) { if (!destroyed) imported("", "", -1, "", message); }
     }
+    /** Advance only after the native core has checked and committed the previous game. */
+    private void nextFolderGame() {
+        for (;;) {
+            android.net.Uri next;
+            synchronized (importLock) {
+                if (destroyed || folderFiles == null) return;
+                if (folderIndex == folderFiles.size()) {
+                    String summary = folderImported + " jeu(x) importé(s), " +
+                            folderFailed + " ignoré(s)";
+                    if (folderFiles.size() == GameLibrary.MAX_FOLDER_GAMES)
+                        summary += " (limite de 256 jeux)";
+                    folderFiles = null;
+                    imported("", "", -1, "", summary);
+                    return;
+                }
+                next = folderFiles.get(folderIndex++);
+                copying = true;
+            }
+            try {
+                GameLibrary.Pending copied = library.prepare(next, pickerSystem);
+                synchronized (importLock) {
+                    copying = false;
+                    if (destroyed) { copied.discard(); return; }
+                    if (pending != null) { copied.discard(); folderFailed++; continue; }
+                    pending = copied;
+                    imported(copied.game.id, copied.game.title, copied.game.system,
+                             copied.temporary.getAbsolutePath(), "");
+                    return;
+                }
+            } catch (Exception error) {
+                synchronized (importLock) { copying = false; folderFailed++; }
+            }
+        }
+    }
     public String finishImport(boolean accept, int system, String coreId, String systemId) {
         synchronized (importLock) {
             GameLibrary.Pending ready = pending;
             pending = null;
             if (ready == null) return accept ? "Import interrompu" : null;
-            if (!accept || destroyed) { ready.discard(); return accept ? "Import interrompu" : null; }
-            if (system < 0 || system >= 32) { ready.discard(); return "Cœur inconnu"; }
-            try { library.commit(ready, system, coreId, systemId); return null; }
-            catch (IOException error) { return error.getMessage() == null ? "Import impossible" : error.getMessage(); }
+            String error = null;
+            boolean committed = false;
+            if (!accept || destroyed) {
+                ready.discard();
+                if (destroyed) error = "Import interrompu";
+            } else if (system < 0 || system >= 32) {
+                ready.discard();
+                error = "Cœur inconnu";
+            } else {
+                try { library.commit(ready, system, coreId, systemId); committed = true; }
+                catch (IOException failure) {
+                    error = failure.getMessage() == null ? "Import impossible" : failure.getMessage();
+                }
+            }
+            if (folderFiles != null) {
+                if (committed) folderImported++;
+                else folderFailed++;
+                if (!destroyed) io.execute(this::nextFolderGame);
+            }
+            return error;
         }
     }
     public void touchGame(String id) {

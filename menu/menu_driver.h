@@ -33,7 +33,9 @@ enum {
     CR_CORE_OPTIONS,
     CR_CORE_OPTION_VALUES,
     CR_SUBSYSTEM_CONFIG,
-    CR_SUBSYSTEM_CONTENTS
+    CR_SUBSYSTEM_CONTENTS,
+    CR_CONTENT,
+    CR_LIBRARY
 };
 /* Stable quick-menu row IDs; unsupported core operations stay disabled. */
 enum {
@@ -82,7 +84,7 @@ typedef struct {
     unsigned input_player;
     unsigned hardware_keys[2], hardware_pulses[2];
     uint64_t core_revision, import_revision;
-    bool import_link;
+    bool import_link, import_folder;
     int link_slot, import_slot;
     char option_key[96], subsystem_id[96], import_subsystem_id[96];
     char link_ids[2][96], link_titles[2][512];

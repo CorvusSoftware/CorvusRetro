@@ -121,8 +121,15 @@ static capture draw(cr_ui *u) {
     return c;
 }
 static int saved_show = -1, saved_audio = -1, writes;
-static int core_refreshes, core_installs;
+static int core_refreshes, core_installs, folder_calls, folder_system;
+static char folder_extensions[128];
 static char selected_pack[96];
+static void pick_folder(void *ctx, int system, const char *extensions) {
+    (void)ctx;
+    folder_calls++;
+    folder_system = system;
+    snprintf(folder_extensions, sizeof(folder_extensions), "%s", extensions);
+}
 static void refresh_core_catalog(void *ctx) {
     (void)ctx;
     core_refreshes++;
@@ -324,7 +331,8 @@ int main(void) {
     cr_ui u;
     cr_ui_init(&u, (cr_platform){.set_preference = set,
                                 .refresh_core_catalog = refresh_core_catalog,
-                                .install_core_pack = install_core_pack}, root);
+                                .install_core_pack = install_core_pack,
+                                .pick_folder = pick_folder}, root);
     cr_ui_size(&u, 384, 700);
     capture c = draw(&u);
     check(c.home_tab && c.settings_tab, "navigation uses home and settings icons");
@@ -355,6 +363,12 @@ int main(void) {
     cr_ui_touch_at(&u, 0, CR_TOUCH_DOWN, 160, 260, 100.08);
     check(u.scroll_velocity == 0, "new touch stops inertial scrolling");
     cr_ui_touch_at(&u, 0, CR_TOUCH_CANCEL, 0, 0, 100.09);
+    long_history[0].played = 0;
+    u.page = CR_LIBRARY;
+    u.scroll = 0;
+    capture library = draw(&u);
+    check(strstr(library.text, "Scroll item 0") && library.row_icons <= 10,
+          "library shows imported games even when they were never played");
     u.games = NULL;
     u.game_count = 0;
     u.page = CR_MAIN;
@@ -364,6 +378,19 @@ int main(void) {
               !strstr(c.text, "Historique") && !strstr(c.text, "Décharger le cœur") &&
               !strstr(c.text, "Configuration du sous-système"),
           "main contains loading and information, history lives in playlists");
+    row(&u, 1);
+    check(u.page == CR_CONTENT, "content entry opens import and library choices");
+    c = draw(&u);
+    check(strstr(c.text, "Importer un jeu") && strstr(c.text, "Bibliothèque"),
+          "content submenu displays library");
+    row(&u, 1);
+    check(u.page == CR_LIBRARY, "library selection opens saved games");
+    c = draw(&u);
+    check(strstr(c.text, "Importer un dossier") && strstr(c.text, "Aucun jeu"),
+          "empty library offers folder import");
+    cr_ui_back(&u);
+    cr_ui_back(&u);
+    check(u.page == CR_MAIN, "back navigation restores content parent");
     row(&u, 0);
     check(u.page == CR_CORES, "core menu opens before downloader");
     c = draw(&u);
@@ -426,6 +453,21 @@ int main(void) {
     c = draw(&u);
     check(strstr(c.text, "Décharger le cœur") && !strstr(c.text, "Charger un cœur"),
           "the same core row changes from load to unload");
+    row(&u, 1);
+    row(&u, 1);
+    check(u.page == CR_LIBRARY, "loaded core can open folder library");
+    row(&u, 0);
+    check(folder_calls == 1 && folder_system == u.engine.system &&
+          folder_extensions[0] && u.import_folder && u.importing && !u.engine.loaded,
+          "folder picker uses the loaded core extensions without launching a game");
+    cr_import folder_done = {.system = -1};
+    snprintf(folder_done.error, sizeof(folder_done.error), "2 jeu(x) importé(s)");
+    cr_ui_import(&u, &folder_done);
+    check(!u.importing && !u.import_folder && strstr(u.message, "2 jeu(x)"),
+          "folder import completion restores navigation and reports the result");
+    cr_ui_back(&u);
+    cr_ui_back(&u);
+    check(u.page == CR_MAIN, "folder import returns to main through content page");
     row(&u, 2);
     c = draw(&u);
     check(u.page == CR_SUBSYSTEMS && !cr_ui_running(&u) &&

@@ -80,6 +80,8 @@ int main(void) {
     cr_ui_touch(&u, 0, CR_TOUCH_UP, 100, 150);
     check(u.page == CR_MAIN, "drag does not activate row");
     tap(&u, 100, 170);
+    check(u.page == CR_CONTENT, "content page offers library and direct import");
+    tap(&u, 100, 100);
     check(picked == -1 && !u.importing && strstr(u.message, "Chargez un cœur"),
           "installed modules alone cannot open the content picker");
     cr_import late = {.system = 0, .title = "Original.gb", .path = "/missing/original.gb"};
@@ -110,6 +112,8 @@ int main(void) {
     u.page = CR_MAIN;
     tap(&u, 100, 100); tap(&u, 100, 100);
     tap(&u, 100, 170);
+    check(u.page == CR_CONTENT, "content page retains loaded core");
+    tap(&u, 100, 100);
     check(picked == 0 && u.importing, "content picker dispatched to platform");
     cr_import cancel = {.system = -1};
     cr_ui_import(&u, &cancel);

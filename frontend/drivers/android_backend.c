@@ -325,6 +325,7 @@ bool cr_android_init(cr_android *p, struct android_app *app) {
     METHOD(preference, "preference", "(Ljava/lang/String;I)I");
     METHOD(set_preference, "preferenceSet", "(Ljava/lang/String;I)V");
     METHOD(pick, "pickContent", "(I)V");
+    METHOD(pick_folder, "pickFolder", "(ILjava/lang/String;)V");
     METHOD(finish, "finishImport", "(ZILjava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
     METHOD(touch, "touchGame", "(Ljava/lang/String;)V");
     METHOD(appearance, "appearance", "(IZ)V");
@@ -420,6 +421,14 @@ static void set_pref(void *ctx, const char *key, int value) {
 static void pick(void *ctx, int system) {
     cr_android *p = ctx;
     (*p->env)->CallVoidMethod(p->env, p->app->activity->clazz, p->pick, system);
+    cr_android_clear_error(p);
+}
+static void pick_folder(void *ctx, int system, const char *extensions) {
+    cr_android *p = ctx;
+    jstring allowed = (*p->env)->NewStringUTF(p->env, extensions ? extensions : "");
+    if (!allowed) { cr_android_clear_error(p); return; }
+    (*p->env)->CallVoidMethod(p->env, p->app->activity->clazz, p->pick_folder, system, allowed);
+    (*p->env)->DeleteLocalRef(p->env, allowed);
     cr_android_clear_error(p);
 }
 static bool finish(void *ctx, bool accept, int system, const char *core_id,
@@ -592,5 +601,6 @@ static void edit_text(void *ctx, int field, const char *text, bool secret) {
 cr_platform cr_android_services(cr_android *p) {
     return (cr_platform){p, pref, set_pref, pick, finish, games, touch, credits,
                          appearance, quit, refresh_catalog, install_pack, install_pending,
-                         achievement_request, achievement_credentials, save_achievement_credentials, edit_text};
+                         achievement_request, achievement_credentials, save_achievement_credentials, edit_text,
+                         pick_folder};
 }
