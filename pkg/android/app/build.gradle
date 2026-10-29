@@ -30,8 +30,8 @@ android {
         targetSdk 35
         versionCode project.hasProperty('corvusVersionCode')
                 ? project.property('corvusVersionCode').toInteger()
-                : 23
-        versionName project.findProperty('corvusVersionName') ?: '0.18.1'
+                : 24
+        versionName project.findProperty('corvusVersionName') ?: '0.18.2'
         ndk { abiFilters 'arm64-v8a', 'x86_64' }
         externalNativeBuild {
             cmake {
