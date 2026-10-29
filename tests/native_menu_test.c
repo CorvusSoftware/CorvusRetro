@@ -344,6 +344,17 @@ int main(void) {
           strstr(scrolled.text, "Scroll item 1000") != NULL &&
           strstr(scrolled.text, "Scroll item 0\n") == NULL,
           "long history only renders on-screen rows around the scroll position");
+    u.scroll = 0;
+    cr_ui_touch_at(&u, 0, CR_TOUCH_DOWN, 160, 340, 100);
+    cr_ui_touch_at(&u, 0, CR_TOUCH_MOVE, 160, 260, 100.05);
+    cr_ui_touch_at(&u, 0, CR_TOUCH_UP, 160, 260, 100.06);
+    float after_release = u.scroll;
+    cr_ui_update(&u, .016);
+    check(after_release >= 80 && u.scroll > after_release,
+          "fast swipe continues scrolling briefly after touch release");
+    cr_ui_touch_at(&u, 0, CR_TOUCH_DOWN, 160, 260, 100.08);
+    check(u.scroll_velocity == 0, "new touch stops inertial scrolling");
+    cr_ui_touch_at(&u, 0, CR_TOUCH_CANCEL, 0, 0, 100.09);
     u.games = NULL;
     u.game_count = 0;
     u.page = CR_MAIN;
