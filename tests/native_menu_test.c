@@ -179,7 +179,7 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
           "load real game and generate battery data through CorvusAPI");
     check(u->engine.api.battery_dirty(u->engine.handle), "test game has unsaved SRAM");
     cr_notifications_push(&u->notifications, CR_NOTIFICATION_GAME, 0, "Original GBA test", "Jeu lancé", "");
-    cr_notifications_progress(&u->notifications, 1, "1/10", "", 10);
+    cr_notifications_progress(&u->notifications, 1, "1/10", "badge", 10);
     u->notifications_loaded = true;
     cr_ui_update(u, .4);
     snprintf(u->title, sizeof(u->title), "Original GBA test");
