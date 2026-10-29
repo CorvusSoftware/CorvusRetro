@@ -187,13 +187,20 @@ void cr_notifications_draw_region(const cr_notifications *n, const cr_painter *p
         float h = 44 * scale;
         float y = bottom - margin - h;
         if (card_visible && y < top + margin + card_height + margin) return;
-        float w = fminf(available, fmaxf(116 * scale,
-                  58 * scale + measure(p, n->progress.text, 14 * scale)));
+        /* A pending progress image must not produce a Corvus crow placeholder. */
+        bool image_ready = n->progress.image_url[0] && p->image && p->image_ready &&
+                           p->image_ready(p->context, n->progress.image_url);
+        float inset = image_ready ? 58 * scale : 16 * scale;
+        float w = fminf(available, fmaxf((image_ready ? 116 : 70) * scale,
+                  inset + measure(p, n->progress.text, 14 * scale)));
         float x = left + width - margin - w;
         float opacity = (float)fmin(1, n->progress_time / .2);
         p->rect(p->context, x, y, w, h, alpha(theme->surface, opacity * .97f));
-        badge(p, theme, n->progress.image_url, x + 6 * scale, y + 6 * scale, 32 * scale, opacity, true);
-        float tx = x + 48 * scale, max = w - 54 * scale;
+        if (image_ready)
+            badge(p, theme, n->progress.image_url, x + 6 * scale, y + 6 * scale,
+                  32 * scale, opacity, false);
+        float tx = x + (image_ready ? 48 : 10) * scale;
+        float max = w - (image_ready ? 54 : 16) * scale;
         label(p, n->progress.text, tx, y + 26 * scale, 14 * scale,
               alpha(theme->text, opacity), max);
         if (n->progress.percent >= 0 && max > 0) {
