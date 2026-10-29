@@ -8,6 +8,7 @@ import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.net.Uri;
 import android.provider.OpenableColumns;
+import android.provider.DocumentsContract;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -16,6 +17,9 @@ import java.security.MessageDigest;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.Comparator;
 import java.util.List;
 import org.json.JSONArray;
@@ -25,6 +29,7 @@ import org.json.JSONObject;
 final class GameLibrary {
     private static final int MAX_ROM = 32 * 1024 * 1024;
     private static final int MAX_BUNDLED_CORES = 32;
+    static final int MAX_FOLDER_GAMES = 256;
     private static final Object INDEX_LOCK = new Object();
     final Context context;
     final SharedPreferences preferences;
@@ -150,6 +155,52 @@ final class GameLibrary {
                                                      current.coreId, current.systemId));
         }
     }
+    /** Enumerate a user-approved SAF tree without requesting broad storage access. */
+    List<Uri> folderGames(Uri tree, String extensions) throws IOException {
+        if (tree == null || !DocumentsContract.isTreeUri(tree) || extensions == null)
+            throw new IOException("Dossier de jeux indisponible");
+        Set<String> allowed = new HashSet<>();
+        for (String extension : extensions.split("\\|")) {
+            if (extension.matches("[a-zA-Z0-9]{1,16}"))
+                allowed.add(extension.toLowerCase(Locale.ROOT));
+        }
+        if (allowed.isEmpty()) throw new IOException("Aucune extension de jeu reconnue");
+        ArrayDeque<String[]> folders = new ArrayDeque<>();
+        folders.add(new String[]{DocumentsContract.getTreeDocumentId(tree), "0"});
+        List<Uri> files = new ArrayList<>();
+        int visited = 0;
+        while (!folders.isEmpty()) {
+            String[] folder = folders.removeFirst();
+            Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, folder[0]);
+            try (Cursor cursor = context.getContentResolver().query(children,
+                    new String[]{DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                            DocumentsContract.Document.COLUMN_MIME_TYPE}, null, null, null)) {
+                if (cursor == null) throw new IOException("Dossier de jeux illisible");
+                while (cursor.moveToNext()) {
+                    if (++visited > 4096)
+                        throw new IOException("Dossier trop volumineux (maximum 4096 éléments)");
+                    String id = cursor.getString(0), name = cursor.getString(1);
+                    String mime = cursor.getString(2);
+                    if (id == null || name == null) continue;
+                    if (DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)) {
+                        int depth = Integer.parseInt(folder[1]);
+                        if (depth < 4) folders.addLast(new String[]{id, Integer.toString(depth + 1)});
+                        continue;
+                    }
+                    int dot = name.lastIndexOf('.');
+                    if (dot < 0 || !allowed.contains(name.substring(dot + 1).toLowerCase(Locale.ROOT)))
+                        continue;
+                    files.add(DocumentsContract.buildDocumentUriUsingTree(tree, id));
+                    if (files.size() == MAX_FOLDER_GAMES) return files;
+                }
+            } catch (SecurityException error) {
+                throw new IOException("Accès au dossier refusé", error);
+            }
+        }
+        return files;
+    }
+
     Pending prepare(Uri uri, int selected) throws Exception {
         String title = "Contenu";
         try (Cursor cursor = context.getContentResolver().query(uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null)) {
