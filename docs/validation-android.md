@@ -127,3 +127,30 @@ erreurs de synchronisation, y compris après publication du fichier.
 Les états groupés et les succès pendant le link sont indisponibles dans les
 modules officiels. Le link GBA reste expérimental. Aucun runtime ARM64,
 appareil physique ou compte RetroAchievements personnel n'est revendiqué.
+
+## Distribution indépendante des cœurs
+
+Le [workflow autonome CorvusRepository](https://github.com/CorvusSoftware/CorvusRepository/actions/runs/40802383314)
+a construit et publié le lot [v0.15.1](https://github.com/CorvusSoftware/CorvusRepository/releases/tag/v0.15.1),
+contenant les six modules CorvusCore 0.15.0 depuis Core `063cf1f` et API
+`39c927c`, sans construire l'application. Les anciennes archives restent accessibles.
+
+Les six ZIP publics ont été téléchargés et vérifiés : tailles, SHA-256,
+bibliothèque unique, architecture, segments ELF de 16 Ko, quatre exports et
+dépendances système uniquement. Ils sont identiques aux fichiers standalone
+utilisés pour les essais Android. Le catalogue a été promu après contrôle,
+avec sa CI et le contenu `raw` de `main` vérifiés.
+
+Sur Android API29 x86_64, les trois parcours paysage sur les nouveaux modules
+publics passent : GB 127, GBC 127, GBA 131, soit 385 contrôles. Les empreintes
+des modules installés concordent avec les archives ; 24 captures couvrent les
+options, le reset, les deux joueurs et la fermeture conservant le cœur.
+Le démarrage TCG a rencontré un ANR System UI avant les essais ; il a été
+identifié et conservé, sans modification des permissions. Aucun crash applicatif
+ni nouvel ANR pendant les essais.
+
+La séparation côté frontend a passé huit tests de publication, Gradle
+Debug/Release/lint/testAPK et les contrôles de base sans moteur. La CI
+`40801908523` et la qualification signée APK seul `40802221654` sont réussies.
+Aucun nouvel APK public n'est requis pour ces téléchargements. Ces preuves
+ne revendiquent aucun essai sur téléphone physique ni runtime ARM64.
