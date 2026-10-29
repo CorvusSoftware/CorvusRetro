@@ -59,34 +59,60 @@ void cr_notifications_push(cr_notifications *n, int kind, uint32_t id, const cha
 void cr_notifications_progress(cr_notifications *n, uint32_t id, const char *text,
                                const char *image_url, float percent) {
     if (!n) return;
+    char url[sizeof(n->progress.image_url)];
+    copy_text(url, sizeof(url), image_url);
+    if (!url[0]) {
+        cr_notifications_hide_progress(n, 0);
+        return;
+    }
+    bool same_image = n->progress.visible && n->progress.id == id &&
+                      strcmp(n->progress.image_url, url) == 0;
     n->progress.id = id;
     n->progress.visible = true;
     n->progress.percent = isfinite(percent) ? fmaxf(0, fminf(100, percent)) : -1;
     copy_text(n->progress.text, sizeof(n->progress.text), text);
-    copy_text(n->progress.image_url, sizeof(n->progress.image_url), image_url);
+    if (!same_image) {
+        copy_text(n->progress.image_url, sizeof(n->progress.image_url), url);
+        n->progress.image_pending = true;
+        n->progress_image_wait = 0;
+        n->progress_image_wait_started = false;
+    }
     n->progress_time = CR_PROGRESS_HOLD;
 }
 void cr_notifications_hide_progress(cr_notifications *n, uint32_t id) {
     if (n && (!id || id == n->progress.id)) {
         memset(&n->progress, 0, sizeof(n->progress));
         n->progress_time = 0;
+        n->progress_image_wait = 0;
+        n->progress_image_wait_started = false;
     }
 }
 void cr_notifications_clear(cr_notifications *n) {
     if (n) memset(n, 0, sizeof(*n));
 }
 void cr_notifications_prepare(cr_notifications *n, const cr_painter *p) {
-    if (!n || !n->count || !p) return;
-    cr_notification_card *card = &n->cards[0];
-    if (!card->image_pending) return;
-    n->image_wait_started = true;
-    if (p->image_ready && p->image_ready(p->context, card->image_url)) {
-        card->image_pending = false;
-        n->image_wait = 0;
-    } else if (n->image_wait >= CR_IMAGE_WAIT) {
-        /* Commit to one fallback if artwork fails; never swap it mid-animation. */
-        card->image_pending = false;
-        card->image_url[0] = 0;
+    if (!n || !p) return;
+    if (n->count && n->cards[0].image_pending) {
+        cr_notification_card *card = &n->cards[0];
+        n->image_wait_started = true;
+        if (p->image_ready && p->image_ready(p->context, card->image_url)) {
+            card->image_pending = false;
+            n->image_wait = 0;
+        } else if (n->image_wait >= CR_IMAGE_WAIT) {
+            /* Commit to one fallback if artwork fails; never swap it mid-animation. */
+            card->image_pending = false;
+            card->image_url[0] = 0;
+        }
+    }
+    if (n->progress.visible && n->progress.image_pending) {
+        n->progress_image_wait_started = true;
+        if (p->image_ready && p->image_ready(p->context, n->progress.image_url)) {
+            n->progress.image_pending = false;
+            n->progress_image_wait = 0;
+        } else if (n->progress_image_wait >= CR_IMAGE_WAIT) {
+            /* An unavailable badge never starts a text-only progress popup. */
+            cr_notifications_hide_progress(n, 0);
+        }
     }
 }
 void cr_notifications_update(cr_notifications *n, double seconds) {
@@ -107,8 +133,12 @@ void cr_notifications_update(cr_notifications *n, double seconds) {
             n->image_wait_started = false;
         }
     }
-    n->progress_time = fmax(0, n->progress_time - seconds);
-    if (!n->progress_time) cr_notifications_hide_progress(n, 0);
+    if (n->progress.visible && n->progress.image_pending) {
+        if (n->progress_image_wait_started) n->progress_image_wait += seconds;
+    } else if (n->progress.visible) {
+        n->progress_time = fmax(0, n->progress_time - seconds);
+        if (!n->progress_time) cr_notifications_hide_progress(n, 0);
+    }
 }
 static float ease_out(double phase) {
     float t = (float)fmax(0, fmin(1, phase));
@@ -183,24 +213,20 @@ void cr_notifications_draw_region(const cr_notifications *n, const cr_painter *p
             card_visible = true;
         }
     }
-    if (n->progress.visible && n->progress_time > 0) {
+    if (n->progress.visible && !n->progress.image_pending && n->progress_time > 0 &&
+        p->image && p->image_ready &&
+        p->image_ready(p->context, n->progress.image_url)) {
         float h = 44 * scale;
         float y = bottom - margin - h;
         if (card_visible && y < top + margin + card_height + margin) return;
-        /* A pending progress image must not produce a Corvus crow placeholder. */
-        bool image_ready = n->progress.image_url[0] && p->image && p->image_ready &&
-                           p->image_ready(p->context, n->progress.image_url);
-        float inset = image_ready ? 58 * scale : 16 * scale;
-        float w = fminf(available, fmaxf((image_ready ? 116 : 70) * scale,
-                  inset + measure(p, n->progress.text, 14 * scale)));
+        float w = fminf(available, fmaxf(116 * scale,
+                  58 * scale + measure(p, n->progress.text, 14 * scale)));
         float x = left + width - margin - w;
         float opacity = (float)fmin(1, n->progress_time / .2);
         p->rect(p->context, x, y, w, h, alpha(theme->surface, opacity * .97f));
-        if (image_ready)
-            badge(p, theme, n->progress.image_url, x + 6 * scale, y + 6 * scale,
-                  32 * scale, opacity, false);
-        float tx = x + (image_ready ? 48 : 10) * scale;
-        float max = w - (image_ready ? 54 : 16) * scale;
+        badge(p, theme, n->progress.image_url, x + 6 * scale, y + 6 * scale,
+              32 * scale, opacity, false);
+        float tx = x + 48 * scale, max = w - 54 * scale;
         label(p, n->progress.text, tx, y + 26 * scale, 14 * scale,
               alpha(theme->text, opacity), max);
         if (n->progress.percent >= 0 && max > 0) {
