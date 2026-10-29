@@ -53,7 +53,9 @@ enum {
     ACT_SUBSYSTEM_SLOT,
     ACT_SUBSYSTEM_GAME,
     ACT_SUBSYSTEM_IMPORT,
-    ACT_SUBSYSTEM_START
+    ACT_SUBSYSTEM_START,
+    ACT_LIBRARY,
+    ACT_FOLDER
 };
 typedef struct {
     char label[512], hint[256];
@@ -126,6 +128,8 @@ static int rows(const cr_ui *u) {
         return count;
     }
     if (u->page == CR_SAVESTATES) return 2;
+    if (u->page == CR_CONTENT) return 2;
+    if (u->page == CR_LIBRARY) return 1 + (int)u->game_count;
     if (u->page == CR_MAIN)
         return 3 + (u->engine.loaded ? 1 : 0) + (u->engine.handle ? 1 : 0);
     if (u->page == CR_LISTS)
@@ -253,12 +257,8 @@ static row get_row(const cr_ui *u, int index) {
                  u->engine.handle ? CR_ICON_UNLOAD : CR_ICON_CORE,
                  u->engine.handle ? ACT_UNLOAD : ACT_CORES, 0);
         if (index == n++)
-            fill(&r, "Charger du contenu",
-                 u->importing ? "Import du contenu…" :
-                 (!u->engine.handle ? "Chargez un cœur avant le contenu" :
-                  "Ouvrir un fichier de jeu compatible"),
-                 CR_ICON_CONTENT, ACT_PICK, 0);
-        if (index == n - 1) r.disabled = !u->engine.handle;
+            fill(&r, "Charger du contenu", "Importer un jeu ou ouvrir la bibliothèque",
+                 CR_ICON_CONTENT, ACT_PAGE, CR_CONTENT);
         if (u->engine.handle && index == n++)
             fill(&r, "Configuration du sous-système", "Sous-systèmes du cœur chargé",
                  CR_ICON_CORE, ACT_PAGE, CR_SUBSYSTEMS);
@@ -267,6 +267,27 @@ static row get_row(const cr_ui *u, int index) {
                  CR_INFORMATION);
     } else if (u->page == CR_LISTS) {
         fill(&r, "Historique", "Contenus récemment ouverts", CR_ICON_HISTORY, ACT_HISTORY, 0);
+    } else if (u->page == CR_CONTENT) {
+        if (!index) {
+            fill(&r, "Importer un jeu", u->engine.handle ? "Choisir un fichier de jeu" :
+                 "Chargez un cœur pour importer", CR_ICON_CONTENT, ACT_PICK, 0);
+            r.disabled = !u->engine.handle || u->importing;
+        } else
+            fill(&r, "Bibliothèque", "Jeux importés et importation de dossiers",
+                 CR_ICON_LIBRARY, ACT_LIBRARY, 0);
+    } else if (u->page == CR_LIBRARY) {
+        if (!index) {
+            fill(&r, "Importer un dossier", u->import_folder ? "Importation du dossier en cours..." :
+                 (u->engine.handle ? "Importer les jeux compatibles avec le cœur chargé" :
+                                    "Chargez un cœur pour importer un dossier"),
+                 CR_ICON_CONTENT, ACT_FOLDER, 0);
+            r.disabled = !u->engine.handle || u->importing;
+        } else if ((size_t)(index - 1) < u->game_count) {
+            const cr_game *game = &u->games[index - 1];
+            fill(&r, game->title, game->system >= 0 ? core_name(game->system) :
+                 "Cœur non installé", CR_ICON_FILE, ACT_GAME, index - 1);
+            r.disabled = !u->engine.handle || game->system != u->engine.system;
+        }
     } else if (u->page == CR_CORES) {
         if (index == (int)cr_registry_count()) {
             fill(&r, "Téléchargeur de cœurs", "Catalogue officiel CorvusSoftware",
@@ -751,6 +772,11 @@ static void show_core_downloader(cr_ui *u) {
 }
 static void activate(cr_ui *u, row r) {
     if (r.disabled && r.action == ACT_QUICK_ACTION) return;
+    if (u->import_folder && (r.action == ACT_SELECT || r.action == ACT_UNLOAD ||
+                             r.action == ACT_GAME || r.action == ACT_PICK)) {
+        cr_ui_message(u, "Importation du dossier en cours");
+        return;
+    }
     if (u->installing && (r.action == ACT_INSTALL_CORE_PACK || r.action == ACT_GAME ||
                           r.action == ACT_SELECT || r.action == ACT_PICK ||
                           r.action == ACT_UNLOAD || r.action == ACT_SAVE_STATE ||
@@ -902,6 +928,24 @@ static void activate(cr_ui *u, row r) {
             page(u, CR_MAIN);
         }
         break;
+    case ACT_LIBRARY:
+        push_page(u, CR_LIBRARY);
+        break;
+    case ACT_FOLDER:
+        if (!u->engine.handle) {
+            cr_ui_message(u, "Chargez un cœur avant d'importer un dossier");
+            break;
+        }
+        if (!u->importing && u->platform.pick_folder) {
+            const cr_core_descriptor *core = cr_registry_get(u->engine.system);
+            if (!core) break;
+            u->importing = true;
+            u->import_folder = true;
+            u->import_link = false;
+            u->import_revision = u->core_revision;
+            u->platform.pick_folder(u->platform.context, u->engine.system, core->extensions);
+        }
+        break;
     case ACT_PICK:
         if (!u->engine.handle) {
             cr_ui_message(u, "Chargez un cœur avant de charger du contenu");
@@ -922,6 +966,7 @@ static void activate(cr_ui *u, row r) {
         push_page(u, CR_ABOUT);
         break;
     case ACT_GAME: {
+        if (r.value < 0 || (size_t)r.value >= u->game_count) break;
         cr_game *g = &u->games[r.value];
         if (g->system < 0) {
             cr_ui_message(u, "Le cœur associé à ce jeu n'est plus installé");
@@ -993,9 +1038,17 @@ int cr_content_system(const char *title, int selected) {
 }
 void cr_ui_import(cr_ui *u, const cr_import *item) {
     bool link = u->import_link;
-    u->import_link = false;
-    u->importing = false;
+    bool folder = u->import_folder;
+    if (!folder) {
+        u->import_link = false;
+        u->importing = false;
+    }
     if (item->system < 0) {
+        if (folder) {
+            u->import_folder = false;
+            u->importing = false;
+            cr_ui_reload(u);
+        }
         if (item->error[0])
             cr_ui_message(u, item->error);
         return;
@@ -1030,10 +1083,11 @@ void cr_ui_import(cr_ui *u, const cr_import *item) {
                                                core ? core->id : "", core ? core->system_id : "",
                                                error, sizeof(error));
     if (!valid || !committed) {
-        cr_ui_message(u, error);
+        if (!folder) cr_ui_message(u, error);
         return;
     }
     cr_ui_reload(u);
+    if (folder) return;
     if (link) {
         snprintf(u->link_ids[u->import_slot], sizeof(u->link_ids[0]), "%s", resolved.id);
         snprintf(u->link_titles[u->import_slot], sizeof(u->link_titles[0]), "%s", resolved.title);
@@ -1454,6 +1508,12 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         case CR_GAMES:
             title = u->filter < 0 ? "Historique" : system_name(u->filter);
             break;
+        case CR_CONTENT:
+            title = "Charger du contenu";
+            break;
+        case CR_LIBRARY:
+            title = "Bibliothèque";
+            break;
         case CR_ABOUT:
             title = "CorvusRetro";
             break;
@@ -1518,6 +1578,10 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
             text(p, u->catalog_loading ? "Recherche des cœurs officiels..." :
                     "Aucun cœur disponible pour cette version.",
                  20, 236, 14, fg, w - 40);
+        }
+        if (u->page == CR_LIBRARY && count == 1) {
+            text(p, "Aucun jeu dans la bibliothèque.",
+                 20, 246, 14, fg, w - 40);
         }
         if (u->page == CR_GAMES && !count) {
             text(p,
