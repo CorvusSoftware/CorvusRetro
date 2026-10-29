@@ -1316,7 +1316,7 @@ static void center(const cr_painter *p, const char *s, float x, float y, float s
     text(p, s, x - width(p, s, size) / 2, y, size, c, 10000);
 }
 static float paragraphs(const cr_painter *p, const char *s, float x, float top, float w, float line,
-                        uint32_t color, float scroll) {
+                        uint32_t color, float scroll, float bottom) {
     char buffer[1024];
     size_t at = 0;
     float y = top - scroll;
@@ -1331,7 +1331,7 @@ static float paragraphs(const cr_painter *p, const char *s, float x, float top, 
         memcpy(next, word, part);
         next[part] = 0;
         if (at && width(p, buffer, 14) + width(p, next, 14) > w) {
-            if (y > 50 && y < 10000)
+            if (y >= 56 && y <= bottom + line)
                 text(p, buffer, x, y, 14, color, w);
             y += line;
             at = 0;
@@ -1343,7 +1343,8 @@ static float paragraphs(const cr_painter *p, const char *s, float x, float top, 
         at += len;
         buffer[at] = 0;
         if (*end == '\n') {
-            text(p, buffer, x, y, 14, color, w);
+            if (y >= 56 && y <= bottom + line)
+                text(p, buffer, x, y, 14, color, w);
             y += line;
             at = 0;
             buffer[0] = 0;
@@ -1353,7 +1354,7 @@ static float paragraphs(const cr_painter *p, const char *s, float x, float top, 
         }
         word = *end ? end + 1 : end;
     }
-    if (at)
+    if (at && y >= 56 && y <= bottom + line)
         text(p, buffer, x, y, 14, color, w);
     return y + scroll - top + line;
 }
@@ -1458,8 +1459,11 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         if (p->clip)
             p->clip(p->context, 0, 56, w, fmaxf(1, body_bottom(u) - 56));
         int count = rows(u);
-        for (int i = 0; i < count; i++) {
-            float y = 64 + i * 76 - (u->quick ? u->quick_scroll : u->scroll);
+        float scroll = u->quick ? u->quick_scroll : u->scroll;
+        int first = (int)fmaxf(0, floorf((scroll - 84) / 76));
+        int end = (int)fminf(count, floorf((scroll + body_bottom(u) - 64) / 76) + 1);
+        for (int i = first; i < end; i++) {
+            float y = 64 + i * 76 - scroll;
             if (y + 76 < 56 || y > body_bottom(u))
                 continue;
             row r = get_row(u, i);
@@ -1499,7 +1503,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
                 "Boy Color, Game Boy Advance (expérimental).\n\nNavigation inspirée de "
                 "MaterialUI. Thèmes CorvusRetro, ASUS et NVIDIA Shield.\n\nCopyright (C) 2026 "
                 "CorvusSoftware\nSPDX-License-Identifier: AGPL-3.0-only",
-                20, 92, w - 40, 24, fg, u->scroll);
+                20, 92, w - 40, 24, fg, u->scroll, body_bottom(u));
         if ((u->page == CR_SUBSYSTEMS || u->page == CR_CORE_OPTIONS) && !count) {
             const char *empty = !u->engine.handle ? "Aucun cœur chargé." :
                 u->page == CR_SUBSYSTEMS ?
@@ -1507,7 +1511,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
                     "Ce module ne déclare pas de configuration de plusieurs contenus." :
                     "Aucune option de cœur disponible.\n\n"
                     "Ce module ne déclare pas de réglage modifiable.";
-            u->text_height = paragraphs(p, empty, 20, 92, w - 40, 24, fg, u->scroll);
+            u->text_height = paragraphs(p, empty, 20, 92, w - 40, 24, fg, u->scroll, body_bottom(u));
         }
         if (u->page == CR_CORE_INFO) {
             char info[2048];
@@ -1529,11 +1533,11 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
             }
             else
                 snprintf(info, sizeof(info), "Aucun cœur chargé");
-            u->text_height = paragraphs(p, info, 20, 92, w - 40, 24, fg, u->scroll);
+            u->text_height = paragraphs(p, info, 20, 92, w - 40, 24, fg, u->scroll, body_bottom(u));
         }
         if (u->page == CR_LICENSE)
             u->text_height = paragraphs(p, u->license ? u->license : "Licence indisponible", 20, 92,
-                                        w - 40, 23, fg, u->scroll);
+                                        w - 40, 23, fg, u->scroll, body_bottom(u));
         if (p->clip)
             p->clip(p->context, 0, 0, w, h);
         // Cover scrolled content before drawing the fixed header and navigation.
@@ -1543,7 +1547,6 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         if (has_back(u))
             p->icon(p->context, CR_ICON_BACK, 12, 16, 24, theme->header_text);
         text(p, title, has_back(u) ? 56 : 20, 35, 19, theme->header_text, w - 100);
-        p->icon(p->context, CR_ICON_CROW, w - 44, 16, 24, theme->header_icon);
         rect(p, 0, body_bottom(u), w, 100, bg);
         char footer[256];
         if (u->engine.handle) {
