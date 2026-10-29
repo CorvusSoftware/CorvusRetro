@@ -1,7 +1,7 @@
 # CorvusRetro - CorvusSoftware
 # Copyright (C) 2026 CorvusSoftware
 # SPDX-License-Identifier: AGPL-3.0-only
-name: Build signed base and native Corvus cores
+name: Build signed CorvusRetro base
 
 on:
   workflow_run:
@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   build:
-    name: Signed base and native cores
+    name: Signed Android base
     if: >-
       github.repository == 'CorvusSoftware/CorvusRetro' &&
       ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
@@ -126,7 +126,7 @@ jobs:
           actual=$(sha256sum "$RUNNER_TEMP/corvus-release-cert.der" | cut -d' ' -f1)
           test "${actual,,}" = "${RELEASE_CERT,,}" || { echo "Pinned release certificate mismatch"; exit 1; }
 
-      - name: Build the signed base and native modules
+      - name: Build the signed base
         env:
           CORVUS_RELEASE_STORE_PASSWORD: ${{ secrets.CORVUS_RELEASE_STORE_PASSWORD }}
           CORVUS_RELEASE_KEY_ALIAS: ${{ secrets.CORVUS_RELEASE_KEY_ALIAS }}
@@ -134,7 +134,7 @@ jobs:
         run: |
           ./gradlew --no-daemon :app:assembleRelease
 
-      - name: Validate the signed base and native modules
+      - name: Validate the signed base
         env:
           RELEASE_CERT: ${{ secrets.CORVUS_RELEASE_CERT_SHA256 }}
         run: |
@@ -148,12 +148,6 @@ jobs:
         run: |
           mkdir -p build/signed-preview
           cp pkg/android/app/build/outputs/apk/release/app-release.apk build/signed-preview/CorvusRetro-base-release.apk
-          for core in gb gbc gba; do
-            for abi in arm64-v8a x86_64; do
-              cp "pkg/android/app/build/native-cores/Release/$abi/libcorvus_$core.so" \
-                "build/signed-preview/libcorvus_$core-$abi.so"
-            done
-          done
           python3 - <<'PY'
           import json, os, subprocess
           from pathlib import Path
@@ -165,8 +159,8 @@ jobs:
                   'rcheevos_sha': revision('deps/rcheevos')}
           Path('build/signed-preview/source.json').write_text(json.dumps(data, indent=2) + '\n')
           PY
-          (cd build/signed-preview && sha256sum *.apk *.so source.json > SHA256SUMS)
-          echo "Signed base and native qualification inputs only. No Release or catalog was published." >> "$GITHUB_STEP_SUMMARY"
+          (cd build/signed-preview && sha256sum *.apk source.json > SHA256SUMS)
+          echo "Signed base qualification only. Core distribution is maintained independently in CorvusRepository." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the signed qualification build
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -174,7 +168,6 @@ jobs:
           name: CorvusRetro-signed-${{ env.SOURCE_SHA }}
           path: |
             build/signed-preview/*.apk
-            build/signed-preview/*.so
             build/signed-preview/source.json
             build/signed-preview/SHA256SUMS
           if-no-files-found: error

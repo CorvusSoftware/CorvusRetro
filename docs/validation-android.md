@@ -12,9 +12,6 @@ make test SANITIZE=ON
 cmake -S . -B build/corefree -DCORVUS_OFFICIAL_CORES=
 cmake --build build/corefree --target native_nocore_test
 (cd build/corefree && ./native_nocore_test)
-python3 tools/test_core_archives.py
-# Pour un catalogue produit localement :
-# python3 tools/validate_core_archives.py build/release-core-check.json
 python3 tools/test_release_workflows.py
 ```
 
@@ -30,15 +27,17 @@ python3 tools/check_core_apks.py \
   --apksigner "$ANDROID_HOME/build-tools/35.0.0/apksigner" \
   --aapt "$ANDROID_HOME/build-tools/35.0.0/aapt" \
   --zipalign "$ANDROID_HOME/build-tools/35.0.0/zipalign"
-python3 tools/build_core_archives.py --variant debug --tag v0.13.0 \
-  --output build/native-cores --catalog build/native-cores.json
 ```
 
 La base `pkg/android/app/build/outputs/apk/debug/app-debug.apk` doit contenir
-uniquement `libcorvusretro.so` pour ARM64 et x86_64. Les six bibliothèques du
-répertoire `pkg/android/app/build/native-cores/Debug/` doivent exposer CorvusAPI,
-correspondre à l'architecture annoncée et avoir des segments ELF de16Ko.
-Chaque ZIP contient une seule bibliothèque.
+uniquement `libcorvusretro.so` pour ARM64 et x86_64, avec des segments ELF
+de 16 Ko. Le build Gradle cible seulement `corvusretro` et ne produit pas
+les archives de cœurs.
+
+La compilation autonome, la validation des bibliothèques et des ZIP,
+les contrôles des fournisseurs et la promotion des catalogues sont dans
+[CorvusRepository](https://github.com/CorvusSoftware/CorvusRepository/blob/main/docs/publication.md).
+Ils n'utilisent ni le projet Gradle ni la signature de l'application.
 
 ## Qualification de l'application
 
@@ -69,8 +68,10 @@ service public depuis un téléphone. Distinguer explicitement build, tests hôt
 Le build signé doit employer le certificat durable de la base déjà distribuée.
 Le publisher exige une CI réussie du commit exact, la provenance des dépendances,
 les empreintes de tous les fichiers et le tag correspondant à la version APK.
-Il réutilise ces fichiers qualifiés, publie les vraies archives puis prépare
-leur catalogue pour revue. Vérifier les octets publics avant promotion du catalogue.
+Il publie l'APK qualifié sans reconstruire ou publier de cœurs.
+CorvusRepository publie ses propres archives et prépare leur catalogue
+pour revue après vérification des octets publics. Les numéros de version
+des moteurs et de l'application sont indépendants.
 
 ## Qualification 0.18.0
 

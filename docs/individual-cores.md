@@ -63,11 +63,18 @@ Un échec conserve les anciens cœurs. Aucun installateur de paquets n'intervien
 
 ## Publication
 
-Le build NDK compile directement les trois moteurs pour les deux architectures.
-Gradle exclut ces bibliothèques de l'APK de base. Les modules sont disponibles dans
-`pkg/android/app/build/native-cores/<Debug|Release>/<ABI>/`.
-`tools/build_core_archives.py` vérifie les ELF et crée six ZIP déterministes.
-La CI signe uniquement la base Android et conserve la provenance et les empreintes
-des six bibliothèques. Le publisher réutilise ces fichiers qualifiés sans reconstruire
-les moteurs, puis génère un catalogue temporaire pour revue dans CorvusRepository.
-Les anciens catalogues ont été supprimés ; les APK historiques ne peuvent plus mettre à jour leurs listes de cœurs. Le catalogue actif est CorvusRepository/catalog/corvuscore.json.
+Les modules et leurs catalogues sont publiés indépendamment dans
+[CorvusRepository](https://github.com/CorvusSoftware/CorvusRepository).
+Son workflow construit les trois moteurs et les deux ABIs depuis une révision
+qualifiée de CorvusCore, sans construire CorvusRetro ni utiliser sa signature APK.
+Les ZIP sont publiés dans les releases de CorvusRepository ; leurs tailles et
+empreintes sont vérifiées sur les fichiers publics avant promotion du catalogue.
+
+CorvusRetro construit, qualifie et publie uniquement sa base signée. Son
+sous-module CorvusCore reste une référence pour les en-têtes CorvusAPI et les
+tests hôtes avec de vrais moteurs, sans verrouiller la version des cœurs
+installés. Les APK 0.18.0 acceptent déjà les archives de CorvusRepository.
+
+Le catalogue actif reste `CorvusRepository/catalog/corvuscore.json`. Les anciens
+assets CorvusRetro sont conservés avec leurs URL et empreintes historiques ;
+aucune réinstallation de l'application n'est nécessaire pour changer d'hébergeur.

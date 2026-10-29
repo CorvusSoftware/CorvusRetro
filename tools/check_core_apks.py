@@ -2,19 +2,55 @@
 # CorvusRetro - CorvusSoftware
 # Copyright (C) 2026 CorvusSoftware
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Check the core-free Android base and six native archive inputs.
+"""Check the core-free Android base, its signer and both frontend ELF layouts.
 
 Release publication requires an independently pinned base certificate.
 """
 import argparse
 import re
 import subprocess
+import struct
 import zipfile
 from pathlib import Path
 
 from android_artifacts import package_info, verify_signer
-from validate_core_archives import OFFICIAL_CORES
-from build_core_archives import verify_elf
+
+
+def verify_frontend_elf(data, abi):
+    machine = {"arm64-v8a": 183, "x86_64": 62}.get(abi)
+    if (machine is None or len(data) < 64 or data[:6] != b"\x7fELF\x02\x01" or
+            struct.unpack_from("<HH", data, 16) != (3, machine)):
+        raise ValueError("incorrect frontend ELF identity")
+    offset = struct.unpack_from("<Q", data, 32)[0]
+    entry_size, count = struct.unpack_from("<HH", data, 54)
+    if entry_size < 56 or count == 0 or offset + entry_size * count > len(data):
+        raise ValueError("invalid frontend program headers")
+    loads = 0
+    for index in range(count):
+        position = offset + index * entry_size
+        if struct.unpack_from("<I", data, position)[0] != 1:
+            continue
+        loads += 1
+        file_offset, address = struct.unpack_from("<QQ", data, position + 8)
+        file_size = struct.unpack_from("<Q", data, position + 32)[0]
+        alignment = struct.unpack_from("<Q", data, position + 48)[0]
+        if (alignment < 16384 or alignment & (alignment - 1) or
+                file_offset + file_size > len(data) or
+                file_offset % alignment != address % alignment):
+            raise ValueError("frontend ELF is truncated or incompatible with 16 KB pages")
+    if not loads:
+        raise ValueError("frontend ELF has no loadable segments")
+
+
+def verify_base_libraries(apk):
+    with zipfile.ZipFile(apk) as archive:
+        libraries = [name for name in archive.namelist()
+                     if name.startswith("lib/") and name.endswith(".so")]
+        expected = {f"lib/{abi}/libcorvusretro.so" for abi in ("arm64-v8a", "x86_64")}
+        if len(libraries) != len(expected) or set(libraries) != expected:
+            raise ValueError("base APK must contain only the frontend for both ABIs")
+        for abi in ("arm64-v8a", "x86_64"):
+            verify_frontend_elf(archive.read(f"lib/{abi}/libcorvusretro.so"), abi)
 
 
 def main():
@@ -39,17 +75,9 @@ def main():
     base_info = package_info(base, args.aapt)
     if base_info.get("split"):
         parser.error("base APK is a feature split")
-    with zipfile.ZipFile(base) as archive:
-        libraries = {n for n in archive.namelist() if n.startswith("lib/") and n.endswith(".so")}
-        expected = {f"lib/{abi}/libcorvusretro.so" for abi in ("arm64-v8a", "x86_64")}
-        if libraries != expected:
-            parser.error("base APK must contain only the frontend for both ABIs")
-    for library, _ in OFFICIAL_CORES.values():
-        for abi in ("arm64-v8a", "x86_64"):
-            module = Path("pkg/android/app/build/native-cores") / args.variant.capitalize() / abi / library
-            verify_elf(module.read_bytes(), abi)
+    verify_base_libraries(base)
     subprocess.run([args.zipalign, "-c", "-P", "16", "4", str(base)], check=True)
-    print("PASS signed core-free base and six native modules: package, signature, ABIs and 16 KB alignment")
+    print("PASS signed core-free base: package, signature, frontend ABIs and 16 KB alignment")
 
 
 if __name__ == "__main__":
