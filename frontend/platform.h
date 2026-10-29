@@ -44,5 +44,6 @@ typedef struct {
     void (*achievement_credentials)(void *, char *, size_t, char *, size_t);
     void (*save_achievement_credentials)(void *, const char *, const char *);
     void (*edit_text)(void *, int, const char *, bool);
+    void (*pick_folder)(void *, int, const char *);
 } cr_platform;
 #endif
