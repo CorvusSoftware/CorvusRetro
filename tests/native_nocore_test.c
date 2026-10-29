@@ -46,9 +46,21 @@ int main(void) {
     check(ui.page == CR_MAIN, "back navigation works without installed cores");
     cr_ui_move(&ui, 1);
     cr_ui_confirm(&ui);
-    check(ui.page == CR_MAIN && !ui.importing && !ui.engine.handle &&
+    check(ui.page == CR_CONTENT, "content navigation remains available with zero cores");
+    cr_ui_confirm(&ui);
+    check(ui.page == CR_CONTENT && !ui.importing && !ui.engine.handle &&
               strstr(ui.message, "Chargez un cœur"),
-          "core-free content action requires explicitly loading a core first");
+          "core-free file import requires explicitly loading a core first");
+    cr_ui_move(&ui, 1);
+    cr_ui_confirm(&ui);
+    check(ui.page == CR_LIBRARY, "library is accessible without installed cores");
+    cr_ui_confirm(&ui);
+    check(ui.page == CR_LIBRARY && !ui.import_folder && !ui.importing &&
+              strstr(ui.message, "Chargez un cœur"),
+          "folder import refuses unavailable core without starting a picker");
+    cr_ui_back(&ui);
+    cr_ui_back(&ui);
+    check(ui.page == CR_MAIN, "library back navigation restores main menu");
 
     cr_ui_destroy(&ui);
     puts("PASS core-free CorvusRetro");
