@@ -363,6 +363,12 @@ int main(void) {
     cr_ui_touch_at(&u, 0, CR_TOUCH_DOWN, 160, 260, 100.08);
     check(u.scroll_velocity == 0, "new touch stops inertial scrolling");
     cr_ui_touch_at(&u, 0, CR_TOUCH_CANCEL, 0, 0, 100.09);
+    long_history[0].played = 0;
+    u.page = CR_LIBRARY;
+    u.scroll = 0;
+    capture library = draw(&u);
+    check(strstr(library.text, "Scroll item 0") && library.row_icons <= 10,
+          "library shows imported games even when they were never played");
     u.games = NULL;
     u.game_count = 0;
     u.page = CR_MAIN;
