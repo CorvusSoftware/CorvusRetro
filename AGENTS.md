@@ -38,7 +38,7 @@ Read docs/core-downloader.md and docs/stable-content-identities.md when touching
 - gfx/drivers/gl2.c: EGL/OpenGL ES2 rendering.
 - audio/drivers/aaudio.c: real-time audio output and pacing.
 - pkg/android/app/src/main/java/com/corvussoftware/corvusretro/: Android-only services.
-- CorvusRepository/catalog/*.json: auto-discovered provider catalogs (no local JSON).
+- CorvusRepository/catalog/v1/*.json: auto-discovered provider catalogs (no local JSON).
 - CoreCatalogDiscovery.java: bounded GitHub Contents API listing and feed aggregation.
 - No JSON catalog lives here. Former catalog endpoints are deliberately retired; old APKs may fail to refresh their download lists.
 - tools/: offline validators and release tooling.

@@ -1,12 +1,12 @@
 # Découverte des cœurs
 
 CorvusRetro recherche automatiquement les fichiers JSON du dossier
-[`catalog/`](https://github.com/CorvusSoftware/CorvusRepository/tree/main/catalog)
+[`catalog/v1/`](https://github.com/CorvusSoftware/CorvusRepository/tree/main/catalog/v1)
 dans le dépôt [CorvusRepository](https://github.com/CorvusSoftware/CorvusRepository).
 
 ## Fonctionnement
 
-1. Le service Android consulte l'[API GitHub du dossier catalog](https://api.github.com/repos/CorvusSoftware/CorvusRepository/contents/catalog?ref=main).
+1. Le service Android consulte l'[API GitHub du dossier catalog/v1](https://api.github.com/repos/CorvusSoftware/CorvusRepository/contents/catalog/v1?ref=main).
 2. Il sélectionne les fichiers `*.json` à nom valide, vérifie leur chemin,
    leur URL publique et leur taille, puis les télécharge via HTTPS.
 3. Chaque fichier doit respecter le format 3 de CorvusAPI 0. Les cœurs sont
@@ -16,12 +16,12 @@ dans le dépôt [CorvusRepository](https://github.com/CorvusSoftware/CorvusRepos
    avant installation dans le stockage privé.
 
 **Aucun index manuel n'est nécessaire.** Quand un nouveau fichier
-`catalog/fournisseur.json` est accepté dans CorvusRepository, CorvusRetro
+`catalog/v1/fournisseur.json` est accepté dans CorvusRepository, CorvusRetro
 le découvre au prochain rafraîchissement du téléchargeur.
 
 ## Fournisseurs et sécurité
 
-- `catalog/corvuscore.json` contient les cœurs officiels CorvusGB,
+- `catalog/v1/corvuscore.json` contient les cœurs officiels CorvusGB,
   CorvusGBC et CorvusGBA.
 - Les autres catalogues utilisent un identifiant par fournisseur
   (`fournisseur.identifiant`) et une bibliothèque native `lib...so`.
@@ -31,7 +31,7 @@ le découvre au prochain rafraîchissement du téléchargeur.
 - Le client accepte au maximum **16 catalogues**, **32 cœurs compatibles**,
   **96 Kio par catalogue** et **32 Mio par ZIP**.
 - Si l'API GitHub n'est pas accessible, il retente directement
-  `catalog/corvuscore.json`. Les modules déjà installés restent disponibles.
+  `catalog/v1/corvuscore.json`. Les modules déjà installés restent disponibles.
 
 **Attention :** un cœur est du code natif exécutable. Une empreinte SHA-256
 confirme l'identité des fichiers, pas leur innocuité. Tout nouveau catalogue
@@ -43,12 +43,14 @@ dans le dépôt officiel.
 CorvusRepository construit les modules officiels depuis une révision qualifiée
 de CorvusCore, ou importe les archives d'un fournisseur approuvé. Il publie
 les ZIP dans ses propres releases, vérifie les fichiers publics puis propose
-le catalogue par pull request. Sa CI valide tous les JSON de `catalog/`.
+le catalogue par pull request. Sa CI valide tous les JSON de `catalog/v1/`.
 
 Les mises à jour des cœurs ne nécessitent ni build de CorvusRetro, ni nouvel
 APK, ni clé de signature Android. CorvusRetro publie uniquement sa base signée.
-Les versions 0.18.0 acceptent déjà les archives de CorvusRepository ; les
-anciennes URL de releases CorvusRetro restent reconnues pour compatibilité.
+La version 0.18.1 corrige le contrôle des origines officielles et accepte les
+archives de CorvusRepository. La version 0.18.0 garde son flux historique
+`catalog/corvuscore.json`, avec les archives CorvusRetro existantes. Les
+promotions centrales utilisent uniquement `catalog/v1/`.
 
 Les anciens flux de CorvusRetro ont été retirés à la demande du
 mainteneur ; les APK v0.13.0 et antérieurs qui utilisaient leurs anciennes

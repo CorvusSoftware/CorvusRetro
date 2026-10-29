@@ -28,8 +28,6 @@ import org.json.JSONObject;
 /** HTTPS services for the integrated native core downloader. */
 final class CoreRepository {
     private static final String INDEX = CoreCatalogDiscovery.DIRECTORY;
-    private static final String RELEASE =
-            "https://github.com/CorvusSoftware/CorvusRetro/releases/download/";
     private static final long MAX_ARCHIVE = 32L * 1024 * 1024;
     private static final int MAX_INDEX = 96 * 1024;
     private static final int MAX_CORES = 32;
@@ -82,8 +80,7 @@ final class CoreRepository {
             }
             url = string(json, "archive_url");
             if (url.length() > 256 ||
-                    !url.matches("https://github\\.com/CorvusSoftware/(CorvusRetro|CorvusRepository)/releases/download/v[0-9]+\\.[0-9]+\\.[0-9]+/[A-Za-z0-9][A-Za-z0-9._-]*\\.zip") ||
-                    ("corvuscore.json".equals(provider) && !url.startsWith(RELEASE)))
+                    !url.matches("https://github\\.com/CorvusSoftware/(CorvusRetro|CorvusRepository)/releases/download/v[0-9]+\\.[0-9]+\\.[0-9]+/[A-Za-z0-9][A-Za-z0-9._-]*\\.zip"))
                 throw new IOException("Origine du module non autorisée");
             for (int i = 0; i < url.length(); i++)
                 if (url.charAt(i) <= 32 || Character.isISOControl(url.charAt(i)))

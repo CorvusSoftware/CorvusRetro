@@ -13,10 +13,10 @@ on:
         type: string
         required: false
       tag:
-        description: "Existing tag at the current tested main commit, e.g. v0.18.0"
+        description: "Existing tag at the current tested main commit, e.g. v0.18.1"
         type: string
         required: true
-        default: v0.18.0
+        default: v0.18.1
 
 permissions:
   contents: write

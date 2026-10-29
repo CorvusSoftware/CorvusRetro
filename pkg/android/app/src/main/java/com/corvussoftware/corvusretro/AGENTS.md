@@ -18,7 +18,7 @@ Read the root AGENTS.md before editing this directory.
 - Keep old content-addressed files while a core may still use them. Preserve games/saves.
 - The downloader does not request APK installation permission or open PackageInstaller.
 - Keep CoreRepository provider validation aligned with the CorvusRepository validator.
-  Discovery reads catalog/*.json and accepts only curated CorvusSoftware releases.
+  Discovery reads catalog/v1/*.json and accepts only curated CorvusSoftware releases.
 - Preserve legacy OS-installed split discovery and users' saves; the old JSON feeds have been intentionally removed.
 - Never log credentials or private paths. Do not change target35 to work around a failure.
 

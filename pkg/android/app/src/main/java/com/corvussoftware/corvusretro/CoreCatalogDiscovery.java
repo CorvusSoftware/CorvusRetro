@@ -17,9 +17,9 @@ import org.json.JSONObject;
 /** Discover reviewed provider feeds from the GitHub catalog directory. */
 final class CoreCatalogDiscovery {
     static final String DIRECTORY =
-            "https://api.github.com/repos/CorvusSoftware/CorvusRepository/contents/catalog?ref=main";
+            "https://api.github.com/repos/CorvusSoftware/CorvusRepository/contents/catalog/v1?ref=main";
     static final String RAW =
-            "https://raw.githubusercontent.com/CorvusSoftware/CorvusRepository/main/catalog/";
+            "https://raw.githubusercontent.com/CorvusSoftware/CorvusRepository/main/catalog/v1/";
     static final String FALLBACK = RAW + "corvuscore.json";
     static final int MAX_CATALOGS = 16;
     static final int MAX_TOTAL_CORES = 32;
@@ -37,7 +37,7 @@ final class CoreCatalogDiscovery {
             String name = item.getString("name");
             if (!name.endsWith(".json")) continue;
             if (!name.matches("[a-z][a-z0-9_-]{0,39}\\.json") ||
-                    !item.getString("path").equals("catalog/" + name))
+                    !item.getString("path").equals("catalog/v1/" + name))
                 throw new IOException("Fichier de catalogue non fiable");
             Object size = item.get("size");
             if (!(size instanceof Integer || size instanceof Long) ||

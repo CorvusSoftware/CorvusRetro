@@ -96,7 +96,7 @@ jobs:
 
       - name: Build APK and run Android lint
         run: |
-          ./gradlew --no-daemon :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest :app:assembleRelease
+          ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest :app:assembleRelease
 
       - name: Verify base APK contains no emulator cores
         run: |

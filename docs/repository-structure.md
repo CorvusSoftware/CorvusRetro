@@ -31,7 +31,7 @@ n'exige aucune nouvelle release de l'application.
 
 Le sous-module CorvusCore reste épinglé pour les en-têtes CorvusAPI et les tests
 hôtes avec les moteurs réels. Le catalogue distribué est découvert dans
-`CorvusRepository/catalog/*.json` ; aucun JSON de catalogue, ancien pack APK
+`CorvusRepository/catalog/v1/*.json` ; aucun JSON de catalogue, ancien pack APK
 ou projet dynamic-feature n'est maintenu dans le frontend.
 
 Les noms de composants servent à retrouver les responsabilités réelles. Les

@@ -73,8 +73,9 @@ empreintes sont vérifiées sur les fichiers publics avant promotion du catalogu
 CorvusRetro construit, qualifie et publie uniquement sa base signée. Son
 sous-module CorvusCore reste une référence pour les en-têtes CorvusAPI et les
 tests hôtes avec de vrais moteurs, sans verrouiller la version des cœurs
-installés. Les APK 0.18.0 acceptent déjà les archives de CorvusRepository.
+installés. Les APK à partir de 0.18.1 acceptent les archives officielles de CorvusRepository.
+Le flux historique `catalog/corvuscore.json` reste compatible avec 0.18.0.
 
-Le catalogue actif reste `CorvusRepository/catalog/corvuscore.json`. Les anciens
+Le catalogue actif reste `CorvusRepository/catalog/v1/corvuscore.json`. Les anciens
 assets CorvusRetro sont conservés avec leurs URL et empreintes historiques ;
 aucune réinstallation de l'application n'est nécessaire pour changer d'hébergeur.
