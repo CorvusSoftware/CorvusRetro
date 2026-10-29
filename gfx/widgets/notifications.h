@@ -18,13 +18,13 @@ typedef struct {
     uint32_t id;
     char text[64], image_url[512];
     float percent;
-    bool visible;
+    bool visible, image_pending;
 } cr_notification_progress;
 typedef struct {
     cr_notification_card cards[CR_NOTIFICATION_CAPACITY];
     size_t count;
-    double elapsed, progress_time, image_wait;
-    bool card_started, image_wait_started;
+    double elapsed, progress_time, image_wait, progress_image_wait;
+    bool card_started, image_wait_started, progress_image_wait_started;
     cr_notification_progress progress;
 } cr_notifications;
 
@@ -38,7 +38,7 @@ void cr_notifications_progress(cr_notifications *, uint32_t id, const char *text
 void cr_notifications_hide_progress(cr_notifications *, uint32_t id);
 void cr_notifications_clear(cr_notifications *);
 void cr_notifications_update(cr_notifications *, double seconds);
-/* Requests/uploads the first card's image without drawing or blocking on network IO. */
+/* Requests the card and progress images without blocking the frontend thread. */
 void cr_notifications_prepare(cr_notifications *, const cr_painter *);
 void cr_notifications_draw(const cr_notifications *, const cr_painter *, float width,
                            float height, const cr_theme *);
