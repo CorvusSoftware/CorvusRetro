@@ -356,8 +356,13 @@ public final class MainActivity extends NativeActivity {
         Bitmap atlas = Bitmap.createBitmap(1024, 2048, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(atlas);
         Paint paint = font();
-        for (int slot = 0; slot < 233; slot++)
-            canvas.drawText(character(codepoint(slot)), slot % 16 * 64, slot / 16 * 64 + 46, paint);
+        for (int slot = 0; slot < 233; slot++) {
+            int x = slot % 16 * 64, y = slot / 16 * 64;
+            canvas.save();
+            canvas.clipRect(x, y, x + 64, y + 64);
+            canvas.drawText(character(codepoint(slot)), x, y + 46, paint);
+            canvas.restore();
+        }
         for (int i = 0; i < ICONS.length; i++) {
             int slot = 480 + i, x = slot % 16 * 64, y = slot / 16 * 64;
             Drawable icon = getResources().getDrawable(ICONS[i], getTheme()).mutate();

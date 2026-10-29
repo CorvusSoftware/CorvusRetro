@@ -53,7 +53,8 @@ enum { CR_TOUCH_DOWN, CR_TOUCH_MOVE, CR_TOUCH_UP, CR_TOUCH_CANCEL };
 typedef struct {
     bool active, dragged;
     float x, y, last_x, last_y, held;
-    double started;
+    double started, last_event;
+    float velocity;
     int target;
     unsigned mask;
 } cr_pointer;
@@ -85,7 +86,7 @@ typedef struct {
     int link_slot, import_slot;
     char option_key[96], subsystem_id[96], import_subsystem_id[96];
     char link_ids[2][96], link_titles[2][512];
-    float width, height, scroll, quick_scroll, text_height;
+    float width, height, scroll, quick_scroll, scroll_velocity, text_height;
     float feedback_alpha, control_feedback[10];
     cr_navigation history[8];
     unsigned depth;
