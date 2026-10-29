@@ -274,7 +274,7 @@ static row get_row(const cr_ui *u, int index) {
             r.disabled = !u->engine.handle || u->importing;
         } else
             fill(&r, "Bibliothèque", "Jeux importés et importation de dossiers",
-                 CR_ICON_LIBRARY, ACT_LIBRARY, 0);
+                 CR_ICON_LIST, ACT_LIBRARY, 0);
     } else if (u->page == CR_LIBRARY) {
         if (!index) {
             fill(&r, "Importer un dossier", u->import_folder ? "Importation du dossier en cours..." :
