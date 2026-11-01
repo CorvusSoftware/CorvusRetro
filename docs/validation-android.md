@@ -248,3 +248,86 @@ aux données du test gelé. Cette limite de connexion de l'émulateur reste
 distincte de la correction du parseur. Aucune modification de TLS ou du
 stockage de confiance n'a été faite pour cet essai. Le téléchargement Internet
 depuis un téléphone reste à qualifier.
+
+## Tests des paramètres
+
+Compiler et installer la base debug ainsi que le runner dédié :
+
+```sh
+./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest \
+  -PcorvusTestRunner=com.corvussoftware.corvusretro.SettingsInstrumentation
+adb install -r pkg/android/app/build/outputs/apk/debug/app-debug.apk
+adb install -r pkg/android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+adb shell am instrument -w -e orientation portrait \
+  com.corvussoftware.corvusretro.test/com.corvussoftware.corvusretro.SettingsInstrumentation
+adb shell am instrument -w -e orientation landscape \
+  com.corvussoftware.corvusretro.test/com.corvussoftware.corvusretro.SettingsInstrumentation
+```
+
+Ce parcours ouvre les six catégories avec les événements Android réels, modifie
+les valeurs, vérifie leur persistance et recrée l'activité pour vérifier que le
+menu natif les recharge. Il restaure les seules préférences touchées. Aucun
+cœur sélectionné ni compte réel n'est requis. Les images sont conservées sous
+`files/test-settings-*.png` dans le profil de test.
+
+La phase `settings_media` de `RetroAchievementsInstrumentation`, avec un
+module GB installé séparément et un programme original de test, vérifie les
+réglages appliqués à une partie. Elle mesure la vidéo entière en pixels
+physiques et trouve le bouton dessiné dans la capture avant d'appuyer dessus :
+son feedback doit s'éclaircir puis revenir à l'intensité de repos choisie.
+L'attente bornée porte sur l'image effectivement présentée par l'émulateur.
+
+## Qualification 0.20.0
+
+Source APK : `1de61ddc6da4c30ffb7021c5abec93e6843d5fca` (PR #19).
+CorvusCore, CorvusAPI et rcheevos restent aux mêmes révisions que la release0.19.0.
+
+- 15 tests natifs et 15 tests ASan/UBSan réussis, avec détection des fuites ;
+  frontend sans cœur, 8 tests JVM, builds debug/release/instrumentation et lint
+  réussis. La base contient seulement les deux bibliothèques frontend ARM64/x86_64.
+- Les tests média vérifient le gain PCM, les limites physiques de l'échelle
+  entière, l'intensité au repos, les géométries agrandies/déplacées et les zones
+  touchées. Les dimensions par défaut conservent la disposition existante.
+- Les tests de menus vérifient les six catégories, les valeurs sauvegardées et
+  rechargées, les défauts en cas de valeur invalide, les restaurations et les
+  retours depuis le Menu rapide et depuis les réglages globaux.
+- Les tests de sauvegardes GB/GBC/GBA couvrent rétention1/2/3, export des copies,
+  journaux v1/v2, interruptions aux frontières fsync, états automatiques séparés
+  et échec d'écriture conservant le jeu. La disponibilité d'un état automatique
+  suit le même contrat de récupération `.bak` que son chargement.
+- Les tests des manettes couvrent profils par défaut, touches réservées ou
+  dupliquées, affectation, restauration, générations et déconnexion. Les noms
+  réels proviennent d'InputManager ; aucune manette physique n'a été testée.
+- 710 contrôles Android API29 x86_64 : 323 paramètres en portrait, 323 en paysage,
+  puis 32 contrôles avec un jeu GB original dans chaque orientation. Ceux-ci
+  observent une vidéo320x288 en pixels entiers et appuient sur le bouton A
+  détecté dans la capture : feedback visible puis retour à l'intensité de repos.
+  Les captures des catégories, des valeurs et des commandes ont été inspectées.
+- La compilation GCC13/Fortify est vérifiée sans neutraliser les diagnostics.
+  La lecture du journal reste bornée par la capacité réelle du record et valide
+  séparément les tailles des formats244/252.
+- Revue indépendante sans défaut bloquant restant.
+
+CI du commit fusionné : [41315920611](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41315920611).
+Build signé : [41316133776](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41316133776).
+APK qualifié SHA-256 :
+`18beba18ca7bf117680faa0143da8a84e348c43b5d7991e1037e05da0d764e53`.
+Certificat durable : celui de la qualification0.19.0 ci-dessus. Provenance et
+sommes vérifiées, alignement16Ko, zéro cœur, fournisseur synthétique absent.
+
+Les tests d'écran utilisent l'émulateur et des programmes originaux. Ils ne
+prouvent pas une exécution ARM64, un appareil physique, une manette Bluetooth/USB
+ou le réseau du téléchargeur. Les alertes SystemUI de démarrage ont été inspectées
+avant Attendre et reprise des tests, sans neutralisation des protections Android.
+
+La mise à jour signée0.19.0/code25 vers0.20.0/code26 est acceptée sans
+désinstallation : même UID10116, dossier et date d'installation initiale. Le
+thème ASUS et l'historique Corvus-preserved.gba sont conservés ; aucun nouveau
+crash applicatif observé. Le profil signé sans cœur montre les six catégories
+des réglages après mise à jour. Les parcours de jeu utilisent le profil debug
+séparé et les modules installés indépendamment.
+
+La [release v0.20.0](https://github.com/CorvusSoftware/CorvusRetro/releases/tag/v0.20.0)
+est publiée par [41316487558](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41316487558).
+L'APK public retéléchargé est identique octet par octet au fichier qualifié,
+avec le SHA-256 ci-dessus.
