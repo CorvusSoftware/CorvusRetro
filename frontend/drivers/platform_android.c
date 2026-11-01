@@ -34,11 +34,26 @@ static void save(application *a) {
 }
 static void controller_devices(application *a) {
     cr_controller_device devices[CR_CONTROLLER_DEVICE_CAP];
+    char names[CR_CONTROLLER_DEVICE_CAP][128];
     size_t count;
-    if (cr_android_controller_devices(devices, &count)) {
+    if (cr_android_controller_devices(devices, names, &count)) {
         unsigned removed = cr_controller_ports_sync(&a->controllers, devices, count);
+        memset(a->platform.controller_connected, 0, sizeof(a->platform.controller_connected));
+        for (unsigned p = 0; p < CR_CONTROLLER_PORT_COUNT; ++p) {
+            for (size_t i = 0; i < count; ++i) {
+                if (devices[i].id != a->controllers.devices[p] ||
+                    devices[i].generation != a->controllers.generations[p]) continue;
+                a->platform.controller_connected[p] = true;
+                memcpy(a->platform.controller_names[p], names[i], sizeof(names[i]));
+                break;
+            }
+        }
         for (unsigned p = 0; p < CR_CONTROLLER_PORT_COUNT; ++p)
             if (removed & (1u << p)) cr_ui_release_player(&a->ui, p);
+        if (removed && a->ui.controller_capture >= 0) {
+            a->ui.controller_capture = -1;
+            cr_ui_message(&a->ui, "Manette déconnectée : affectation annulée");
+        }
     }
 }
 static void controller_mode(application *a) {
@@ -77,6 +92,7 @@ static void command(struct android_app *app, int32_t cmd) {
         }
         break;
     case APP_CMD_TERM_WINDOW:
+        a->ui.controller_capture = -1;
         if (a->window)
             cr_gl_destroy(&a->gl);
         a->window = false;
@@ -100,6 +116,7 @@ static void command(struct android_app *app, int32_t cmd) {
         a->deadline = now();
         break;
     case APP_CMD_PAUSE:
+        a->ui.controller_capture = -1;
         a->resumed = false;
         cr_audio_pause(&a->audio);
         cr_ui_clear_input(&a->ui);
@@ -111,6 +128,7 @@ static void command(struct android_app *app, int32_t cmd) {
         a->deadline = now();
         break;
     case APP_CMD_LOST_FOCUS:
+        a->ui.controller_capture = -1;
         a->focused = false;
         cr_audio_pause(&a->audio);
         cr_ui_clear_input(&a->ui);
@@ -118,6 +136,7 @@ static void command(struct android_app *app, int32_t cmd) {
         save(a);
         break;
     case APP_CMD_CONFIG_CHANGED:
+        a->ui.controller_capture = -1;
         cr_ui_clear_input(&a->ui);
         cr_controller_ports_clear(&a->controllers);
         break;
@@ -174,8 +193,13 @@ static int32_t input(struct android_app *app, AInputEvent *event) {
                 cr_ui_back(u);
             return 1;
         }
+        if (u->controller_capture >= 0) {
+            if (controller && port >= 0 && down && AKeyEvent_getRepeatCount(event) == 0)
+                cr_ui_controller_key(u, key);
+            return 1;
+        }
         if (cr_ui_running(u)) {
-            int b = button(key);
+            int b = controller ? cr_controller_binding_button(u->controller_bindings, key) : button(key);
             if (b >= 0) {
                 if (controller) {
                     if (port >= 0) {
@@ -205,11 +229,12 @@ static int32_t input(struct android_app *app, AInputEvent *event) {
                 return 1;
             }
         }
-        return button(key) >= 0 ? 1 : 0;
+        return (controller ? cr_controller_binding_valid(key) : button(key) >= 0) ? 1 : 0;
     }
     if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION) {
         if (controller) {
             if (port < 0) return 1;
+            if (u->controller_capture >= 0) return 1;
             unsigned previous = cr_controller_mask(&a->controllers, (unsigned)port);
             unsigned directions = 0;
             if ((AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK) != AMOTION_EVENT_ACTION_CANCEL &&
@@ -387,6 +412,7 @@ void android_main(struct android_app *app) {
                 cr_ui_achievement_frame(&a->ui);
                 if (a->ui.audio) {
                     if (cr_audio_start(&a->audio, a->ui.engine.rate)) {
+                        cr_audio_set_volume(&a->audio, a->ui.volume);
                         cr_audio_write(&a->audio, a->ui.engine.audio, a->ui.engine.audio_count);
                         a->audio_warning = false;
                     } else if (!a->audio_warning) {
@@ -412,9 +438,11 @@ void android_main(struct android_app *app) {
             }
         }
         if (a->window && a->resumed) {
+            cr_gl_set_smoothing(&a->gl, a->ui.video_smooth);
             cr_gl_begin(&a->gl, cr_theme_get(a->ui.theme)->system_bar);
             if (fabsf(a->ui.width - a->gl.width) > .1f || fabsf(a->ui.height - a->gl.height) > .1f)
                 cr_ui_size(&a->ui, a->gl.width, a->gl.height);
+            a->ui.pixel_density = a->gl.density;
             cr_ui_update(&a->ui, time - a->last_draw);
             cr_painter painter = cr_gl_painter(&a->gl);
             cr_ui_draw(&a->ui, &painter);

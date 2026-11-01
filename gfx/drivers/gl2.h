@@ -24,6 +24,8 @@ typedef struct {
     GLint dimensions, mode;
     int full_width, full_height, left, top, pixel_width, pixel_height, game_width, game_height;
     float width, height, density;
+    bool smoothing;
+    GLint game_filter;
     cr_vertex vertices[12288];
     size_t count;
     float advances[480];
@@ -32,6 +34,7 @@ typedef struct {
     cr_gl_image images[16];
 } cr_gl;
 bool cr_gl_init(cr_gl *, cr_android *);
+void cr_gl_set_smoothing(cr_gl *, bool enabled);
 void cr_gl_destroy(cr_gl *);
 void cr_gl_begin(cr_gl *, uint32_t system_bar);
 bool cr_gl_end(cr_gl *);

@@ -39,6 +39,31 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
     private final java.util.concurrent.CountDownLatch metadataRelease = new java.util.concurrent.CountDownLatch(1);
     private final java.util.concurrent.CountDownLatch gameImageRelease = new java.util.concurrent.CountDownLatch(1);
     private File onlineFlag;
+    private final java.util.Map<String, Object> displayPreferences = new java.util.HashMap<>();
+    private void displayDefaults() {
+        SharedPreferences preferences = getTargetContext().getSharedPreferences("corvus", Context.MODE_PRIVATE);
+        java.util.Map<String, ?> current = preferences.getAll();
+        String[] keys = {"notify_cards", "notify_progress", "video_integer", "video_smooth",
+                "overlay_opacity", "overlay_size", "overlay_position"};
+        int[] values = {1, 1, 0, 0, 100, 100, 0};
+        SharedPreferences.Editor edit = preferences.edit();
+        for (int i = 0; i < keys.length; ++i) {
+            displayPreferences.put(keys[i], current.get(keys[i]));
+            edit.putInt(keys[i], values[i]);
+        }
+        check(edit.commit(), "original display and notification defaults for the fixture");
+    }
+    private void restoreDisplayPreferences() {
+        if (displayPreferences.isEmpty()) return;
+        SharedPreferences.Editor edit = getTargetContext().getSharedPreferences("corvus", Context.MODE_PRIVATE).edit();
+        for (java.util.Map.Entry<String, Object> entry : displayPreferences.entrySet()) {
+            edit.remove(entry.getKey());
+            if (entry.getValue() instanceof Integer) edit.putInt(entry.getKey(), (Integer)entry.getValue());
+            else if (entry.getValue() instanceof Boolean) edit.putBoolean(entry.getKey(), (Boolean)entry.getValue());
+            else if (entry.getValue() instanceof String) edit.putString(entry.getKey(), (String)entry.getValue());
+        }
+        check(edit.commit(), "restore only display preferences touched by the fixture");
+    }
     private static final String USER = "CorvusTest", TOKEN = "SyntheticSessionToken";
     private static final String LOGIN = "{\"Success\":true,\"User\":\"CorvusTest\",\"Token\":\"SyntheticSessionToken\",\"Score\":0,\"SoftcoreScore\":0,\"Messages\":0}";
     private static final String GAME = "{\"Success\":true,\"GameId\":731,\"Title\":\"Corvus Original Test\",\"ConsoleId\":4,\"ImageIconUrl\":\"https://media.retroachievements.org/Images/1.png\",\"RichPresenceGameId\":731,\"RichPresencePatch\":\"\",\"Sets\":[{\"AchievementSetId\":731,\"GameId\":731,\"Title\":null,\"Type\":\"core\",\"ImageIconUrl\":\"https://media.retroachievements.org/Images/1.png\",\"Achievements\":[{\"ID\":9001,\"Title\":\"Corvus memory transition\",\"Description\":\"Press A in the original test game\",\"Flags\":3,\"Points\":5,\"MemAddr\":\"0xH00c000=66\",\"Author\":\"CorvusSoftware\",\"BadgeName\":\"00001\",\"Created\":1700000000,\"Modified\":1700000000}],\"Leaderboards\":[]}]}";
@@ -521,6 +546,152 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
         float y = h >= w ? h - Math.max(h / 2, 276 * s) + 36 * s : 36 * s;
         tap(activity, x, y); state(8, system, 1, 1);
     }
+    private int[] settingsVideoBounds(android.graphics.Bitmap screen, int[] safe) {
+        int w = screen.getWidth(), h = screen.getHeight();
+        int[] pixels = new int[w * h], queue = new int[w * h];
+        boolean[] marked = new boolean[w * h];
+        screen.getPixels(pixels, 0, w, 0, 0, w, h);
+        int[] best = {w, h, -1, -1}; int largest = 0;
+        for (int y = safe[3]; y < h - safe[5]; ++y) for (int x = safe[2]; x < w - safe[4]; ++x) {
+            int point = y * w + x;
+            if (marked[point]) continue;
+            int rgb = pixels[point];
+            if (Math.max((rgb >> 16) & 255, Math.max((rgb >> 8) & 255, rgb & 255)) <= 200) continue;
+            int count = 1, at = 0, left = x, right = x, top = y, bottom = y;
+            queue[0] = point; marked[point] = true;
+            while (at < count) {
+                int current = queue[at++], px = current % w, py = current / w;
+                left = Math.min(left, px); right = Math.max(right, px);
+                top = Math.min(top, py); bottom = Math.max(bottom, py);
+                for (int direction = 0; direction < 4; ++direction) {
+                    int nx = px + (direction == 0 ? -1 : direction == 1 ? 1 : 0);
+                    int ny = py + (direction == 2 ? -1 : direction == 3 ? 1 : 0);
+                    if (nx < safe[2] || nx >= w - safe[4] || ny < safe[3] || ny >= h - safe[5]) continue;
+                    int next = ny * w + nx; if (marked[next]) continue;
+                    int color = pixels[next];
+                    if (Math.max((color >> 16) & 255, Math.max((color >> 8) & 255, color & 255)) > 200) {
+                        marked[next] = true; queue[count++] = next;
+                    }
+                }
+            }
+            // A real video region dominates the tiny bright intersections of utility glyphs.
+            if (count > largest) { largest = count; best = new int[] {left, top, right, bottom}; }
+        }
+        return best;
+    }
+    private int[] settingsVisibleButton(android.graphics.Bitmap image, int[] safe) {
+        int w = image.getWidth(), h = image.getHeight();
+        boolean[] marked = new boolean[w * h]; int[] queue = new int[w * h];
+        int[] best = null;
+        int xStart = safe[2] + (w - safe[2] - safe[4]) * 2 / 3;
+        int yStart = landscape ? safe[3] : safe[3] + (h - safe[3] - safe[5]) * 2 / 5;
+        for (int y = yStart; y < h - safe[5]; ++y) for (int x = xStart; x < w - safe[4]; ++x) {
+            int point = y * w + x;
+            if (marked[point]) continue;
+            int rgb = image.getPixel(x, y), r = (rgb >> 16) & 255, g = (rgb >> 8) & 255, b = rgb & 255;
+            if (r < 20 || r > 90 || Math.abs(r - g) > 2 || Math.abs(g - b) > 2) continue;
+            int count = 1, at = 0, left = x, right = x, top = y, bottom = y;
+            queue[0] = point; marked[point] = true;
+            while (at < count) {
+                int p = queue[at++], px = p % w, py = p / w;
+                left = Math.min(left, px); right = Math.max(right, px);
+                top = Math.min(top, py); bottom = Math.max(bottom, py);
+                for (int dy = -1; dy <= 1; ++dy) for (int dx = -1; dx <= 1; ++dx) {
+                    int nx = px + dx, ny = py + dy;
+                    if (nx < xStart || nx >= w - safe[4] || ny < yStart || ny >= h - safe[5]) continue;
+                    int next = ny * w + nx; if (marked[next]) continue;
+                    int color = image.getPixel(nx, ny), red = (color >> 16) & 255, green = (color >> 8) & 255, blue = color & 255;
+                    if (red >= 20 && red <= 90 && Math.abs(red - green) <= 2 && Math.abs(green - blue) <= 2) {
+                        marked[next] = true; queue[count++] = next;
+                    }
+                }
+            }
+            int width = right - left + 1, height = bottom - top + 1;
+            if (width < 45 || height < 45 || width > height * 1.2f || height > width * 1.2f) continue;
+            if (best == null || width > (best[2] - best[0] + 1) * 1.3f
+                    || (width >= (best[2] - best[0] + 1) * .85f && left > best[0]))
+                best = new int[] {left, top, right, bottom};
+        }
+        check(best != null, "configured A button is located from its actual visible ring, without duplicating layout calculations");
+        return best;
+    }
+    private int settingsBrightPixels(android.graphics.Bitmap image, int[] area) {
+        int count = 0;
+        for (int y = area[1]; y <= area[3]; ++y) for (int x = area[0]; x <= area[2]; ++x) {
+            int c = image.getPixel(x, y);
+            if (((c >> 16) & 255) > 200 && ((c >> 8) & 255) > 200 && (c & 255) > 200) ++count;
+        }
+        return count;
+    }
+    private void settingsMedia() throws Exception {
+        check(overlaySystem == 0, "settings media uses the original GB video fixture");
+        String id = prepareOverlayGame(0);
+        SharedPreferences prefs = getTargetContext().getSharedPreferences("corvus", Context.MODE_PRIVATE);
+        java.util.Map<String, Object> previous = new java.util.HashMap<>();
+        String[] keys = {"audio_volume", "overlay_opacity", "overlay_size", "overlay_position",
+                "video_integer", "video_smooth", "show_input", "achievements_enabled"};
+        int[] values = {30, 30, 110, -10, 1, 1, 1, 0};
+        SharedPreferences.Editor edit = prefs.edit(); java.util.Map<String, ?> stored = prefs.getAll();
+        for (int i = 0; i < keys.length; ++i) { previous.put(keys[i], stored.get(keys[i])); edit.putInt(keys[i], values[i]); }
+        check(edit.commit(), "non-default media fixture persisted before native activity starts");
+        MainActivity activity = (MainActivity) startActivitySync(new Intent(getTargetContext(), MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        try {
+            check(getUiAutomation().setRotation(landscape ? android.app.UiAutomation.ROTATION_FREEZE_90 : android.app.UiAutomation.ROTATION_FREEZE_0), "media settings rotation");
+            waitFor(() -> { int[] safe = activity.safeWindowArea(); return safe != null && (safe[0] > safe[1]) == landscape; }, "media settings safe orientation");
+            state(0, -1, 0, 0); selectFixtureCore(activity);
+            tab(activity, 1); configurationRow(activity, 0); state(4, 0, 0, 0);
+            check(activity.games()[0].equals(id), "original media test fixture selected from history");
+            configurationRow(activity, 0); state(8, 0, 1, 0); android.os.SystemClock.sleep(700);
+            android.graphics.Bitmap idle = getUiAutomation().takeScreenshot();
+            check(idle != null, "actual game frame with non-default media settings");
+            screenshot("settings-media-" + (landscape ? "landscape" : "portrait") + "-idle");
+            int[] safe = activity.safeWindowArea(), video = settingsVideoBounds(idle, safe);
+            int width = video[2] - video[0] + 1, height = video[3] - video[1] + 1;
+            check(width >= 160 && height >= 144 && width % 160 == 0 && height % 144 == 0
+                    && width / 160 == height / 144, "integer scaling uses whole physical pixels with the native GB aspect ratio: "
+                    + width + "x" + height + " bounds=" + java.util.Arrays.toString(video) + " safe=" + java.util.Arrays.toString(safe));
+            int[] button = settingsVisibleButton(idle, safe);
+            int before = settingsBrightPixels(idle, button); idle.recycle();
+            float x = (button[0] + button[2]) / 2f, y = (button[1] + button[3]) / 2f;
+            long time = android.os.SystemClock.uptimeMillis();
+            sendPointerSync(android.view.MotionEvent.obtain(time, time, android.view.MotionEvent.ACTION_DOWN, x, y, 0));
+            android.os.SystemClock.sleep(180);
+            try {
+                android.graphics.Bitmap held = null; int brightness = 0;
+                long deadline = android.os.SystemClock.uptimeMillis() + 3000;
+                do {
+                    if (held != null) held.recycle();
+                    held = getUiAutomation().takeScreenshot();
+                    brightness = held == null ? 0 : settingsBrightPixels(held, button);
+                    if (brightness > before + 40) break;
+                    android.os.SystemClock.sleep(100);
+                } while (android.os.SystemClock.uptimeMillis() < deadline);
+                screenshot("settings-media-" + (landscape ? "landscape" : "portrait") + "-held");
+                check(held != null && brightness > before + 40,
+                        "pressing the rendered configured button reaches its native hit target and brightens feedback: "
+                        + "button=" + java.util.Arrays.toString(button) + " before=" + before + " held=" + brightness);
+                if (held != null) held.recycle();
+            } finally {
+                sendPointerSync(android.view.MotionEvent.obtain(time, android.os.SystemClock.uptimeMillis(), android.view.MotionEvent.ACTION_UP, x, y, 0));
+            }
+            android.os.SystemClock.sleep(450);
+            android.graphics.Bitmap released = getUiAutomation().takeScreenshot();
+            check(released != null && settingsBrightPixels(released, button) <= before + 10, "release returns to configured resting opacity");
+            if (released != null) released.recycle();
+            configurationKey(activity, android.view.KeyEvent.KEYCODE_BACK); state(8, 0, 1, 1);
+            configurationRow(activity, 2); state(0, 0, 0, 0);
+        } finally {
+            runOnMainSync(activity::finish);
+            SharedPreferences.Editor restore = prefs.edit();
+            for (java.util.Map.Entry<String, Object> e : previous.entrySet()) {
+                restore.remove(e.getKey());
+                if (e.getValue() instanceof Integer) restore.putInt(e.getKey(), (Integer)e.getValue());
+                else if (e.getValue() instanceof Boolean) restore.putBoolean(e.getKey(), (Boolean)e.getValue());
+                else if (e.getValue() instanceof String) restore.putString(e.getKey(), (String)e.getValue());
+            }
+            check(restore.commit(), "media test restores only its touched preferences");
+        }
+    }
     private void quickRow(int index) {
         for (int i = 0; i < index; ++i) sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_DOWN);
         sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER);
@@ -854,10 +1025,15 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
     @Override public void onStart() {
         Bundle result = new Bundle();
         try {
-            if ("savetransfer".equals(phase)) saveTransfers(); else if ("configuration".equals(phase)) configuration(); else if ("overlays".equals(phase)) overlays(); else if ("navigation".equals(phase)) navigation(); else if ("popups".equals(phase)) popups(); else if ("ui".equals(phase)) ui(); else if ("outbox".equals(phase)) outbox(); else if ("recover".equals(phase)) recover(); else credentials();
+            if ("savetransfer".equals(phase) || "configuration".equals(phase) || "overlays".equals(phase)
+                    || "navigation".equals(phase) || "popups".equals(phase) || "ui".equals(phase)
+                    || "settings_media".equals(phase)) displayDefaults();
+            if ("settings_media".equals(phase)) settingsMedia(); else if ("savetransfer".equals(phase)) saveTransfers(); else if ("configuration".equals(phase)) configuration(); else if ("overlays".equals(phase)) overlays(); else if ("navigation".equals(phase)) navigation(); else if ("popups".equals(phase)) popups(); else if ("ui".equals(phase)) ui(); else if ("outbox".equals(phase)) outbox(); else if ("recover".equals(phase)) recover(); else credentials();
+            restoreDisplayPreferences();
             result.putString("stream", "PASS " + checks + " Android RetroAchievements checks phase=" + phase + " pid=" + android.os.Process.myPid() + "\n");
             finish(Activity.RESULT_OK, result);
         } catch (Throwable failure) {
+            try { restoreDisplayPreferences(); } catch (Throwable cleanup) { failure.addSuppressed(cleanup); }
             result.putString("stream", "FAIL " + failure + "\n"); finish(Activity.RESULT_CANCELED, result);
         }
     }

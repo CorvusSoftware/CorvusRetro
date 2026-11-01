@@ -53,5 +53,6 @@ typedef struct {
     void (*pick_folder)(void *, int, const char *);
     bool (*save_transfer)(void *, uint64_t, int, const char *, const uint8_t *, size_t);
     void (*finish_save_transfer)(void *, uint64_t);
+    bool (*controller_info)(void *, unsigned port, char *name, size_t capacity);
 } cr_platform;
 #endif

@@ -511,8 +511,10 @@ int main(void) {
     tab(&u, 2);
     c = draw(&u);
     check(strstr(c.text, "Interface utilisateur") && strstr(c.text, "Vidéo") &&
-              strstr(c.text, "Audio") && strstr(c.text, "Affichage à l’écran"),
-          "four real settings categories");
+              strstr(c.text, "Audio") && strstr(c.text, "Commandes") &&
+              strstr(c.text, "Sauvegardes") && strstr(c.text, "RetroAchievements") &&
+              !strstr(c.text, "Affichage à l’écran"),
+          "six functional settings categories replace the former OSD container");
     // A stationary touch fades in before release, without opening the submenu.
     cr_ui_touch_at(&u, 0, CR_TOUCH_DOWN, 160, 252, 10);
     cr_ui_update(&u, .1);
@@ -575,7 +577,7 @@ int main(void) {
     row(&u, 0);
     row(&u, 0);
     check(u.page == CR_OVERLAY_SETTINGS && !u.show_input && saved_show == 0 && u.depth == 2,
-          "OSD overlay preference is functional and saved");
+          "touch controls preference is functional and saved in the shorter hierarchy");
     cr_ui_back(&u);
     cr_ui_back(&u);
     check(u.page == CR_SETTINGS && u.focus == 3, "nested settings parent selection restored");

@@ -20,10 +20,12 @@ Les pages sans capacité déclarée par le cœur affichent leur état indisponib
 | Menu rapide | Reprendre, Redémarrer, Fermer, Sauvegardes d'état, Options du cœur, Commandes, Succès, Informations sur le cœur, Menu principal, joueur contrôlé en câble link, Sauvegardes du jeu |
 | Menu rapide > Sauvegardes d'état | Sauvegarder l'état, Charger l'état |
 | Menu rapide > Sauvegardes du jeu | Importer `.sav` ou `.srm`, exporter `.sav` ou `.srm`, choix du joueur en câble link |
-| Réglages > Interface utilisateur | Thème de l'interface |
-| Réglages > Vidéo | Garder l'écran allumé pendant le jeu |
-| Réglages > Audio | Activer le son |
-| Réglages > Affichage à l'écran > Surimpression tactile | Afficher les commandes |
+| Réglages > Interface utilisateur | Thèmes, Notifications |
+| Réglages > Vidéo | Veille, présentation de l'image, filtrage |
+| Réglages > Audio | Son et volume du jeu |
+| Réglages > Commandes | Commandes tactiles, Manettes |
+| Réglages > Sauvegardes | Copies de sécurité, État automatique |
+| Réglages > RetroAchievements | Activation, Compte |
 
 Le bouton Retour restaure la page précédente, sa sélection, son filtre et son
 défilement. Les trois onglets restent Menu principal, Listes de lecture, Réglages,
@@ -60,5 +62,5 @@ menu à un doigt, l'opacité dessinée d'un tap bref, son fondu et la désactiva
 des commandes tactiles. Voir [l'interface de jeu](game-interface.md) et [la validation Android](validation-android.md)
 pour les essais et captures sur émulateur.
 
-Le [plan des réglages](settings-plan.md) propose un rangement des catégories et
-sous-réglages. Il distingue les fonctions existantes des préférences à développer.
+Le [guide des paramètres](settings-plan.md) décrit les catégories, leurs
+sous-paramètres, les valeurs possibles et leur persistance.

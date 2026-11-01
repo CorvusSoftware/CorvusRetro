@@ -90,6 +90,12 @@ void cr_notifications_hide_progress(cr_notifications *n, uint32_t id) {
 void cr_notifications_clear(cr_notifications *n) {
     if (n) memset(n, 0, sizeof(*n));
 }
+void cr_notifications_hide_cards(cr_notifications *n) {
+    memset(n->cards, 0, sizeof(n->cards));
+    n->count = 0;
+    n->elapsed = n->image_wait = 0;
+    n->card_started = n->image_wait_started = false;
+}
 void cr_notifications_prepare(cr_notifications *n, const cr_painter *p) {
     if (!n || !p) return;
     if (n->count && n->cards[0].image_pending) {

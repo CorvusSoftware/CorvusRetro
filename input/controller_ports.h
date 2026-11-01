@@ -31,4 +31,11 @@ void cr_controller_button(cr_controller_ports *, unsigned port, unsigned mask, b
 void cr_controller_axes(cr_controller_ports *, unsigned port, unsigned mask);
 /* Lifecycle/menu transitions release state without changing device assignments. */
 void cr_controller_ports_clear(cr_controller_ports *);
+/* Android hardware key codes are kept separate from the emulator button masks. */
+int cr_controller_binding_default(unsigned button);
+bool cr_controller_binding_valid(int key);
+void cr_controller_bindings_sanitize(int bindings[10]);
+int cr_controller_binding_button(const int bindings[10], int key);
+bool cr_controller_bindings_assign(int bindings[10], unsigned button, int key);
+void cr_controller_binding_name(int key, char *name, size_t capacity);
 #endif

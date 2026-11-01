@@ -37,6 +37,7 @@ void cr_notifications_progress(cr_notifications *, uint32_t id, const char *text
 /* id == 0 hides the current indicator regardless of its achievement. */
 void cr_notifications_hide_progress(cr_notifications *, uint32_t id);
 void cr_notifications_clear(cr_notifications *);
+void cr_notifications_hide_cards(cr_notifications *);
 void cr_notifications_update(cr_notifications *, double seconds);
 /* Requests the card and progress images without blocking the frontend thread. */
 void cr_notifications_prepare(cr_notifications *, const cr_painter *);

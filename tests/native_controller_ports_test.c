@@ -5,8 +5,46 @@
 #undef NDEBUG
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
 
 int main(void) {
+    int bindings[10] = {0};
+    cr_controller_bindings_sanitize(bindings);
+    for (unsigned button = 0; button < 10; ++button) {
+        assert(bindings[button] == cr_controller_binding_default(button));
+        assert(cr_controller_binding_button(bindings, bindings[button]) == (int)button);
+    }
+    assert(cr_controller_binding_default(10) == -1);
+    assert(cr_controller_binding_button(bindings, 54) == 4);
+    assert(cr_controller_binding_button(bindings, 52) == 5);
+    assert(cr_controller_binding_button(bindings, 66) == 6);
+    assert(cr_controller_binding_button(bindings, 62) == 7);
+    assert(cr_controller_binding_button(bindings, 0) == -1);
+    assert(!cr_controller_binding_valid(4)); // Android Back always remains available.
+    assert(!cr_controller_bindings_assign(bindings, 4, 4));
+    assert(!cr_controller_bindings_assign(bindings, 4, bindings[5]));
+    assert(!cr_controller_bindings_assign(bindings, 10, 100));
+    assert(cr_controller_bindings_assign(bindings, 4, 100));
+    assert(cr_controller_binding_button(bindings, 100) == 4);
+    assert(cr_controller_binding_button(bindings, 96) == -1);
+    assert(cr_controller_binding_button(bindings, 54) == -1);
+    assert(cr_controller_bindings_assign(bindings, 5, 54));
+    assert(cr_controller_binding_button(bindings, 54) == 5);
+    bindings[0] = bindings[1];
+    cr_controller_bindings_sanitize(bindings);
+    assert(bindings[4] == 96 && bindings[5] == 97);
+    bindings[9] = -1;
+    cr_controller_bindings_sanitize(bindings);
+    assert(bindings[9] == 103);
+    char label[40];
+    cr_controller_binding_name(96, label, sizeof(label));
+    assert(strcmp(label, "Bouton A") == 0);
+    cr_controller_binding_name(203, label, sizeof(label));
+    assert(strcmp(label, "Bouton 16") == 0);
+    cr_controller_binding_name(4, label, sizeof(label));
+    assert(strcmp(label, "Non définie") == 0);
+    cr_controller_binding_name(96, label, 1);
+    assert(label[0] == 0);
     cr_controller_ports ports;
     cr_controller_ports_init(&ports);
     cr_controller_device devices[] = {{17, 1}, {42, 2}, {99, 3}};
@@ -70,5 +108,6 @@ int main(void) {
     cr_controller_axes(&ports, 2, ~0u);
     assert(cr_controller_mask(&ports, 2) == 0);
     puts("controller ports: stable routing, disconnect isolation and axis/button overlap passed");
+    puts("controller bindings: real key mapping, aliases, validation, conflict rejection and reset passed");
     return 0;
 }

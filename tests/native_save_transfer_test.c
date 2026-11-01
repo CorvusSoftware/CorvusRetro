@@ -146,6 +146,15 @@ int main(void) {
     uint8_t *actual = NULL; size_t actual_size = 0;
     check(cr_engine_export_battery(&u.engine, 0, &actual, &actual_size) && actual_size == 8192 &&
           !memcmp(actual, replacement, 8192), "confirmed import loads every byte", &u); free(actual);
+    open_saves(&u); choose(&u, 3);
+    check(u.page == CR_GAME_BACKUPS && u.backup_available == 1,
+          "backup menu reports the actual private safety copy", &u);
+    choose(&u, 0);
+    check(u.save_request && f.operation == CR_SAVE_EXPORT_SAV && f.size == 8192 &&
+          f.snapshot[2] == 0x51 && strstr(f.title, "copie 1"),
+          "backup export makes pre-import live progress recoverable through SAF", &u);
+    cr_save_transfer_result exported_backup = {.request = u.save_request};
+    cr_ui_save_transfer_result(&u, &exported_backup);
     open_saves(&u); choose(&u, CR_SAVE_IMPORT); uint64_t request = u.save_request;
     ++u.core_revision;
     item = (cr_save_transfer_result){.request = request}; cr_ui_save_transfer_result(&u, &item);
@@ -153,6 +162,12 @@ int main(void) {
     choose(&u, CR_SAVE_IMPORT); item = (cr_save_transfer_result){.request = u.save_request};
     snprintf(item.path, sizeof(item.path), "%.4095s", rom); cr_ui_save_transfer_result(&u, &item);
     check(!u.save_request && u.page == CR_GAME_SAVES, "import rejects file outside request-owned stage", &u);
+    check(cr_engine_save_auto_state(&u.engine), "create a real automatic state for the quick menu", &u);
+    u.page = CR_PLAY; u.quick = true; u.depth = 0; choose(&u, CR_QUICK_STATES);
+    check(u.page == CR_SAVESTATES && u.auto_state_available && !cr_ui_running(&u),
+          "automatic-state availability is refreshed when the state menu opens", &u);
+    choose(&u, 2);
+    check(cr_ui_running(&u) && u.engine.loaded, "quick menu restores a real automatic state", &u);
     const char *ids[2] = {id, id}, *paths[2] = {rom, rom};
     corvus_subsystem_info info;
     check(cr_engine_subsystem(&u.engine, 0, &info), "declared real subsystem", &u);

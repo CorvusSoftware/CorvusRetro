@@ -48,3 +48,16 @@ utilisent un fournisseur de documents réservé aux tests pour vérifier les oct
 exportés, les fichiers importés, les annulations et les résultats périmés.
 Les tests de fichiers bornent la taille et vérifient le nettoyage des transferts
 incomplets. Aucun jeu commercial n'est utilisé ou distribué par ces tests.
+
+## Copies et états automatiques
+
+Dans Réglages > Sauvegardes, conserver 1 à 3 copies des batteries précédant
+un import réussi. Depuis Sauvegardes du jeu > Copies de secours, exporter
+une copie disponible en `.sav`, puis l'importer pour la restaurer. Les
+copies d'un joueur restent distinctes de celles de l'autre joueur. Une copie
+absente ou illisible est désactivée dans cette liste.
+
+L'état automatique, désactivé par défaut, est une préférence distincte : il
+s'enregistre à la fermeture ou au remplacement d'un contenu sérialisable,
+sans écraser l'état manuel. Son chargement reste explicite dans Sauvegardes
+d'état. Voir le [guide des paramètres](settings-plan.md).

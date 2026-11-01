@@ -320,11 +320,18 @@ static void clip(void *ctx, float x, float y, float w, float h) {
     glEnable(GL_SCISSOR_TEST);
     glScissor(left, bottom, (int)ceilf(w * g->density), (int)ceilf(h * g->density));
 }
+void cr_gl_set_smoothing(cr_gl *g, bool enabled) { g->smoothing = enabled; }
 static void game(void *ctx, const uint32_t *pixels, int width, int height, float x, float y,
                  float w, float h) {
     cr_gl *g = ctx;
     flush(g);
     glBindTexture(GL_TEXTURE_2D, g->game);
+    GLint filter = g->smoothing ? GL_LINEAR : GL_NEAREST;
+    if (filter != g->game_filter) {
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
+        g->game_filter = filter;
+    }
     if (g->game_width != width || g->game_height != height) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
                      pixels);

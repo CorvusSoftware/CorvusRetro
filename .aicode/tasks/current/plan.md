@@ -1,8 +1,7 @@
-Objectif livré : Sous-système dynamique, import/export batteries brutes .sav/.srm, plan des réglages propre.
-Budget DEEP : persistance, remplacement natif, JNI/SAF asynchrone et lifecycle.
-1. DONE : métadonnées de sous-systèmes existantes, IDs/chemins/options et états conservés.
-2. DONE : export SRAM live, stage privé borné, confirmation, candidat natif, backup live et journal groupé.
-3. DONE : liens joueur/contenus/revision, refus des résultats périmés et annulations/lifecycle propres.
-4. DONE : tests moteurs réels solo/link P1/P2, rollback/crash, Android documents/JNI et orientations ; revue indépendante.
-5. DONE : guides et plan, CI/PR/main, APK signé qualifié, mise à jour et publication v0.19.0, octets publics vérifiés.
-Les préférences globales proposées restent à implémenter dans un prochain lot ; aucune fausse option ajoutée.
+Objectif : développer le plan docs/settings-plan.md en réglages réellement opérationnels, sans options factices. Budget DEEP : menus, média, contrôleurs et persistance traversent C/JNI/Android.
+1. Conserver six catégories propres et les clés existantes ; séparer compte global RA et succès du jeu.
+2. Ajouter notifications configurables, taille vidéo entière/filtrage, volume, opacité/taille/position tactiles avec restauration.
+3. Montrer les manettes réellement connectées et permettre affectation/restauration des touches.
+4. Ajouter conservation bornée des backups et états automatiques distincts, erreurs sans perte du jeu.
+5. Tests ciblés, natifs/sanitizers/Android, revue indépendante, CI/main et APK signé avec mise à jour qualifiée.
+Contrats : root possède menus/préférences/notifications/docs. Agent média possède rendu/audio/layout ; agent manettes possède backend plateformes/contrôleurs/JNI ; agent sauvegardes possède moteur/tests persistance. Pas de modifications CorvusAPI/Core ni du téléchargeur.

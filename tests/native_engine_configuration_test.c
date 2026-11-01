@@ -445,6 +445,147 @@ static void transfer_tests(cr_engine *e, const char *rom, const char *option_key
     }
     free(original); free(replacement); free(other); free(disk);
 }
+static void assert_backup(cr_engine *e, unsigned player, unsigned index, uint8_t value) {
+    uint8_t *bytes = NULL; size_t size = 0;
+    check(cr_engine_export_backup(e, player, index, &bytes, &size) && size > 0,
+          "retained battery backup exports actual raw bytes", e);
+    for (size_t i = 0; i < size; ++i) check(bytes[i] == value, "backup retention order and contents", e);
+    free(bytes);
+}
+static void seed_history(cr_engine *e, unsigned player, uint8_t *bytes, size_t size) {
+    for (unsigned n = 1; n <= 4; ++n) {
+        memset(bytes, n * 0x11, size);
+        check(cr_engine_import_battery(e, player, bytes, size), "build bounded backup history", e);
+    }
+}
+static void history_policy_tests(cr_engine *e) {
+    unsigned player = e->players - 1;
+    size_t size = cr_engine_battery_size(e, player);
+    uint8_t *bytes = malloc(size); check(bytes && size, "history fixture buffer", e);
+    cr_engine_set_save_policy(e, 3, false);
+    seed_history(e, player, bytes, size);
+    check(e->backup_count == 3 && !e->auto_state, "policy survives every candidate replacement", e);
+    for (unsigned i = 0; i < 3; ++i) assert_backup(e, player, i, (uint8_t)((3 - i) * 0x11));
+    char obstructed[4352];
+    int n = snprintf(obstructed, sizeof(obstructed), "%s/saves/%s%s.import-backup.history.new", e->root,
+                     player ? e->second_id : e->id, player ? "-link-p2.sav" : ".sav");
+    check(n > 0 && n < (int)sizeof(obstructed) && !mkdir(obstructed, 0700), "obstruct backup history write", e);
+    void *active = e->handle; memset(bytes, 0x55, size);
+    check(!cr_engine_import_battery(e, player, bytes, size) && e->handle == active,
+          "history write failure retains the active engine", e);
+    for (unsigned i = 0; i < 3; ++i) assert_backup(e, player, i, (uint8_t)((3 - i) * 0x11));
+    check(!rmdir(obstructed), "remove history obstruction", e);
+#ifdef CR_TEST_WRAP_FSYNC
+    for (unsigned point = 1; point <= e->players + 7; ++point) {
+        fail_sync_after = point; fail_sync_count = 1;
+        check(!cr_engine_import_battery(e, player, bytes, size) && e->handle == active,
+              "history and batteries roll back after each failed durable boundary", e);
+        fail_sync_after = fail_sync_count = 0;
+        for (unsigned i = 0; i < 3; ++i) assert_backup(e, player, i, (uint8_t)((3 - i) * 0x11));
+    }
+    for (unsigned point = 1; point <= e->players + 9; ++point) {
+        seed_history(e, player, bytes, size); memset(bytes, 0x55, size);
+        pid_t child = fork(); check(child >= 0, "fork interrupted history transaction", e);
+        if (!child) {
+            crash_sync_after = point;
+            bool ok = cr_engine_import_battery(e, player, bytes, size);
+            _exit(ok ? 0 : 79);
+        }
+        int status;
+        check(waitpid(child, &status, 0) == child && WIFEXITED(status) &&
+              (WEXITSTATUS(status) == 77 || WEXITSTATUS(status) == 0), "kill import during every history boundary", e);
+        cr_engine recovered; cr_engine_init(&recovered, e->root);
+        cr_engine_set_save_policy(&recovered, 3, false);
+        const char *ids[2] = {e->id, e->second_id}, *paths[2] = {e->content_paths[0], e->content_paths[1]};
+        check(e->players == 2 ? cr_engine_open_subsystem(&recovered, e->system, e->subsystem_id, ids, paths) :
+              cr_engine_open(&recovered, e->system, e->id, e->content_paths[0]), "reopen interrupted history transaction", &recovered);
+        uint8_t *current = NULL; size_t current_size = 0;
+        check(cr_engine_export_battery(&recovered, player, &current, &current_size) && current_size == size,
+              "read recovered live battery", &recovered);
+        bool committed = current[0] == 0x55;
+        for (size_t i = 0; i < size; ++i) check(current[i] == (committed ? 0x55 : 0x44), "entire recovered battery uses one decision", &recovered);
+        free(current);
+        for (unsigned i = 0; i < 3; ++i) assert_backup(&recovered, player, i, (uint8_t)((3 + committed - i) * 0x11));
+        cr_engine_destroy(&recovered);
+    }
+#endif
+    cr_engine_set_save_policy(e, 1, false);
+    memset(bytes, 0x66, size);
+    check(cr_engine_import_battery(e, player, bytes, size), "reduce bounded history after next import", e);
+    uint8_t *copy = NULL; size_t copied = 0;
+    check(!cr_engine_export_backup(e, player, 1, &copy, &copied) && !copy && !copied,
+          "backup count one does not expose older versions", e);
+    free(bytes);
+}
+static void legacy_import_record_test(cr_engine *e) {
+    struct legacy_record {
+        uint32_t magic, slots, selected, existed, backup_existed;
+        char names[2][112];
+    } record = {.magic = UINT32_C(0x43524931), .slots = 1, .existed = 1, .backup_existed = 1};
+    snprintf(record.names[0], sizeof(record.names[0]), "%s.sav", e->id);
+    char saved[4352], old[4352], backup[4352], backup_old[4352], pending[4352];
+    snprintf(saved, sizeof(saved), "%s/saves/%s.sav", e->root, e->id);
+    snprintf(old, sizeof(old), "%.4300s.import-old", saved);
+    snprintf(backup, sizeof(backup), "%.4300s.import-backup", saved);
+    snprintf(backup_old, sizeof(backup_old), "%.4300s.old", backup);
+    snprintf(pending, sizeof(pending), "%s/saves/.battery-import", e->root);
+    size_t size = cr_engine_battery_size(e, 0);
+    uint8_t *bytes = malloc(size); check(bytes && size, "legacy journal fixture buffer", e);
+    memset(bytes, 0x66, size); write_bytes(old, bytes, size);
+    memset(bytes, 0x77, size); write_bytes(saved, bytes, size);
+    memset(bytes, 0x33, size); write_bytes(backup_old, bytes, size);
+    memset(bytes, 0x88, size); write_bytes(backup, bytes, size);
+    write_bytes(pending, &record, sizeof(record));
+    assert_backup(e, 0, 0, 0x33);
+    check(read_bytes(saved, (char *)bytes, size) == size, "read recovered v1 battery", e);
+    for (size_t i = 0; i < size; ++i) check(bytes[i] == 0x66, "v1 journal recovery preserves old save", e);
+    check(access(pending, F_OK) != 0, "v1 transaction is consumed after recovery", e);
+    free(bytes);
+}
+static uint8_t *snapshot_state(cr_engine *e, size_t *size) {
+    *size = e->api.serialize_size(e->handle);
+    uint8_t *bytes = malloc(*size);
+    check(bytes && e->api.serialize(e->handle, bytes, *size), "capture actual machine state", e);
+    return bytes;
+}
+static void auto_policy_tests(cr_engine *e) {
+    size_t size = 0; uint8_t *manual = snapshot_state(e, &size);
+    check(cr_engine_save_state(e), "save manual state before automatic policy", e);
+    cr_engine_set_save_policy(e, 3, true);
+    check(cr_engine_step(e, 0), "advance before automatic save", e);
+    size_t expected_size; uint8_t *expected = snapshot_state(e, &expected_size);
+    char id[96], rom[4096], temporary[4352], saved[4352];
+    snprintf(id, sizeof(id), "%s", e->id); snprintf(rom, sizeof(rom), "%s", e->content_paths[0]);
+    int system = e->system;
+    snprintf(saved, sizeof(saved), "%s/states/%s-" CR_CORE_VERSION ".auto.state", e->root, id);
+    snprintf(temporary, sizeof(temporary), "%.4300s.new", saved);
+    check(!mkdir(temporary, 0700), "block automatic-state output", e);
+    void *active = e->handle;
+    check(!cr_engine_unload_game(e) && !cr_engine_close(e) && e->handle == active && e->loaded,
+          "failed automatic state leaves content and core alive", e);
+    check(!cr_engine_open(e, system, id, rom) && e->handle == active,
+          "failed automatic state prevents replacing content", e);
+    check(!cr_engine_select(e, (system + 1) % 3) && e->handle == active,
+          "failed automatic state prevents replacing core", e);
+    check(!rmdir(temporary), "unblock automatic-state output", e);
+    check(cr_engine_unload_game(e) && e->handle == active && !e->loaded && e->auto_state && e->backup_count == 3,
+          "automatic state closes only content and preserves policy", e);
+    check(cr_engine_open(e, system, id, rom) && cr_engine_has_auto_state(e) && cr_engine_load_auto_state(e),
+          "recreated core can load the separate automatic state", e);
+    char recovery[4352]; snprintf(recovery, sizeof(recovery), "%.4300s.bak", saved);
+    check(rename(saved, recovery) == 0, "simulate an automatic state available only through recovery", e);
+    check(cr_engine_has_auto_state(e) && access(recovery, F_OK) != 0 &&
+          cr_engine_load_auto_state(e),
+          "automatic-state availability uses the same recovery contract as loading", e);
+    size_t actual_size; uint8_t *actual = snapshot_state(e, &actual_size);
+    check(actual_size == expected_size && !memcmp(actual, expected, actual_size), "automatic state restores exact previous machine", e);
+    free(actual);
+    check(cr_engine_load_state(e), "manual state remains separately loadable", e);
+    actual = snapshot_state(e, &actual_size);
+    check(actual_size == size && !memcmp(actual, manual, size), "automatic saving never overwrites manual state", e);
+    free(actual); free(manual); free(expected);
+    cr_engine_set_save_policy(e, 1, false);
+}
 static void real_engine_tests(void) {
     const char *cores[] = {"corvus.gb", "corvus.gbc", "corvus.gba"};
     for (unsigned s = 0; s < 3; ++s) {
@@ -495,6 +636,9 @@ static void real_engine_tests(void) {
         }
         check(cr_engine_open(&e, system, ids[0], rom), "single player battery transfer fixture", &e);
         transfer_tests(&e, rom, key, selected);
+        history_policy_tests(&e);
+        legacy_import_record_test(&e);
+        auto_policy_tests(&e);
         check(cr_engine_close(&e), "close single transfer fixture", &e);
         char solo_saved[4352]; snprintf(solo_saved, sizeof(solo_saved), "%s/%s.sav", saves, ids[0]);
         memset(battery, 0x31, battery_size); write_bytes(solo_saved, battery, battery_size);
@@ -519,6 +663,9 @@ static void real_engine_tests(void) {
         check(e.subsystems.battery_copy(e.handle, 1, battery, battery_size, &generation) &&
               battery[1] == (s == 2 ? 0xff : 0x0f), "real P2 receives released buttons", &e);
         transfer_tests(&e, rom, key, selected);
+        history_policy_tests(&e);
+        cr_engine_set_save_policy(&e, 1, true);
+        check(!cr_engine_has_auto_state(&e), "unsupported link state is never advertised", &e);
         /* The ROM must make both fresh candidate slots dirty before the existing
          * multi-slot persistence failure regression. */
         check(cr_engine_step_players(&e, player_masks), "dirty both slots after transfer", &e);

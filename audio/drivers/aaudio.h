@@ -17,10 +17,12 @@ typedef struct {
     bool playing;
     int rate;
     atomic_bool failed;
+    atomic_int volume;
 } cr_audio;
 void cr_audio_init(cr_audio *);
 bool cr_audio_start(cr_audio *, int);
 void cr_audio_pause(cr_audio *);
+void cr_audio_set_volume(cr_audio *, int percent);
 void cr_audio_write(cr_audio *, const int16_t *, size_t);
 void cr_audio_close(cr_audio *);
 void cr_audio_destroy(cr_audio *);
