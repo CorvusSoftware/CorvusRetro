@@ -1136,9 +1136,12 @@ static bool recover_import(cr_engine *e) {
     if (fd < 0) return errno == ENOENT || fail(e, "Journal d’importation inaccessible");
     struct import_record r = {.backup_count = 1};
     struct stat status;
-    bool ok = fstat(fd, &status) == 0 && S_ISREG(status.st_mode) &&
-        (status.st_size == sizeof(r) || status.st_size == IMPORT_LEGACY_SIZE);
-    size_t record_size = ok ? (size_t)status.st_size : 0;
+    bool ok = fstat(fd, &status) == 0 && S_ISREG(status.st_mode);
+    size_t record_size = sizeof(r);
+    if (ok && status.st_size == (off_t)IMPORT_LEGACY_SIZE)
+        record_size = IMPORT_LEGACY_SIZE;
+    else if (ok && status.st_size != (off_t)sizeof(r))
+        ok = false;
     size_t offset = 0;
     while (ok && offset < record_size) {
         ssize_t n = read(fd, (uint8_t *)&r + offset, record_size - offset);
