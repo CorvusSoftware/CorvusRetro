@@ -1,7 +1,8 @@
-Objectif : entrée « Sous-système » dynamique ; transferts des sauvegardes de jeu .sav/.srm dans le Menu rapide, états instantanés séparés ; plan d'organisation des réglages sans implémenter de fausses options.
-Budget DEEP : sauvegardes persistantes, remplacement de session, copie SAF et annulation asynchrone, thread natif propriétaire du cœur. Agents spécialisés C, documentation, puis revue indépendante.
-1. Réutiliser métadonnées de sous-systèmes et interfaces de batterie existantes. Garder IDs et chemins .sav, P2-link, options et format états inchangés.
-2. Capture native immuable pour export ; import dans fichier privé borné, confirmation, candidat natif et commit durable avec backup, sans appel cœur depuis Java.
-3. Garder import/export liés au joueur et contenu d'origine, annuler proprement picker/activity/busy, ignorer callbacks périmés.
-4. Tester roundtrip .sav/.srm, erreurs taille/IO, P2 distinct, reprise après interruption, lifecycle Android et affichage des vrais sous-systèmes, cas sans cœur/batterie.
-5. Documenter plan de réglages avec existant/proposé distinct ; revue/CI/fusion et APK signé qualifié puis publié.
+Objectif livré : Sous-système dynamique, import/export batteries brutes .sav/.srm, plan des réglages propre.
+Budget DEEP : persistance, remplacement natif, JNI/SAF asynchrone et lifecycle.
+1. DONE : métadonnées de sous-systèmes existantes, IDs/chemins/options et états conservés.
+2. DONE : export SRAM live, stage privé borné, confirmation, candidat natif, backup live et journal groupé.
+3. DONE : liens joueur/contenus/revision, refus des résultats périmés et annulations/lifecycle propres.
+4. DONE : tests moteurs réels solo/link P1/P2, rollback/crash, Android documents/JNI et orientations ; revue indépendante.
+5. DONE : guides et plan, CI/PR/main, APK signé qualifié, mise à jour et publication v0.19.0, octets publics vérifiés.
+Les préférences globales proposées restent à implémenter dans un prochain lot ; aucune fausse option ajoutée.
