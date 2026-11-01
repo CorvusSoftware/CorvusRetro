@@ -125,14 +125,16 @@ static bool sibling(cr_engine *engine, char out[4096], const char *path, const c
     int n = snprintf(out, 4096, "%s%s", path, suffix);
     return (n >= 0 && n < 4096) || fail(engine, "Chemin de sauvegarde trop long");
 }
+static bool recover_import(cr_engine *engine);
 static bool read_file(cr_engine *engine, const char *path, size_t limit, bool optional,
                       uint8_t **bytes, size_t *size) {
     *bytes = NULL;
     *size = 0;
+    if (!recover_import(engine)) return false;
     char backup[4096];
+    struct stat status;
     if (!sibling(engine, backup, path, ".bak"))
         return false;
-    struct stat status;
     if (lstat(backup, &status) == 0) {
         if (!S_ISREG(status.st_mode) || rename(backup, path) != 0)
             return fail(engine, "Récupération de la sauvegarde impossible");
@@ -621,6 +623,7 @@ static void release_handle(cr_engine *engine) {
     memset(&engine->achievements, 0, sizeof(engine->achievements));
     memset(&engine->options, 0, sizeof(engine->options));
     memset(&engine->subsystems, 0, sizeof(engine->subsystems));
+    memset(engine->content_paths, 0, sizeof(engine->content_paths));
     engine->players = 0;
     engine->second_id[0] = engine->subsystem_id[0] = '\0';
     engine->loaded = false;
@@ -803,15 +806,9 @@ static bool battery_path(cr_engine *engine, uint32_t slot, char path[4096]) {
     return (n > 0 && n < 4096) || fail(engine, "Chemin de sauvegarde trop long");
 }
 struct mapped_game { corvus_game game; uint8_t *battery; };
-static bool map_game(cr_engine *engine, struct mapped_game *mapped, const char *path,
-                     uint32_t slot) {
+static bool map_rom(cr_engine *engine, struct mapped_game *mapped, const char *path) {
     mapped->game.struct_size = sizeof(mapped->game);
     if (!path || !path[0]) return fail(engine, "Contenu absent");
-    char saved_path[4096];
-    if (!battery_path(engine, slot, saved_path) ||
-        !read_file(engine, saved_path, MAX_BATTERY, true, &mapped->battery,
-                   &mapped->game.battery_size)) return false;
-    mapped->game.battery_data = mapped->battery;
     int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
     if (fd < 0) return fail(engine, "Contenu illisible");
     struct stat status;
@@ -828,6 +825,15 @@ static bool map_game(cr_engine *engine, struct mapped_game *mapped, const char *
     mapped->game.rom_size = size;
     return true;
 }
+static bool map_game(cr_engine *engine, struct mapped_game *mapped, const char *path,
+                     uint32_t slot) {
+    char saved_path[4096];
+    if (!battery_path(engine, slot, saved_path) ||
+        !read_file(engine, saved_path, MAX_BATTERY, true, &mapped->battery,
+                   &mapped->game.battery_size)) return false;
+    mapped->game.battery_data = mapped->battery;
+    return map_rom(engine, mapped, path);
+}
 static void unmap_game(struct mapped_game *mapped) {
     if (mapped->game.rom_data) munmap((void *)mapped->game.rom_data, mapped->game.rom_size);
     free(mapped->battery);
@@ -839,6 +845,9 @@ static bool open_session(cr_engine *engine, int system, const char *subsystem_id
     if (!ids || !paths || !content_matches(system, ids[0]) ||
         (linked && (!token(subsystem_id) || !content_matches(system, ids[1]))))
         return fail(engine, "Identifiant de contenu ou de sous-système invalide");
+    for (unsigned i = 0; i < (linked ? 2u : 1u); ++i)
+        if (!paths[i] || !paths[i][0] || strlen(paths[i]) >= sizeof(engine->content_paths[i]))
+            return fail(engine, "Chemin de contenu invalide");
     cr_engine candidate;
     cr_engine_init(&candidate, engine->root);
     bool ok = create_handle(&candidate, system);
@@ -855,6 +864,8 @@ static bool open_session(cr_engine *engine, int system, const char *subsystem_id
     if (ok) {
         snprintf(candidate.id, sizeof(candidate.id), "%s", ids[0]);
         candidate.players = linked ? 2 : 1;
+        for (unsigned i = 0; i < candidate.players; ++i)
+            snprintf(candidate.content_paths[i], sizeof(candidate.content_paths[i]), "%s", paths[i]);
         if (linked) {
             snprintf(candidate.second_id, sizeof(candidate.second_id), "%s", ids[1]);
             snprintf(candidate.subsystem_id, sizeof(candidate.subsystem_id), "%s", subsystem_id);
@@ -941,6 +952,7 @@ bool cr_engine_step_players(cr_engine *engine, const unsigned masks[2]) {
     return true;
 }
 bool cr_engine_save_battery(cr_engine *engine) {
+    if (!recover_import(engine)) return false;
     if (!engine->handle || !engine->loaded) { success(engine); return true; }
     bool slots = engine->subsystems.battery_size != NULL;
     if (engine->players > 1 && !slots)
@@ -981,6 +993,265 @@ bool cr_engine_save_battery(cr_engine *engine) {
     for (unsigned i = 0; i < 2; ++i) free(bytes[i]);
     if (ok) success(engine);
     return ok;
+}
+size_t cr_engine_battery_size(const cr_engine *engine, unsigned player) {
+    if (!engine || !engine->handle || !engine->loaded || player >= engine->players) return 0;
+    size_t size = engine->subsystems.battery_size
+        ? engine->subsystems.battery_size(engine->handle, player)
+        : (player == 0 && engine->api.battery_size ? engine->api.battery_size(engine->handle) : 0);
+    return size <= MAX_BATTERY ? size : 0;
+}
+bool cr_engine_export_battery(cr_engine *engine, unsigned player, uint8_t **bytes, size_t *size) {
+    if (!bytes || !size) return fail(engine, "Destination de sauvegarde invalide");
+    *bytes = NULL; *size = 0;
+    size_t count = cr_engine_battery_size(engine, player);
+    if (!count) return fail(engine, "Aucune sauvegarde batterie pour ce joueur");
+    uint8_t *copy = malloc(count);
+    if (!copy) return fail(engine, "Mémoire insuffisante");
+    uint64_t generation = 0;
+    int ok = engine->subsystems.battery_size
+        ? engine->subsystems.battery_copy(engine->handle, player, copy, count, &generation)
+        : engine->api.battery_copy(engine->handle, copy, count, &generation);
+    if (!ok) { free(copy); return sdk_error(engine); }
+    *bytes = copy; *size = count;
+    success(engine);
+    return true;
+}
+/* One durable decision covers both players and the pre-import live backup.
+ * Journals remain until that decision, so recovery never mixes link sessions. */
+struct import_record {
+    uint32_t magic, slots, selected, existed, backup_existed;
+    char names[2][112];
+};
+#define IMPORT_MAGIC UINT32_C(0x43524931)
+struct import_paths {
+    char directory[4096], pending[4096], record_new[4096], committed[4096];
+    char saves[2][4096], staged[2][4096], old[2][4096];
+    char backup[4096], backup_new[4096], backup_old[4096];
+};
+static bool import_paths(cr_engine *e, struct import_paths *p, const struct import_record *r) {
+    if (!sibling(e, p->directory, e->root, "/saves") ||
+        !sibling(e, p->pending, p->directory, "/.battery-import") ||
+        !sibling(e, p->record_new, p->pending, ".new") ||
+        !sibling(e, p->committed, p->directory, "/.battery-import-committed")) return false;
+    if (!r) return true;
+    if (r->magic != IMPORT_MAGIC || !r->slots || (r->slots & ~3u) || r->selected > 1 ||
+        !(r->slots & (1u << r->selected)) || (r->existed & ~r->slots) || r->backup_existed > 1)
+        return fail(e, "Journal d’importation invalide");
+    for (unsigned i = 0; i < 2; ++i) {
+        if (!(r->slots & (1u << i))) continue;
+        size_t n = strnlen(r->names[i], sizeof(r->names[i]));
+        const char *suffix = i ? "-link-p2.sav" : ".sav";
+        size_t tail = strlen(suffix);
+        if (n >= sizeof(r->names[i]) || n <= tail || strcmp(r->names[i] + n - tail, suffix))
+            return fail(e, "Journal d’importation invalide");
+        char id[96];
+        if (n - tail >= sizeof(id)) return fail(e, "Journal d’importation invalide");
+        memcpy(id, r->names[i], n - tail); id[n - tail] = 0;
+        if (!cr_game_id_valid(id)) return fail(e, "Journal d’importation invalide");
+        int count = snprintf(p->saves[i], 4096, "%s/%s", p->directory, r->names[i]);
+        if (count < 0 || count >= 4096 ||
+            !sibling(e, p->staged[i], p->saves[i], ".import-new") ||
+            !sibling(e, p->old[i], p->saves[i], ".import-old")) return false;
+    }
+    return sibling(e, p->backup, p->saves[r->selected], ".import-backup") &&
+           sibling(e, p->backup_new, p->backup, ".new") &&
+           sibling(e, p->backup_old, p->backup, ".old");
+}
+static bool remove_import_file(const char *path) {
+    struct stat status;
+    if (lstat(path, &status) != 0) return errno == ENOENT;
+    return S_ISREG(status.st_mode) && unlink(path) == 0;
+}
+static bool restore_import_file(const char *old, const char *path, bool existed) {
+    struct stat status;
+    if (!existed) return remove_import_file(path);
+    if (lstat(old, &status) == 0) return S_ISREG(status.st_mode) && rename(old, path) == 0;
+    /* Missing journal means this original was not moved or already restored. */
+    return errno == ENOENT && lstat(path, &status) == 0 && S_ISREG(status.st_mode);
+}
+static bool finish_import(cr_engine *e, const struct import_paths *p,
+                          const struct import_record *r, bool committed, int fd) {
+    bool ok = true;
+    if (!committed) {
+        for (unsigned i = 0; i < 2; ++i)
+            if (r->slots & (1u << i))
+                if (!restore_import_file(p->old[i], p->saves[i], (r->existed & (1u << i)) != 0)) ok = false;
+        if (!restore_import_file(p->backup_old, p->backup, r->backup_existed != 0)) ok = false;
+        if (!sync_fd(fd)) ok = false;
+        if (!ok) return fail(e, "Récupération de l’importation interrompue impossible");
+    }
+    for (unsigned i = 0; i < 2; ++i) {
+        if (!(r->slots & (1u << i))) continue;
+        if (!remove_import_file(p->old[i]) || !remove_import_file(p->staged[i])) ok = false;
+    }
+    if (!remove_import_file(p->backup_new) || !remove_import_file(p->backup_old)) ok = false;
+    /* Retain the decision until every journal is durably gone. */
+    if (!ok || !sync_fd(fd)) return fail(e, "Finalisation de l’importation impossible");
+    if (!remove_import_file(committed ? p->committed : p->pending) || !sync_fd(fd))
+        return fail(e, "Finalisation de l’importation impossible");
+    return true;
+}
+static bool recover_import(cr_engine *e) {
+    struct import_paths p = {0};
+    if (!import_paths(e, &p, NULL)) return false;
+    int fd = open(p.committed, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    bool committed = fd >= 0;
+    if (fd < 0 && errno == ENOENT) fd = open(p.pending, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return errno == ENOENT || fail(e, "Journal d’importation inaccessible");
+    struct import_record r;
+    struct stat status;
+    bool ok = fstat(fd, &status) == 0 && S_ISREG(status.st_mode) && status.st_size == sizeof(r);
+    size_t offset = 0;
+    while (ok && offset < sizeof(r)) {
+        ssize_t n = read(fd, (uint8_t *)&r + offset, sizeof(r) - offset);
+        if (n < 0 && errno == EINTR) continue;
+        if (n <= 0) { ok = false; break; }
+        offset += (size_t)n;
+    }
+    if (close(fd) != 0) ok = false;
+    if (!ok || !import_paths(e, &p, &r)) return fail(e, "Journal d’importation invalide");
+    fd = open(p.directory, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return fail(e, "Dossier d’importation inaccessible");
+    ok = finish_import(e, &p, &r, committed, fd);
+    close(fd);
+    return ok;
+}
+static bool import_existing(const char *path, bool *exists) {
+    struct stat status;
+    *exists = lstat(path, &status) == 0;
+    return *exists ? S_ISREG(status.st_mode) : errno == ENOENT;
+}
+static bool commit_import(cr_engine *e, unsigned player, uint8_t *bytes[2], size_t sizes[2],
+                           const uint8_t *live_backup) {
+    if (!recover_import(e)) return false;
+    struct import_record r = {.magic = IMPORT_MAGIC, .selected = player};
+    struct import_paths p = {0};
+    bool ok = true, exists = false, recorded = false, committed = false;
+    for (unsigned i = 0; ok && i < e->players; ++i) {
+        if (!sizes[i]) continue;
+        char path[4096] = {0};
+        ok = battery_path(e, i, path);
+        const char *name = strrchr(path, '/');
+        if (!ok || !name || strlen(name + 1) >= sizeof(r.names[i])) { ok = false; break; }
+        snprintf(r.names[i], sizeof(r.names[i]), "%s", name + 1);
+        r.slots |= 1u << i;
+    }
+    if (ok) ok = import_paths(e, &p, &r);
+    for (unsigned i = 0; ok && i < e->players; ++i) {
+        if (!sizes[i]) continue;
+        ok = import_existing(p.saves[i], &exists);
+        if (exists) r.existed |= 1u << i;
+        char legacy[4096];
+        if (ok) ok = sibling(e, legacy, p.saves[i], ".bak") &&
+            import_existing(legacy, &exists) && !exists &&
+            import_existing(p.old[i], &exists) && !exists;
+        if (ok) ok = stage_config(e, p.staged[i], bytes[i], sizes[i]);
+    }
+    if (ok) ok = import_existing(p.backup, &exists);
+    r.backup_existed = exists;
+    if (ok) ok = import_existing(p.backup_old, &exists) && !exists &&
+                 stage_config(e, p.backup_new, live_backup, sizes[player]);
+    int fd = ok ? open(p.directory, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW) : -1;
+    if (fd < 0) ok = false;
+    /* Publish the complete rollback record before changing any durable save. */
+    if (ok) ok = stage_config(e, p.record_new, (const uint8_t *)&r, sizeof(r)) &&
+                 rename(p.record_new, p.pending) == 0 && sync_fd(fd);
+    if (ok) recorded = true;
+    for (unsigned i = 0; ok && i < e->players; ++i)
+        if ((r.existed & (1u << i)) && rename(p.saves[i], p.old[i]) != 0) ok = false;
+    if (ok && r.backup_existed) ok = rename(p.backup, p.backup_old) == 0;
+    /* All originals precede all replacements, including across a process death. */
+    if (ok) ok = sync_fd(fd);
+    for (unsigned i = 0; ok && i < e->players; ++i)
+        if (sizes[i] && rename(p.staged[i], p.saves[i]) != 0) ok = false;
+    if (ok) ok = rename(p.backup_new, p.backup) == 0 && sync_fd(fd);
+    if (ok) {
+        committed = rename(p.pending, p.committed) == 0;
+        ok = committed && sync_fd(fd);
+    }
+    if (!ok && committed) {
+        /* Revert the decision before rolling back an observed sync failure. */
+        if (rename(p.committed, p.pending) != 0 || !sync_fd(fd)) {
+            if (fd >= 0) close(fd);
+            return fail(e, "Stockage indisponible : relancez le jeu pour récupérer l’importation");
+        }
+        committed = false;
+    }
+    if (recorded) {
+        bool recovered = finish_import(e, &p, &r, committed, fd);
+        /* A durable commit is authoritative even when journal cleanup must retry. */
+        if (!ok || (!recovered && !committed)) {
+            if (fd >= 0) close(fd);
+            return fail(e, "Importation annulée : écriture impossible");
+        }
+    } else {
+        for (unsigned i = 0; i < 2; ++i) if (p.staged[i][0]) remove_import_file(p.staged[i]);
+        if (p.backup_new[0]) remove_import_file(p.backup_new);
+        if (p.pending[0]) remove_import_file(p.pending);
+        if (p.record_new[0]) remove_import_file(p.record_new);
+    }
+    if (fd >= 0) close(fd);
+    return ok || fail(e, "Importation annulée : écriture impossible");
+}
+bool cr_engine_import_battery(cr_engine *engine, unsigned player, const uint8_t *bytes, size_t size) {
+    size_t expected = cr_engine_battery_size(engine, player);
+    if (!expected || !bytes || size != expected)
+        return fail(engine, "Taille incompatible avec la sauvegarde batterie du jeu");
+    uint8_t *snapshots[2] = {NULL}; size_t sizes[2] = {0};
+    bool ok = true;
+    for (unsigned i = 0; ok && i < engine->players; ++i) {
+        if (!cr_engine_battery_size(engine, i)) continue;
+        ok = cr_engine_export_battery(engine, i, &snapshots[i], &sizes[i]);
+    }
+    uint8_t *live_backup = ok ? malloc(size) : NULL;
+    if (ok && !live_backup) ok = fail(engine, "Mémoire insuffisante");
+    if (ok) { memcpy(live_backup, snapshots[player], size); memcpy(snapshots[player], bytes, size); }
+    cr_engine candidate; cr_engine_init(&candidate, engine->root);
+    if (ok) ok = create_handle(&candidate, engine->system);
+    if (ok && strcmp(candidate.module_path, engine->module_path))
+        ok = fail(&candidate, "Le cœur chargé a changé : importation annulée");
+    if (ok) {
+        candidate.players = engine->players;
+        memcpy(candidate.id, engine->id, sizeof(candidate.id));
+        memcpy(candidate.second_id, engine->second_id, sizeof(candidate.second_id));
+        memcpy(candidate.subsystem_id, engine->subsystem_id, sizeof(candidate.subsystem_id));
+        memcpy(candidate.content_paths, engine->content_paths, sizeof(candidate.content_paths));
+        /* Preserve the live option values as well as the durable option records. */
+        for (size_t i = 0; ok && i < cr_engine_option_count(engine); ++i) {
+            corvus_core_option option;
+            if (!cr_engine_option(engine, i, &option)) { ok = false; break; }
+            uint32_t value = cr_engine_option_value(engine, option.key);
+            ok = candidate.options.set_value && value < option.value_count &&
+                 candidate.options.set_value(candidate.handle, option.key, value);
+        }
+        if (!ok) fail(&candidate, "Options du cœur incompatibles");
+    }
+    struct mapped_game mapped[2] = {0};
+    for (unsigned i = 0; ok && i < engine->players; ++i) {
+        ok = map_rom(&candidate, &mapped[i], engine->content_paths[i]);
+        mapped[i].game.battery_data = snapshots[i]; mapped[i].game.battery_size = sizes[i];
+    }
+    if (ok) {
+        corvus_game games[2] = {mapped[0].game, mapped[1].game};
+        int loaded = candidate.players > 1 && candidate.subsystems.load
+            ? candidate.subsystems.load(candidate.handle, candidate.subsystem_id, games, 2)
+            : (candidate.players == 1 ? candidate.api.load_game(candidate.handle, &games[0]) : 0);
+        if (!loaded) ok = sdk_error(&candidate);
+    }
+    for (unsigned i = 0; i < 2; ++i) unmap_game(&mapped[i]);
+    if (ok) ok = prepare_output(&candidate);
+    for (unsigned i = 0; ok && i < engine->players; ++i)
+        if (cr_engine_battery_size(&candidate, i) != sizes[i])
+            ok = fail(&candidate, "Format batterie incompatible après redémarrage");
+    if (!ok && candidate.error[0]) fail(engine, candidate.error);
+    if (ok) ok = commit_import(engine, player, snapshots, sizes, live_backup);
+    free(live_backup);
+    for (unsigned i = 0; i < 2; ++i) free(snapshots[i]);
+    if (!ok) { release_handle(&candidate); return false; }
+    release_handle(engine); *engine = candidate;
+    success(engine);
+    return true;
 }
 bool cr_engine_reset(cr_engine *engine) {
     if (!ready(engine))
@@ -1070,6 +1341,7 @@ bool cr_engine_unload_game(cr_engine *engine) {
     memset(engine->audio, 0, sizeof(engine->audio));
     engine->id[0] = engine->second_id[0] = engine->subsystem_id[0] = '\0';
     engine->players = 0;
+    memset(engine->content_paths, 0, sizeof(engine->content_paths));
     success(engine);
     return true;
 }

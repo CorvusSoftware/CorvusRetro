@@ -326,6 +326,9 @@ void android_main(struct android_app *app) {
         cr_import item;
         if (cr_android_import(&item))
             cr_ui_import(&a->ui, &item);
+        cr_save_transfer_result save_result;
+        if (cr_android_save_transfer_result(&save_result))
+            cr_ui_save_transfer_result(&a->ui, &save_result);
         cr_core_catalog core_catalog;
         if (cr_android_core_catalog(&core_catalog))
             cr_ui_catalog(&a->ui, &core_catalog);

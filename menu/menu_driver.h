@@ -35,7 +35,9 @@ enum {
     CR_SUBSYSTEM_CONFIG,
     CR_SUBSYSTEM_CONTENTS,
     CR_CONTENT,
-    CR_LIBRARY
+    CR_LIBRARY,
+    CR_GAME_SAVES,
+    CR_SAVE_CONFIRM
 };
 /* Stable quick-menu row IDs; unsupported core operations stay disabled. */
 enum {
@@ -49,6 +51,7 @@ enum {
     CR_QUICK_CORE_INFO,
     CR_QUICK_MAIN,
     CR_QUICK_PLAYER,
+    CR_QUICK_GAME_SAVES,
     CR_QUICK_COUNT
 };
 enum { CR_TOUCH_DOWN, CR_TOUCH_MOVE, CR_TOUCH_UP, CR_TOUCH_CANCEL };
@@ -84,6 +87,11 @@ typedef struct {
     unsigned input_player;
     unsigned hardware_keys[2], hardware_pulses[2];
     uint64_t core_revision, import_revision;
+    uint64_t save_request, save_revision;
+    void *save_handle;
+    unsigned save_player;
+    int save_operation;
+    char save_id[96], save_second_id[96], save_path[4096];
     bool import_link, import_folder;
     int link_slot, import_slot;
     char option_key[96], subsystem_id[96], import_subsystem_id[96];
@@ -117,6 +125,7 @@ unsigned cr_ui_input(cr_ui *);
 bool cr_ui_running(const cr_ui *);
 int cr_content_system(const char *, int);
 void cr_ui_import(cr_ui *, const cr_import *);
+void cr_ui_save_transfer_result(cr_ui *, const cr_save_transfer_result *);
 void cr_ui_message(cr_ui *, const char *);
 void cr_ui_reload(cr_ui *);
 void cr_ui_catalog(cr_ui *, const cr_core_catalog *);

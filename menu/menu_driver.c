@@ -1,11 +1,17 @@
 // CorvusRetro - CorvusSoftware
 // Copyright (C) 2026 CorvusSoftware
 // SPDX-License-Identifier: AGPL-3.0-only
+#define _POSIX_C_SOURCE 200809L
 #include "menu_driver.h"
 #include "play_layout.h"
 #include "overlay.h"
 #include "core_registry.h"
 #include <ctype.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdatomic.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -55,7 +61,11 @@ enum {
     ACT_SUBSYSTEM_IMPORT,
     ACT_SUBSYSTEM_START,
     ACT_LIBRARY,
-    ACT_FOLDER
+    ACT_FOLDER,
+    ACT_SAVE_TRANSFER,
+    ACT_SAVE_PLAYER,
+    ACT_SAVE_COMMIT,
+    ACT_SAVE_CANCEL
 };
 typedef struct {
     char label[512], hint[256];
@@ -64,6 +74,7 @@ typedef struct {
 } row;
 static void quick_action(cr_ui *u, int action);
 static void quick_clamp(cr_ui *u);
+static void finish_save_transfer(cr_ui *u);
 static int target(const cr_ui *u, float x, float y);
 static bool has_back(const cr_ui *u) {
     return u->quick || u->depth || (u->page != CR_MAIN && u->page != CR_LISTS && u->page != CR_SETTINGS);
@@ -127,6 +138,8 @@ static int rows(const cr_ui *u) {
         for (size_t i = 0; i < u->game_count; ++i) if (link_game(u, i)) ++count;
         return count;
     }
+    if (u->page == CR_GAME_SAVES) return 3 + (u->engine.players > 1);
+    if (u->page == CR_SAVE_CONFIRM) return 2;
     if (u->page == CR_SAVESTATES) return 2;
     if (u->page == CR_CONTENT) return 2;
     if (u->page == CR_LIBRARY) return 1 + (int)u->game_count;
@@ -171,24 +184,27 @@ static row get_row(const cr_ui *u, int index) {
     row r;
     fill(&r, "", "", CR_ICON_FILE, ACT_NONE, 0);
     if (u->quick) {
+        if (u->engine.players < 2 && index >= CR_QUICK_PLAYER) ++index;
         static const char *labels[CR_QUICK_COUNT] = {
             "Reprendre le contenu", "Redémarrer le contenu", "Fermer le contenu",
             "Sauvegardes d’état", "Options du cœur", "Commandes", "Succès", "Informations sur le cœur",
-            "Menu principal", "Joueur contrôlé"
+            "Menu principal", "Joueur contrôlé", "Sauvegardes du jeu"
         };
         static const char *hints[CR_QUICK_COUNT] = {
             "Retourner au jeu", "Relancer le contenu actuel", "Garder le cœur chargé",
             "Sauvegarder ou charger l’état du jeu", "Réglages proposés par le cœur", "Surimpression tactile",
             "Compte et succès du jeu", "Version et fonctions disponibles", "Retourner aux menus",
-            "Choisir le joueur du tactile et du clavier"
+            "Choisir le joueur du tactile et du clavier", "Importer ou exporter la mémoire batterie (.sav / .srm)"
         };
         static const int icons[CR_QUICK_COUNT] = {
             CR_ICON_CONTENT, CR_ICON_CONTENT, CR_ICON_UNLOAD, CR_ICON_FILE,
-            CR_ICON_CORE, CR_ICON_SETTINGS, CR_ICON_INFO, CR_ICON_CORE, CR_ICON_HOME, CR_ICON_CONTENT
+            CR_ICON_CORE, CR_ICON_SETTINGS, CR_ICON_INFO, CR_ICON_CORE, CR_ICON_HOME, CR_ICON_CONTENT, CR_ICON_FILE
         };
         fill(&r, labels[index], hints[index], icons[index], ACT_QUICK_ACTION, index);
         r.disabled = (index == CR_QUICK_RESTART && !cr_engine_can_reset(&u->engine)) ||
-                     (index == CR_QUICK_STATES && !cr_engine_can_state(&u->engine));
+                     (index == CR_QUICK_STATES && !cr_engine_can_state(&u->engine)) ||
+                     (index == CR_QUICK_GAME_SAVES && (!u->platform.save_transfer ||
+                      (!cr_engine_battery_size(&u->engine, 0) && !cr_engine_battery_size(&u->engine, 1))));
         if (index == CR_QUICK_PLAYER)
             snprintf(r.hint, sizeof(r.hint), "Joueur %u - toucher pour changer", u->input_player + 1);
     } else if (u->page == CR_CORE_OPTIONS) {
@@ -241,6 +257,22 @@ static row get_row(const cr_ui *u, int index) {
                     break;
                 }
         }
+    } else if (u->page == CR_GAME_SAVES) {
+        if (u->engine.players > 1 && index == 0) {
+            fill(&r, "Joueur de la sauvegarde", u->save_player ? "Joueur 2" : "Joueur 1",
+                 CR_ICON_CONTENT, ACT_SAVE_PLAYER, 0);
+        } else {
+            int operation = index - (u->engine.players > 1);
+            static const char *labels[] = {"Importer une sauvegarde", "Exporter en .sav", "Exporter en .srm"};
+            fill(&r, labels[operation], operation ? "Copie de la mémoire batterie actuelle" :
+                 "Le contenu redémarrera après confirmation", CR_ICON_FILE, ACT_SAVE_TRANSFER, operation);
+            r.disabled = u->save_request || !u->platform.save_transfer ||
+                         !cr_engine_battery_size(&u->engine, u->save_player);
+        }
+    } else if (u->page == CR_SAVE_CONFIRM) {
+        fill(&r, index ? "Annuler" : "Importer et redémarrer le contenu",
+             index ? "Conserver la partie actuelle" : "Copie de secours conservée", CR_ICON_FILE,
+             index ? ACT_SAVE_CANCEL : ACT_SAVE_COMMIT, 0);
     } else if (u->page == CR_SAVESTATES) {
         fill(&r, index ? "Charger l’état" : "Sauvegarder l’état",
              index ? "Restaurer la sauvegarde de ce contenu" : "Enregistrer la position actuelle",
@@ -260,7 +292,7 @@ static row get_row(const cr_ui *u, int index) {
             fill(&r, "Charger du contenu", "Importer un jeu ou ouvrir la bibliothèque",
                  CR_ICON_CONTENT, ACT_PAGE, CR_CONTENT);
         if (u->engine.handle && index == n++)
-            fill(&r, "Configuration du sous-système", "Sous-systèmes du cœur chargé",
+            fill(&r, "Sous-système", "Sous-systèmes du cœur chargé",
                  CR_ICON_CORE, ACT_PAGE, CR_SUBSYSTEMS);
         if (index == n)
             fill(&r, "Informations", "Application, cœur et licences", CR_ICON_INFO, ACT_PAGE,
@@ -608,6 +640,7 @@ void cr_ui_init(cr_ui *u, cr_platform p, const char *root) {
     cr_ui_reload(u);
 }
 void cr_ui_destroy(cr_ui *u) {
+    finish_save_transfer(u);
     cr_cheevos_destroy(u->achievements);
     u->achievements = NULL;
     memset(u->ra_password, 0, sizeof(u->ra_password));
@@ -657,7 +690,7 @@ void cr_ui_inputs(cr_ui *u, unsigned masks[2]) {
     masks[player] |= bits;
 }
 bool cr_ui_running(const cr_ui *u) {
-    return u->page == CR_PLAY && !u->quick && u->engine.loaded && !u->installing;
+    return u->page == CR_PLAY && !u->quick && u->engine.loaded && !u->installing && !u->save_request;
 }
 void cr_ui_update(cr_ui *u, double seconds) {
     achievement_sync(u, false);
@@ -770,7 +803,106 @@ static void show_core_downloader(cr_ui *u) {
         cr_ui_message(u, "Catalogue Android indisponible");
     }
 }
+static atomic_uint_fast64_t save_nonce = ATOMIC_VAR_INIT(0);
+static bool save_current(const cr_ui *u) {
+    return u->save_request && u->engine.loaded && u->engine.handle == u->save_handle &&
+        u->core_revision == u->save_revision && u->save_player < u->engine.players &&
+        !strcmp(u->engine.id, u->save_id) && !strcmp(u->engine.second_id, u->save_second_id);
+}
+static void finish_save_transfer(cr_ui *u) {
+    uint64_t request = u->save_request;
+    u->save_request = 0; u->save_path[0] = 0; u->save_handle = NULL;
+    if (request && u->platform.finish_save_transfer)
+        u->platform.finish_save_transfer(u->platform.context, request);
+}
+static void begin_save_transfer(cr_ui *u, int operation) {
+    if (u->save_request || u->importing || u->installing || !u->platform.save_transfer ||
+        !cr_engine_battery_size(&u->engine, u->save_player)) return;
+    uint8_t *bytes = NULL; size_t size = 0;
+    if (operation != CR_SAVE_IMPORT &&
+        !result(u, cr_engine_export_battery(&u->engine, u->save_player, &bytes, &size))) return;
+    u->save_request = atomic_fetch_add(&save_nonce, 1) + 1;
+    u->save_revision = u->core_revision; u->save_handle = u->engine.handle;
+    u->save_operation = operation;
+    snprintf(u->save_id, sizeof(u->save_id), "%s", u->engine.id);
+    snprintf(u->save_second_id, sizeof(u->save_second_id), "%s", u->engine.second_id);
+    char title[600];
+    snprintf(title, sizeof(title), "%s%s", u->title[0] ? u->title : u->engine.id,
+             u->save_player ? " - Joueur 2" : "");
+    bool started = u->platform.save_transfer(u->platform.context, u->save_request,
+                                            operation, title, bytes, size);
+    free(bytes);
+    if (!started) {
+        finish_save_transfer(u); cr_ui_message(u, "Service de sauvegarde indisponible");
+    }
+    cr_ui_clear_input(u);
+}
+void cr_ui_save_transfer_result(cr_ui *u, const cr_save_transfer_result *item) {
+    if (!item || !item->request) return;
+    if (item->request != u->save_request) {
+        if (u->platform.finish_save_transfer)
+            u->platform.finish_save_transfer(u->platform.context, item->request);
+        return;
+    }
+    if (u->save_path[0]) return;
+    if (!save_current(u) || item->cancelled || item->error[0]) {
+        if (item->error[0]) cr_ui_message(u, item->error);
+        else cr_ui_message(u, item->cancelled ? "Transfert annulé" : "Transfert expiré : contenu modifié");
+        finish_save_transfer(u); return;
+    }
+    if (u->save_operation != CR_SAVE_IMPORT) {
+        finish_save_transfer(u); cr_ui_message(u, "Sauvegarde exportée"); return;
+    }
+    char expected_path[4096];
+    int n = snprintf(expected_path, sizeof(expected_path), "%s/save-transfer/%llu.sav",
+                     u->engine.root, (unsigned long long)u->save_request);
+    if (n <= 0 || n >= (int)sizeof(expected_path) || strcmp(item->path, expected_path)) {
+        finish_save_transfer(u); cr_ui_message(u, "Fichier de sauvegarde invalide"); return;
+    }
+    snprintf(u->save_path, sizeof(u->save_path), "%s", item->path);
+    push_page(u, CR_SAVE_CONFIRM);
+}
+static bool import_save_file(cr_ui *u) {
+    if (!save_current(u)) { cr_ui_message(u, "Transfert expiré : contenu modifié"); return false; }
+    char directory_path[4096];
+    int n = snprintf(directory_path, sizeof(directory_path), "%s/save-transfer", u->engine.root);
+    int directory_fd = n > 0 && n < (int)sizeof(directory_path)
+        ? open(directory_path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_DIRECTORY) : -1;
+    char name[64]; snprintf(name, sizeof(name), "%llu.sav", (unsigned long long)u->save_request);
+    int fd = directory_fd >= 0 ? openat(directory_fd, name, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK) : -1;
+    if (directory_fd >= 0) close(directory_fd);
+    struct stat status;
+    size_t expected = cr_engine_battery_size(&u->engine, u->save_player);
+    if (fd < 0 || fstat(fd, &status) || !S_ISREG(status.st_mode) || !expected ||
+        status.st_size != (off_t)expected || expected > 1024u * 1024u) {
+        if (fd >= 0) close(fd);
+        cr_ui_message(u, "Taille ou fichier incompatible avec la sauvegarde du jeu"); return false;
+    }
+    uint8_t *bytes = malloc(expected);
+    bool ok = bytes != NULL;
+    size_t offset = 0;
+    while (ok && offset < expected) {
+        ssize_t count = read(fd, bytes + offset, expected - offset);
+        if (count < 0 && errno == EINTR) continue;
+        if (count <= 0) { ok = false; break; }
+        offset += (size_t)count;
+    }
+    uint8_t extra;
+    if (ok && read(fd, &extra, 1) != 0) ok = false;
+    if (close(fd) != 0) ok = false;
+    if (ok) ok = result(u, cr_engine_import_battery(&u->engine, u->save_player, bytes, expected));
+    else cr_ui_message(u, "Lecture de la sauvegarde impossible");
+    free(bytes);
+    return ok;
+}
 static void activate(cr_ui *u, row r) {
+    if (u->save_request && (r.action == ACT_SELECT || r.action == ACT_UNLOAD ||
+        r.action == ACT_GAME || r.action == ACT_PICK || r.action == ACT_FOLDER ||
+        r.action == ACT_INSTALL_CORE_PACK || r.action == ACT_OPTION_VALUE ||
+        r.action == ACT_SUBSYSTEM_START || r.action == ACT_SUBSYSTEM_IMPORT ||
+        r.action == ACT_SAVE_STATE || r.action == ACT_LOAD_STATE || r.action == ACT_SAVE_PLAYER)) {
+        cr_ui_message(u, "Transfert de sauvegarde en cours"); return;
+    }
     if (r.disabled && r.action == ACT_QUICK_ACTION) return;
     if (u->import_folder && (r.action == ACT_SELECT || r.action == ACT_UNLOAD ||
                              r.action == ACT_GAME || r.action == ACT_PICK ||
@@ -787,6 +919,25 @@ static void activate(cr_ui *u, row r) {
         return;
     }
     switch (r.action) {
+    case ACT_SAVE_PLAYER:
+        u->save_player = u->save_player ? 0 : 1;
+        break;
+    case ACT_SAVE_TRANSFER:
+        if (!r.disabled) begin_save_transfer(u, r.value);
+        break;
+    case ACT_SAVE_CANCEL:
+        finish_save_transfer(u); pop_page(u); cr_ui_message(u, "Importation annulée");
+        break;
+    case ACT_SAVE_COMMIT: {
+        bool ok = import_save_file(u);
+        finish_save_transfer(u);
+        if (ok) {
+            ++u->core_revision; cr_cheevos_reset(u->achievements);
+            achievement_sync(u, true); page(u, CR_PLAY);
+            cr_ui_message(u, "Sauvegarde importée : contenu redémarré");
+        } else pop_page(u);
+        break;
+    }
     case ACT_CORE_OPTION: {
         corvus_core_option option;
         if (cr_engine_option(&u->engine, (size_t)r.value, &option)) {
@@ -1100,7 +1251,13 @@ void cr_ui_import(cr_ui *u, const cr_import *item) {
     open_game(u, resolved.system, resolved.id, resolved.title, path);
 }
 static void quick_action(cr_ui *u, int action) {
-    if (action < 0 || action >= CR_QUICK_COUNT || get_row(u, action).disabled) return;
+    if (action < 0 || action >= CR_QUICK_COUNT ||
+        (action == CR_QUICK_RESTART && !cr_engine_can_reset(&u->engine)) ||
+        (action == CR_QUICK_STATES && !cr_engine_can_state(&u->engine))) return;
+    if (u->save_request && (action == CR_QUICK_RESTART || action == CR_QUICK_CLOSE ||
+                           action == CR_QUICK_STATES || action == CR_QUICK_GAME_SAVES)) {
+        cr_ui_message(u, "Transfert de sauvegarde en cours"); return;
+    }
     if (u->installing && (action == CR_QUICK_RESTART || action == CR_QUICK_CLOSE ||
                           action == CR_QUICK_STATES)) {
         cr_ui_message(u, "Téléchargement du cœur en cours");
@@ -1125,6 +1282,12 @@ static void quick_action(cr_ui *u, int action) {
             page(u, CR_MAIN);
         }
         break;
+    case CR_QUICK_GAME_SAVES:
+        if (u->platform.save_transfer && (cr_engine_battery_size(&u->engine, 0) ||
+                                        cr_engine_battery_size(&u->engine, 1))) {
+            u->save_player = 0; push_page(u, CR_GAME_SAVES);
+        }
+        break;
     case CR_QUICK_STATES: push_page(u, CR_SAVESTATES); break;
     case CR_QUICK_CORE_OPTIONS: push_page(u, CR_CORE_OPTIONS); break;
     case CR_QUICK_CONTROLS: push_page(u, CR_OVERLAY_SETTINGS); break;
@@ -1140,6 +1303,10 @@ static void quick_action(cr_ui *u, int action) {
 }
 void cr_ui_back(cr_ui *u) {
     cr_ui_clear_input(u);
+    if (u->save_request) {
+        finish_save_transfer(u);
+        cr_ui_message(u, "Transfert annulé");
+    }
     if (u->page == CR_PLAY) {
         u->quick = !u->quick;
         u->focus = 0;
@@ -1173,8 +1340,8 @@ void cr_ui_back(cr_ui *u) {
         u->platform.quit(u->platform.context);
 }
 void cr_ui_confirm(cr_ui *u) {
-    if (u->quick)
-        quick_action(u, u->focus);
+    if (u->quick && u->focus >= 0 && u->focus < rows(u))
+        quick_action(u, get_row(u, u->focus).value);
     else if (u->page != CR_PLAY && u->focus >= 0 && u->focus < rows(u))
         activate(u, get_row(u, u->focus));
 }
@@ -1349,7 +1516,7 @@ void cr_ui_touch_at(cr_ui *u, int id, int phase, float x, float y, double event_
             return;
         }
         if (t >= 10000) {
-            quick_action(u, t - 10000);
+            quick_action(u, get_row(u, t - 10000).value);
             return;
         }
         if (t == -5) {
@@ -1482,6 +1649,12 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         case CR_CORES:
             title = "Charger un cœur";
             break;
+        case CR_GAME_SAVES:
+            title = "Sauvegardes du jeu";
+            break;
+        case CR_SAVE_CONFIRM:
+            title = "Confirmer l’importation";
+            break;
         case CR_SAVESTATES:
             title = "Sauvegardes d’état";
             break;
@@ -1598,7 +1771,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         if (u->page == CR_ABOUT)
             u->text_height = paragraphs(
                 p,
-                "CorvusRetro 0.18.1\n\nFrontend original en C, rendu OpenGL ES et audio "
+                "CorvusRetro 0.19.0\n\nFrontend original en C, rendu OpenGL ES et audio "
                 "AAudio.\n\nCorvusSoftware\nCœurs officiels CorvusCore 0.15.0 : Game Boy, Game "
                 "Boy Color, Game Boy Advance (expérimental).\n\nNavigation inspirée de "
                 "MaterialUI. Thèmes CorvusRetro, ASUS et NVIDIA Shield.\n\nCopyright (C) 2026 "

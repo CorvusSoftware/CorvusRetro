@@ -29,6 +29,7 @@ typedef struct cr_engine {
     int16_t audio[4096];
     size_t audio_count;
     char id[96], second_id[96], subsystem_id[96], root[4096], module_path[4096], error[256];
+    char content_paths[2][4096];
 } cr_engine;
 
 /* All operations for an engine run on its owning frontend thread. */
@@ -55,6 +56,11 @@ bool cr_engine_reset(cr_engine *engine);
 bool cr_engine_save_state(cr_engine *engine);
 bool cr_engine_load_state(cr_engine *engine);
 bool cr_engine_save_battery(cr_engine *engine);
+/* Fresh owner-thread snapshots; caller owns the bytes. No dirty acknowledgement. */
+size_t cr_engine_battery_size(const cr_engine *engine, unsigned player);
+bool cr_engine_export_battery(cr_engine *engine, unsigned player, uint8_t **bytes, size_t *size);
+/* Validates a fresh candidate before committing battery files and replacing the session. */
+bool cr_engine_import_battery(cr_engine *engine, unsigned player, const uint8_t *bytes, size_t size);
 /* Close only the content; the selected core and its callback context stay loaded. */
 bool cr_engine_unload_game(cr_engine *engine);
 /* Failed persistence leaves the current engine alive so the caller can retry. */

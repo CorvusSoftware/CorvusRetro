@@ -18,6 +18,10 @@
 static pthread_mutex_t import_mutex = PTHREAD_MUTEX_INITIALIZER;
 static cr_import import_value;
 static bool import_ready;
+static pthread_mutex_t save_mutex = PTHREAD_MUTEX_INITIALIZER;
+static uint64_t save_request;
+static cr_save_transfer_result save_result;
+static bool save_ready, save_delivered;
 static ALooper *import_looper;
 static pthread_mutex_t core_mutex = PTHREAD_MUTEX_INITIALIZER;
 static char pending_modules[CR_MAX_CORES][4096];
@@ -287,6 +291,32 @@ JNIEXPORT void JNICALL Java_com_corvussoftware_corvusretro_MainActivity_imported
         ALooper_wake(import_looper);
     pthread_mutex_unlock(&import_mutex);
 }
+JNIEXPORT void JNICALL Java_com_corvussoftware_corvusretro_MainActivity_saveTransferResult(
+    JNIEnv *env, jclass cls, jlong request, jstring path, jstring error, jboolean cancelled) {
+    (void)cls;
+    if (request <= 0) return;
+    cr_save_transfer_result result = {.request = (uint64_t)request, .cancelled = cancelled != JNI_FALSE};
+    bool valid = (!path || (*env)->GetStringUTFLength(env, path) < (jsize)sizeof(result.path)) &&
+                 (!error || (*env)->GetStringUTFLength(env, error) < (jsize)sizeof(result.error));
+    if (valid) {
+        string_copy(env, path, result.path, sizeof(result.path));
+        string_copy(env, error, result.error, sizeof(result.error));
+    } else snprintf(result.error, sizeof(result.error), "Réponse de sauvegarde trop longue");
+    if ((*env)->ExceptionCheck(env)) return;
+    pthread_mutex_lock(&save_mutex);
+    if (save_request == (uint64_t)request && !save_delivered) {
+        save_result = result; save_ready = save_delivered = true;
+    }
+    pthread_mutex_unlock(&save_mutex);
+    wake_frontend();
+}
+bool cr_android_save_transfer_result(cr_save_transfer_result *out) {
+    pthread_mutex_lock(&save_mutex);
+    bool ready = save_ready;
+    if (ready) { *out = save_result; save_ready = false; }
+    pthread_mutex_unlock(&save_mutex);
+    return ready;
+}
 bool cr_android_import(cr_import *out) {
     pthread_mutex_lock(&import_mutex);
     bool ready = import_ready;
@@ -326,6 +356,8 @@ bool cr_android_init(cr_android *p, struct android_app *app) {
     METHOD(set_preference, "preferenceSet", "(Ljava/lang/String;I)V");
     METHOD(pick, "pickContent", "(I)V");
     METHOD(pick_folder, "pickFolder", "(ILjava/lang/String;)V");
+    METHOD(save_transfer, "saveTransfer", "(JILjava/lang/String;[B)V");
+    METHOD(finish_save_transfer, "finishSaveTransfer", "(J)V");
     METHOD(finish, "finishImport", "(ZILjava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
     METHOD(touch, "touchGame", "(Ljava/lang/String;)V");
     METHOD(appearance, "appearance", "(IZ)V");
@@ -372,6 +404,10 @@ bool cr_android_init(cr_android *p, struct android_app *app) {
     return true;
 }
 void cr_android_destroy(cr_android *p) {
+    pthread_mutex_lock(&save_mutex);
+    save_request = 0; save_ready = save_delivered = false;
+    memset(&save_result, 0, sizeof(save_result));
+    pthread_mutex_unlock(&save_mutex);
     cr_achievement_tasks_clear();
     pthread_mutex_lock(&text_mutex);
     memset(text_value, 0, sizeof(text_value));
@@ -598,9 +634,43 @@ static void edit_text(void *ctx, int field, const char *text, bool secret) {
     }
     cr_android_clear_error(p);
 }
+static bool save_transfer(void *context, uint64_t request, int operation, const char *title,
+                          const uint8_t *bytes, size_t size) {
+    cr_android *p = context;
+    if (!request || request > INT64_MAX || size > 1024u * 1024u ||
+        (operation != CR_SAVE_IMPORT && (!bytes || !size))) return false;
+    jstring name = (*p->env)->NewStringUTF(p->env, title);
+    jbyteArray data = operation != CR_SAVE_IMPORT ? (*p->env)->NewByteArray(p->env, (jsize)size) : NULL;
+    if (!name || (operation != CR_SAVE_IMPORT && !data)) {
+        if (name) (*p->env)->DeleteLocalRef(p->env, name);
+        if (data) (*p->env)->DeleteLocalRef(p->env, data);
+        cr_android_clear_error(p); return false;
+    }
+    if (data) (*p->env)->SetByteArrayRegion(p->env, data, 0, (jsize)size, (const jbyte *)bytes);
+    bool ok = !cr_android_clear_error(p);
+    if (ok) {
+        pthread_mutex_lock(&save_mutex);
+        save_request = request; save_ready = save_delivered = false;
+        pthread_mutex_unlock(&save_mutex);
+        (*p->env)->CallVoidMethod(p->env, p->app->activity->clazz, p->save_transfer,
+                                 (jlong)request, (jint)operation, name, data);
+        ok = !cr_android_clear_error(p);
+    }
+    (*p->env)->DeleteLocalRef(p->env, name);
+    if (data) (*p->env)->DeleteLocalRef(p->env, data);
+    return ok;
+}
+static void finish_save_transfer(void *context, uint64_t request) {
+    cr_android *p = context;
+    pthread_mutex_lock(&save_mutex);
+    if (save_request == request) { save_request = 0; save_ready = save_delivered = false; }
+    pthread_mutex_unlock(&save_mutex);
+    (*p->env)->CallVoidMethod(p->env, p->app->activity->clazz, p->finish_save_transfer, (jlong)request);
+    cr_android_clear_error(p);
+}
 cr_platform cr_android_services(cr_android *p) {
     return (cr_platform){p, pref, set_pref, pick, finish, games, touch, credits,
                          appearance, quit, refresh_catalog, install_pack, install_pending,
                          achievement_request, achievement_credentials, save_achievement_credentials, edit_text,
-                         pick_folder};
+                         pick_folder, save_transfer, finish_save_transfer};
 }

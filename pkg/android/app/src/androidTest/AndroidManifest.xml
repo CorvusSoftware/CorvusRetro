@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- CorvusRetro - CorvusSoftware
+     Copyright (C) 2026 CorvusSoftware
+     SPDX-License-Identifier: AGPL-3.0-only -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <provider android:name="com.corvussoftware.corvusretro.SaveTransferTestProvider"
+            android:authorities="com.corvussoftware.corvusretro.test.saves"
+            android:exported="true" />
+    </application>
+</manifest>

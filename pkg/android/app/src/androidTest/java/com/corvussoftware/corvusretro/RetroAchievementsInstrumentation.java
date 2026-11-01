@@ -350,6 +350,9 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
         state(0, 0, 0, 0);
     }
     private String prepareOverlayGame(int system) throws Exception {
+        return prepareOverlayGame(system, false);
+    }
+    private String prepareOverlayGame(int system, boolean battery) throws Exception {
         Context context = getTargetContext();
         String[] names = {"CorvusGB", "CorvusGBC", "CorvusGBA"};
         String[] ids = {"corvus.gb", "corvus.gbc", "corvus.gba"};
@@ -377,6 +380,7 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             rom[0x150] = 0x18; rom[0x151] = (byte) 0xfe;
             System.arraycopy("CORVUS OVERLAY".getBytes(StandardCharsets.US_ASCII), 0, rom, 0x134, 14);
             rom[0x143] = system == 1 ? (byte) 0x80 : 0;
+            if (battery) { rom[0x147] = 3; rom[0x149] = 2; }
             int checksum = 0;
             for (int i = 0x134; i <= 0x14c; ++i) checksum = (checksum - (rom[i] & 255) - 1) & 255;
             rom[0x14d] = (byte) checksum;
@@ -394,6 +398,114 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
         library.commit(new GameLibrary.Pending(game, temporary), system, ids[system], systems[system]);
         library.touch(id);
         return id;
+    }
+    private byte[] batteryFile(File file) throws Exception {
+        check(file.isFile() && file.length() == 8192, "raw game battery remains exactly 8 KiB");
+        try (InputStream input = new java.io.FileInputStream(file); ByteArrayOutputStream bytes = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[8192]; int size;
+            while ((size = input.read(buffer)) != -1) {
+                check(bytes.size() + size <= 8192, "battery read remains bounded");
+                bytes.write(buffer, 0, size);
+            }
+            return bytes.toByteArray();
+        }
+    }
+    private android.net.Uri saveDocument(String name) {
+        return android.net.Uri.parse("content://" + SaveTransferTestProvider.AUTHORITY + "/" + name);
+    }
+    private byte[] exportedBattery(String name) throws Exception {
+        try (InputStream input = getTargetContext().getContentResolver().openInputStream(saveDocument(name));
+             ByteArrayOutputStream bytes = new ByteArrayOutputStream()) {
+            check(input != null, "exported document can be read through its provider");
+            byte[] buffer = new byte[8192]; int size;
+            while ((size = input.read(buffer)) != -1) {
+                check(bytes.size() + size <= 8192, "exported document read remains bounded");
+                bytes.write(buffer, 0, size);
+            }
+            check(bytes.size() == 8192, "native snapshot exports raw battery bytes without a state header");
+            return bytes.toByteArray();
+        }
+    }
+    private SaveTransfers gameSaveService(MainActivity activity) throws Exception {
+        java.lang.reflect.Field field = MainActivity.class.getDeclaredField("saveTransfers");
+        field.setAccessible(true);
+        return (SaveTransfers) field.get(activity);
+    }
+    private void savePicker(MainActivity activity, String action, int keySteps, String document,
+                            boolean cancelled) throws Exception {
+        android.content.IntentFilter filter = new android.content.IntentFilter(action);
+        filter.addCategory(Intent.CATEGORY_OPENABLE); filter.addDataType("*/*");
+        Intent data = document == null ? null : new Intent().setData(saveDocument(document));
+        ActivityMonitor monitor = addMonitor(filter, new ActivityResult(cancelled ? Activity.RESULT_CANCELED : Activity.RESULT_OK, data), true);
+        try {
+            configurationRow(activity, keySteps);
+            waitFor(() -> monitor.getHits() == 1, "native save action opens Android's document contract exactly once");
+            if (cancelled || Intent.ACTION_CREATE_DOCUMENT.equals(action))
+                waitFor(() -> !gameSaveService(activity).busy(), "native consumes the matching document completion");
+        } finally { removeMonitor(monitor); }
+    }
+    private void saveTransfers() throws Exception {
+        check(overlaySystem >= 0 && overlaySystem < 2, "save transfer fixture supports GB and GBC");
+        String id = prepareOverlayGame(overlaySystem, true);
+        Context context = getTargetContext();
+        String prefix = "save-transfer-" + overlaySystem + (landscape ? "-landscape" : "-portrait");
+        context.getSharedPreferences("corvus", Context.MODE_PRIVATE).edit().putInt("achievements_enabled", 0)
+                .putString("theme", "corvus").putInt("show_input", 1).commit();
+        MainActivity activity = (MainActivity) startActivitySync(new Intent(context, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        try {
+            check(getUiAutomation().setRotation(landscape ? android.app.UiAutomation.ROTATION_FREEZE_90 : android.app.UiAutomation.ROTATION_FREEZE_0), "save transfer test rotation");
+            waitFor(() -> { int[] area = activity.safeWindowArea(); return area != null && (area[0] > area[1]) == landscape; }, "save transfer safe viewport");
+            state(0, -1, 0, 0);
+            configurationRow(activity, 0); state(3, -1, 0, 0);
+            configurationRow(activity, overlaySystem); state(0, overlaySystem, 0, 0);
+            screenshot(prefix + "-main-loaded");
+            configurationRow(activity, 2); state(19, overlaySystem, 0, 0);
+            screenshot(prefix + "-subsystems");
+            configurationKey(activity, android.view.KeyEvent.KEYCODE_BACK); state(0, overlaySystem, 0, 0);
+            tab(activity, 1); configurationRow(activity, 0); state(4, overlaySystem, 0, 0);
+            check(activity.games()[0].equals(id), "new original battery fixture is the first history item");
+            configurationRow(activity, 0); state(8, overlaySystem, 1, 0);
+            quickOpen(activity, overlaySystem); configurationRow(activity, 9); state(26, overlaySystem, 1, 0);
+            screenshot(prefix + "-saves");
+            savePicker(activity, Intent.ACTION_CREATE_DOCUMENT, 1, "output.sav", false);
+            byte[] previous = exportedBattery("output.sav");
+            savePicker(activity, Intent.ACTION_CREATE_DOCUMENT, 1, "output.srm", false);
+            check(java.util.Arrays.equals(previous, exportedBattery("output.srm")), ".sav and .srm exports contain the same actual native SRAM snapshot");
+            configurationKey(activity, android.view.KeyEvent.KEYCODE_DPAD_UP);
+            configurationKey(activity, android.view.KeyEvent.KEYCODE_DPAD_UP);
+            savePicker(activity, Intent.ACTION_OPEN_DOCUMENT, 0, null, true);
+            state(26, overlaySystem, 1, 0);
+            savePicker(activity, Intent.ACTION_OPEN_DOCUMENT, 0, "battery.sav", false);
+            state(27, overlaySystem, 1, 0); screenshot(prefix + "-confirm");
+            configurationRow(activity, 1); state(26, overlaySystem, 1, 0);
+            waitFor(() -> !gameSaveService(activity).busy(), "confirmation cancellation releases only its own transfer");
+            savePicker(activity, Intent.ACTION_CREATE_DOCUMENT, 1, "output.sav", false);
+            check(java.util.Arrays.equals(previous, exportedBattery("output.sav")), "cancelled import leaves the running core battery unchanged");
+            configurationKey(activity, android.view.KeyEvent.KEYCODE_DPAD_UP);
+            savePicker(activity, Intent.ACTION_OPEN_DOCUMENT, 0, "battery.SRM", false);
+            state(27, overlaySystem, 1, 0);
+            configurationRow(activity, 0); state(8, overlaySystem, 1, 0);
+            waitFor(() -> !gameSaveService(activity).busy(), "confirmed import releases its stage after native commit");
+            byte[] imported = SaveTransferTestProvider.battery();
+            check(java.util.Arrays.equals(imported, batteryFile(new File(context.getFilesDir(), "saves/" + id + ".sav"))), "confirmed SRM import commits the selected game's raw battery");
+            check(java.util.Arrays.equals(previous, batteryFile(new File(context.getFilesDir(), "saves/" + id + ".sav.import-backup"))), "pre-import live SRAM remains recoverable in the safety copy");
+            quickOpen(activity, overlaySystem); configurationRow(activity, 9); state(26, overlaySystem, 1, 0);
+            savePicker(activity, Intent.ACTION_CREATE_DOCUMENT, 1, "output.sav", false);
+            check(java.util.Arrays.equals(imported, exportedBattery("output.sav")), "the recreated core actually loaded imported bytes, not only the disk file");
+            screenshot(prefix + "-imported");
+            configurationKey(activity, android.view.KeyEvent.KEYCODE_BACK); state(8, overlaySystem, 1, 1);
+            // Returning restores the original quick-menu selection at its battery row.
+            for (int i = 0; i < 7; ++i) configurationKey(activity, android.view.KeyEvent.KEYCODE_DPAD_UP);
+            configurationRow(activity, 0); state(0, overlaySystem, 0, 0);
+            configurationRow(activity, 2); state(19, overlaySystem, 0, 0);
+            configurationKey(activity, android.view.KeyEvent.KEYCODE_BACK); state(0, overlaySystem, 0, 0);
+            configurationKey(activity, android.view.KeyEvent.KEYCODE_DPAD_UP);
+            configurationKey(activity, android.view.KeyEvent.KEYCODE_DPAD_UP);
+            configurationRow(activity, 0); state(0, -1, 0, 0);
+            screenshot(prefix + "-main-unloaded");
+            configurationRow(activity, 2); state(14, -1, 0, 0);
+            screenshot(prefix + "-unloaded");
+        } finally { runOnMainSync(activity::finish); }
     }
     private float[] overlayMetrics(MainActivity activity) {
         int[] area = activity.safeWindowArea();
@@ -742,7 +854,7 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
     @Override public void onStart() {
         Bundle result = new Bundle();
         try {
-            if ("configuration".equals(phase)) configuration(); else if ("overlays".equals(phase)) overlays(); else if ("navigation".equals(phase)) navigation(); else if ("popups".equals(phase)) popups(); else if ("ui".equals(phase)) ui(); else if ("outbox".equals(phase)) outbox(); else if ("recover".equals(phase)) recover(); else credentials();
+            if ("savetransfer".equals(phase)) saveTransfers(); else if ("configuration".equals(phase)) configuration(); else if ("overlays".equals(phase)) overlays(); else if ("navigation".equals(phase)) navigation(); else if ("popups".equals(phase)) popups(); else if ("ui".equals(phase)) ui(); else if ("outbox".equals(phase)) outbox(); else if ("recover".equals(phase)) recover(); else credentials();
             result.putString("stream", "PASS " + checks + " Android RetroAchievements checks phase=" + phase + " pid=" + android.os.Process.myPid() + "\n");
             finish(Activity.RESULT_OK, result);
         } catch (Throwable failure) {

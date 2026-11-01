@@ -1,4 +1,7 @@
-Objectif : rétablir le téléchargement pour les clients0.18.0 et corriger l'APK pour la distribution centrale indépendante.
-Budget DEEP : contrat de catalogue entre dépôts et versions publiées, origine de code natif, mise à jour signée conservant les données.
-Plan : reproduire le filtre officiel Java ; restaurer le flux0.18.0 et créer catalog/v1 pour clients corrigés ; retirer la restriction redondante tout en conservant les deux origines curées ; test JVM rouge/vert et instrumentation avec vrais catalogues ; CI/revue/fusion ; APK0.18.1/code23 avec signature durable, qualification et publication immuable.
-P0 : six entrées publiques reconnues en trois cœurs par ABI, officiels des deux dépôts acceptés, origines étrangères toujours refusées, flux ancien jamais modifié par les promotions nouvelles, affichage et téléchargement réels, données et signer conservés.
+Objectif : entrée « Sous-système » dynamique ; transferts des sauvegardes de jeu .sav/.srm dans le Menu rapide, états instantanés séparés ; plan d'organisation des réglages sans implémenter de fausses options.
+Budget DEEP : sauvegardes persistantes, remplacement de session, copie SAF et annulation asynchrone, thread natif propriétaire du cœur. Agents spécialisés C, documentation, puis revue indépendante.
+1. Réutiliser métadonnées de sous-systèmes et interfaces de batterie existantes. Garder IDs et chemins .sav, P2-link, options et format états inchangés.
+2. Capture native immuable pour export ; import dans fichier privé borné, confirmation, candidat natif et commit durable avec backup, sans appel cœur depuis Java.
+3. Garder import/export liés au joueur et contenu d'origine, annuler proprement picker/activity/busy, ignorer callbacks périmés.
+4. Tester roundtrip .sav/.srm, erreurs taille/IO, P2 distinct, reprise après interruption, lifecycle Android et affichage des vrais sous-systèmes, cas sans cœur/batterie.
+5. Documenter plan de réglages avec existant/proposé distinct ; revue/CI/fusion et APK signé qualifié puis publié.

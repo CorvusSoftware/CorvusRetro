@@ -38,6 +38,7 @@ Le menu rapide est une liste plein écran qui suspend l'émulation. Il propose :
 8. Informations sur le cœur.
 9. Menu principal.
 10. Joueur des commandes tactiles et du clavier, pendant une session à deux joueurs.
+11. [Sauvegardes du jeu](save-files.md), pour importer ou exporter la batterie `.sav` ou `.srm`.
 
 Une opération non disponible pour le cœur est désactivée. Le retour d'un
 sous-menu conserve la pause, la sélection et le défilement du menu rapide.

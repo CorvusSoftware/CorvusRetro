@@ -60,7 +60,7 @@ Les modules officiels sont disponibles pour **arm64-v8a** et **x86_64**.
 - **Menu rapide plein écran :** reprise, redémarrage, fermeture du jeu, sauvegarde et chargement d’état, commandes et succès.
 - **Options du cœur :** palettes GB/GBC, sauvegarde et horloge GBA, valeurs persistantes et application différée indiquée.
 - **Câble link local :** deux jeux, écrans côte à côte, commandes et batteries séparées ; configuration visible tant que le cœur reste chargé.
-- **Historique et sauvegardes :** historique seul dans les listes de lecture, sauvegardes batterie et états instantanés selon le moteur.
+- **Historique et sauvegardes :** historique seul dans les listes de lecture, import/export batterie `.sav` et `.srm`, choix du joueur en câble link, états instantanés séparés selon le moteur.
 - **Gestion du contenu :** cœur compatible chargé avant le jeu ; fermer le contenu conserve le cœur chargé.
 - **Thèmes :** CorvusRetro, NVIDIA Shield et ASUS.
 - **Cœurs téléchargeables :** installation et mise à jour indépendantes de l'application.
@@ -123,6 +123,8 @@ Ces commandes couvrent les tests natifs, les vérifications mémoire et le proje
 | [Prise en main et navigation](docs/navigation.md) | Menus et réglages |
 | [Commandes tactiles](docs/controls.md) | Boutons, gestes et orientation |
 | [Interface de jeu](docs/game-interface.md) | Profils par console et menu rapide |
+| [Sauvegardes du jeu](docs/save-files.md) | Import et export batterie `.sav` et `.srm` |
+| [Plan des réglages](docs/settings-plan.md) | Proposition de catégories et sous-réglages |
 | [Menus du cœur](docs/core-menus.md) | Sous-systèmes, options et capacités actuelles |
 | [Téléchargement des cœurs](docs/individual-cores.md) | Modules natifs et installation |
 | [RetroAchievements](docs/retroachievements.md) | Compte, succès et limitations |
