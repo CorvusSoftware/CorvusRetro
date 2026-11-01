@@ -56,14 +56,16 @@ static void dpad(const cr_painter *p, cr_area a, int direction, float scale, uin
         path(p, points, count, 2 * scale, value);
     }
 }
-void cr_overlay_draw(const cr_play_layout *layout, const cr_painter *p, unsigned held,
-                     const float feedback[10], bool visible, bool menu_down, bool hide_down) {
+void cr_overlay_draw_configured(const cr_play_layout *layout, const cr_painter *p, unsigned held,
+                                const float feedback[10], bool visible, bool menu_down,
+                                bool hide_down, int opacity_percent) {
     float scale = layout->scale, stroke = 2 * scale;
+    unsigned opacity = opacity_percent < 0 ? 0 : opacity_percent > 100 ? 100 : (unsigned)opacity_percent;
     if (visible) for (int i = 0; i < layout->count; ++i) {
         const cr_control *button = &layout->controls[i];
         cr_area a = button->area;
         float level = held & button->mask ? 1 : feedback[i];
-        uint32_t edge = color(level, 128), text = color(level, 160);
+        uint32_t edge = color(level, 128 * opacity / 100), text = color(level, 160 * opacity / 100);
         if (i < 4) dpad(p, a, i, scale, edge);
         else if (i < 6) {
             float radius = a.w / 2 - stroke;
@@ -103,4 +105,9 @@ void cr_overlay_draw(const cr_play_layout *layout, const cr_painter *p, unsigned
             stroke, color(hide_down, 160));
     segment(p, cx, cy + 4 * scale * sign, cx + 7 * scale, cy - 3 * scale * sign,
             stroke, color(hide_down, 160));
+}
+
+void cr_overlay_draw(const cr_play_layout *layout, const cr_painter *p, unsigned held,
+                     const float feedback[10], bool visible, bool menu_down, bool hide_down) {
+    cr_overlay_draw_configured(layout, p, held, feedback, visible, menu_down, hide_down, 100);
 }

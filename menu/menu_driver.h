@@ -9,6 +9,7 @@
 #include "theme.h"
 #include "cheevos.h"
 #include "notifications.h"
+#include "controller_ports.h"
 enum {
     CR_MAIN,
     CR_LISTS,
@@ -37,7 +38,16 @@ enum {
     CR_CONTENT,
     CR_LIBRARY,
     CR_GAME_SAVES,
-    CR_SAVE_CONFIRM
+    CR_SAVE_CONFIRM,
+    CR_NOTIFICATIONS_SETTINGS,
+    CR_SETTING_VALUES,
+    CR_OVERLAY_LAYOUT,
+    CR_CONTROLLER_SETTINGS,
+    CR_CONTROLLER_BINDINGS,
+    CR_SAVE_SETTINGS,
+    CR_RA_SETTINGS,
+    CR_RA_ACCOUNT,
+    CR_GAME_BACKUPS
 };
 /* Stable quick-menu row IDs; unsupported core operations stay disabled. */
 enum {
@@ -84,6 +94,12 @@ typedef struct {
     bool catalog_loading;
     int page, filter, theme, focus, tab, menu_pointer, feedback_target;
     bool quick, audio, awake, importing, show_input, installing;
+    int volume, video_integer, video_smooth, overlay_opacity, overlay_size, overlay_position;
+    int notify_cards, notify_progress, backup_count, auto_state, editing_setting;
+    int controller_bindings[10], controller_capture;
+    float pixel_density;
+    bool auto_state_available;
+    unsigned backup_available;
     unsigned input_player;
     unsigned hardware_keys[2], hardware_pulses[2];
     uint64_t core_revision, import_revision;
@@ -134,4 +150,5 @@ void cr_ui_install_status(cr_ui *, const char *, bool finished);
 void cr_ui_text_result(cr_ui *, int, const char *, bool);
 void cr_ui_achievement_frame(cr_ui *);
 void cr_ui_update(cr_ui *, double);
+bool cr_ui_controller_key(cr_ui *, int);
 #endif

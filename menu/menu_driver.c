@@ -65,13 +65,69 @@ enum {
     ACT_SAVE_TRANSFER,
     ACT_SAVE_PLAYER,
     ACT_SAVE_COMMIT,
-    ACT_SAVE_CANCEL
+    ACT_SAVE_CANCEL,
+    ACT_SETTING_VALUES,
+    ACT_SETTING_VALUE,
+    ACT_SETTING_TOGGLE,
+    ACT_LAYOUT_RESET,
+    ACT_BIND_CAPTURE,
+    ACT_BIND_RESET,
+    ACT_LOAD_AUTO_STATE,
+    ACT_BACKUP_MENU,
+    ACT_EXPORT_BACKUP
 };
 typedef struct {
     char label[512], hint[256];
     int icon, action, value;
     bool toggle, checked, disabled;
 } row;
+enum { SET_VOLUME, SET_INTEGER, SET_FILTER, SET_OPACITY, SET_SIZE, SET_POSITION,
+       SET_CARDS, SET_PROGRESS, SET_BACKUPS, SET_AUTO_STATE, SET_COUNT };
+typedef struct {
+    const char *key, *label;
+    int minimum, maximum, step, fallback;
+    size_t offset;
+} setting_spec;
+#define SETTING(key, label, field, min, max, step, fallback) \
+    {key, label, min, max, step, fallback, offsetof(cr_ui, field)}
+static const setting_spec settings[SET_COUNT] = {
+    SETTING("audio_volume", "Volume du jeu", volume, 0, 100, 10, 100),
+    SETTING("video_integer", "Présentation de l'image", video_integer, 0, 1, 1, 0),
+    SETTING("video_smooth", "Filtrage", video_smooth, 0, 1, 1, 0),
+    SETTING("overlay_opacity", "Intensité au repos", overlay_opacity, 10, 100, 10, 100),
+    SETTING("overlay_size", "Taille des commandes", overlay_size, 100, 130, 10, 100),
+    SETTING("overlay_position", "Position verticale", overlay_position, -15, 15, 5, 0),
+    SETTING("notify_cards", "Cartes de jeu et de succès", notify_cards, 0, 1, 1, 1),
+    SETTING("notify_progress", "Progression des succès", notify_progress, 0, 1, 1, 1),
+    SETTING("backup_count", "Copies de sécurité", backup_count, 1, 3, 1, 1),
+    SETTING("auto_state", "État automatique", auto_state, 0, 1, 1, 0)
+};
+#undef SETTING
+static int *setting_value(cr_ui *u, int id) {
+    return (int *)((char *)u + settings[id].offset);
+}
+static int setting_get(const cr_ui *u, int id) {
+    return *(const int *)((const char *)u + settings[id].offset);
+}
+static void setting_label(int id, int value, char *out, size_t size) {
+    if (id == SET_INTEGER) snprintf(out, size, "%s", value ? "Échelle entière" : "Ratio natif adapté");
+    else if (id == SET_FILTER) snprintf(out, size, "%s", value ? "Interpolation" : "Pixels nets");
+    else if (id == SET_BACKUPS) snprintf(out, size, "%d copie%s par joueur", value, value > 1 ? "s" : "");
+    else if (id == SET_POSITION && !value) snprintf(out, size, "%s", "Automatique");
+    else if (id == SET_POSITION) snprintf(out, size, "%+d %%", value);
+    else snprintf(out, size, "%d %%", value);
+}
+static void apply_setting(cr_ui *u, int id, int value) {
+    *setting_value(u, id) = value;
+    if (u->platform.set_preference)
+        u->platform.set_preference(u->platform.context, settings[id].key, value);
+    if (id == SET_SIZE || id == SET_POSITION || id == SET_OPACITY) cr_ui_clear_input(u);
+    if (id == SET_CARDS && !value) cr_notifications_hide_cards(&u->notifications);
+    if (id == SET_PROGRESS && !value) cr_notifications_hide_progress(&u->notifications, 0);
+    if (id == SET_BACKUPS || id == SET_AUTO_STATE)
+        cr_engine_set_save_policy(&u->engine, (unsigned)u->backup_count, u->auto_state != 0);
+}
+static const char *binding_labels[10] = {"Haut", "Bas", "Gauche", "Droite", "A", "B", "Start", "Select", "L", "R"};
 static void quick_action(cr_ui *u, int action);
 static void quick_clamp(cr_ui *u);
 static void finish_save_transfer(cr_ui *u);
@@ -138,9 +194,10 @@ static int rows(const cr_ui *u) {
         for (size_t i = 0; i < u->game_count; ++i) if (link_game(u, i)) ++count;
         return count;
     }
-    if (u->page == CR_GAME_SAVES) return 3 + (u->engine.players > 1);
+    if (u->page == CR_GAME_SAVES) return 4 + (u->engine.players > 1);
+    if (u->page == CR_GAME_BACKUPS) return u->backup_count;
     if (u->page == CR_SAVE_CONFIRM) return 2;
-    if (u->page == CR_SAVESTATES) return 2;
+    if (u->page == CR_SAVESTATES) return 3;
     if (u->page == CR_CONTENT) return 2;
     if (u->page == CR_LIBRARY) return 1 + (int)u->game_count;
     if (u->page == CR_MAIN)
@@ -151,16 +208,24 @@ static int rows(const cr_ui *u) {
         return 1 + (int)cr_registry_count();
     if (u->page == CR_CORE_DOWNLOADS)
         return 1 + (int)u->core_catalog.count;
-    if (u->page == CR_SETTINGS)
-        return 5;
+    if (u->page == CR_SETTINGS) return 6;
+    if (u->page == CR_SETTING_VALUES) {
+        const setting_spec *spec = &settings[u->editing_setting];
+        return 1 + (spec->maximum - spec->minimum) / spec->step;
+    }
+    if (u->page == CR_NOTIFICATIONS_SETTINGS || u->page == CR_UI_SETTINGS ||
+        u->page == CR_AUDIO_SETTINGS || u->page == CR_OSD_SETTINGS ||
+        u->page == CR_SAVE_SETTINGS || u->page == CR_RA_SETTINGS) return 2;
+    if (u->page == CR_OVERLAY_SETTINGS || u->page == CR_OVERLAY_LAYOUT ||
+        u->page == CR_VIDEO_SETTINGS || u->page == CR_CONTROLLER_SETTINGS) return 3;
+    if (u->page == CR_CONTROLLER_BINDINGS) return 11;
+    if (u->page == CR_RA_ACCOUNT) return 4;
     if (u->page == CR_ACHIEVEMENTS) {
         size_t count = cr_cheevos_achievement_count(u->achievements);
-        return 6 + (int)(count < 4096 ? count : 4096);
+        return 2 + (int)(count < 4096 ? count : 4096);
     }
     if (u->page == CR_INFORMATION)
         return 2 + (u->engine.handle ? 1 : 0);
-    if (u->page >= CR_UI_SETTINGS && u->page <= CR_OVERLAY_SETTINGS)
-        return 1;
     if (u->page == CR_THEMES)
         return CR_THEME_COUNT;
     if (u->page == CR_GAMES) {
@@ -261,6 +326,8 @@ static row get_row(const cr_ui *u, int index) {
         if (u->engine.players > 1 && index == 0) {
             fill(&r, "Joueur de la sauvegarde", u->save_player ? "Joueur 2" : "Joueur 1",
                  CR_ICON_CONTENT, ACT_SAVE_PLAYER, 0);
+        } else if (index - (u->engine.players > 1) == 3) {
+            fill(&r, "Copies de secours", "Exporter une batterie avant import", CR_ICON_FILE, ACT_BACKUP_MENU, 0);
         } else {
             int operation = index - (u->engine.players > 1);
             static const char *labels[] = {"Importer une sauvegarde", "Exporter en .sav", "Exporter en .srm"};
@@ -269,14 +336,22 @@ static row get_row(const cr_ui *u, int index) {
             r.disabled = u->save_request || !u->platform.save_transfer ||
                          !cr_engine_battery_size(&u->engine, u->save_player);
         }
+    } else if (u->page == CR_GAME_BACKUPS) {
+        char label[64]; snprintf(label, sizeof(label), "Copie de secours %d", index + 1);
+        bool available = (u->backup_available & (1u << index)) != 0;
+        fill(&r, label, available ? "Exporter en .sav" : "Absente ou illisible pour ce joueur",
+             CR_ICON_FILE, ACT_EXPORT_BACKUP, index);
+        r.disabled = !available;
     } else if (u->page == CR_SAVE_CONFIRM) {
         fill(&r, index ? "Annuler" : "Importer et redémarrer le contenu",
              index ? "Conserver la partie actuelle" : "Copie de secours conservée", CR_ICON_FILE,
              index ? ACT_SAVE_CANCEL : ACT_SAVE_COMMIT, 0);
     } else if (u->page == CR_SAVESTATES) {
-        fill(&r, index ? "Charger l’état" : "Sauvegarder l’état",
-             index ? "Restaurer la sauvegarde de ce contenu" : "Enregistrer la position actuelle",
-             CR_ICON_FILE, index ? ACT_LOAD_STATE : ACT_SAVE_STATE, 0);
+        static const char *labels[] = {"Sauvegarder l’état", "Charger l’état", "Charger l'état automatique"};
+        fill(&r, labels[index], index == 2 ? "Dernier état créé à la fermeture" :
+             (index ? "Restaurer la sauvegarde de ce contenu" : "Enregistrer la position actuelle"),
+             CR_ICON_FILE, index == 2 ? ACT_LOAD_AUTO_STATE : (index ? ACT_LOAD_STATE : ACT_SAVE_STATE), 0);
+        if (index == 2) r.disabled = !u->auto_state_available;
     } else if (u->page == CR_MAIN) {
         int n = 0;
         if (u->engine.loaded) {
@@ -348,18 +423,20 @@ static row get_row(const cr_ui *u, int index) {
             fill(&r, pack->name, hint, CR_ICON_CORE, ACT_INSTALL_CORE_PACK, index - 1);
         }
     } else if (u->page == CR_SETTINGS) {
-        const char *labels[] = {"Interface utilisateur", "Vidéo", "Audio", "Affichage à l’écran", "RetroAchievements"};
-        const char *hints[] = {"Apparence des menus", "Affichage pendant le jeu", "Sortie audio",
-                               "Surimpression tactile", "Compte et succès des jeux"};
-        const int pages[] = {CR_UI_SETTINGS, CR_VIDEO_SETTINGS, CR_AUDIO_SETTINGS, CR_OSD_SETTINGS, CR_ACHIEVEMENTS};
+        const char *labels[] = {"Interface utilisateur", "Vidéo", "Audio", "Commandes", "Sauvegardes", "RetroAchievements"};
+        const char *hints[] = {"Thèmes et notifications", "Présentation de l'image", "Son et volume du jeu",
+                              "Tactile et manettes", "Copies et états automatiques", "Activation et compte"};
+        const int pages[] = {CR_UI_SETTINGS, CR_VIDEO_SETTINGS, CR_AUDIO_SETTINGS, CR_OSD_SETTINGS, CR_SAVE_SETTINGS, CR_RA_SETTINGS};
         fill(&r, labels[index], hints[index], CR_ICON_SETTINGS, ACT_PAGE, pages[index]);
-    } else if (u->page == CR_ACHIEVEMENTS) {
+    } else if (u->page == CR_RA_SETTINGS) {
+        fill(&r, index ? "Compte" : "Activer RetroAchievements", index ? "Connexion et état du compte" :
+             "Mode normal", CR_ICON_SETTINGS, index ? ACT_PAGE : ACT_RA_ENABLE, CR_RA_ACCOUNT);
+        if (!index) { r.toggle = true; r.checked = u->ra_enabled; }
+    } else if (u->page == CR_ACHIEVEMENTS || u->page == CR_RA_ACCOUNT) {
+        index += u->page == CR_RA_ACCOUNT ? 1 : 4;
         cr_cheevos_status status = {0};
         cr_cheevos_get_status(u->achievements, &status);
-        if (index == 0) {
-            fill(&r, "Activer RetroAchievements", "Mode normal, avec sauvegardes d’état", CR_ICON_SETTINGS, ACT_RA_ENABLE, 0);
-            r.toggle = true; r.checked = u->ra_enabled;
-        } else if (index == 1) {
+        if (index == 1) {
             const char *user = status.connected ? status.username : (u->ra_editing == 1 ? u->ra_preview : u->ra_username);
             fill(&r, "Identifiant", user[0] ? user : "Saisir le nom du compte", CR_ICON_INFO, status.connected || status.pending ? ACT_NONE : ACT_RA_USER, 0);
         } else if (index == 2) {
@@ -386,24 +463,60 @@ static row get_row(const cr_ui *u, int index) {
             }
         }
     } else if (u->page == CR_UI_SETTINGS) {
-        fill(&r, "Thème de l’interface", cr_theme_get(u->theme)->name, CR_ICON_THEME, ACT_THEME, 0);
-    } else if (u->page == CR_VIDEO_SETTINGS) {
-        fill(&r, "Garder l’écran allumé", "Empêcher la veille pendant le jeu", CR_ICON_SETTINGS,
-             ACT_AWAKE, 0);
-        r.toggle = true;
-        r.checked = u->awake;
-    } else if (u->page == CR_AUDIO_SETTINGS) {
+        fill(&r, index ? "Notifications" : "Thèmes", index ? "Cartes et progression des succès" : cr_theme_get(u->theme)->name,
+             index ? CR_ICON_SETTINGS : CR_ICON_THEME, index ? ACT_PAGE : ACT_THEME, CR_NOTIFICATIONS_SETTINGS);
+    } else if (u->page == CR_NOTIFICATIONS_SETTINGS) {
+        int id = index ? SET_PROGRESS : SET_CARDS;
+        fill(&r, settings[id].label, "Affichage dans le jeu", CR_ICON_SETTINGS, ACT_SETTING_TOGGLE, id);
+        r.toggle = true; r.checked = setting_get(u, id) != 0;
+    } else if (u->page == CR_VIDEO_SETTINGS && !index) {
+        fill(&r, "Garder l’écran allumé", "Empêcher la veille pendant le jeu", CR_ICON_SETTINGS, ACT_AWAKE, 0);
+        r.toggle = true; r.checked = u->awake;
+    } else if (u->page == CR_AUDIO_SETTINGS && !index) {
         fill(&r, "Activer le son", "Sortie audio pendant le jeu", CR_ICON_SETTINGS, ACT_AUDIO, 0);
-        r.toggle = true;
-        r.checked = u->audio;
+        r.toggle = true; r.checked = u->audio;
     } else if (u->page == CR_OSD_SETTINGS) {
-        fill(&r, "Surimpression tactile", "Retour visuel des commandes", CR_ICON_SETTINGS, ACT_PAGE,
-             CR_OVERLAY_SETTINGS);
-    } else if (u->page == CR_OVERLAY_SETTINGS) {
-        fill(&r, "Afficher les commandes", "Afficher les commandes tactiles pendant le jeu", CR_ICON_SETTINGS,
-             ACT_SHOW_INPUT, 0);
-        r.toggle = true;
-        r.checked = u->show_input;
+        fill(&r, index ? "Manettes" : "Commandes tactiles", index ? "Appareils et affectation des touches" :
+             "Visibilité, opacité et disposition", CR_ICON_SETTINGS, ACT_PAGE,
+             index ? CR_CONTROLLER_SETTINGS : CR_OVERLAY_SETTINGS);
+    } else if (u->page == CR_OVERLAY_SETTINGS && !index) {
+        fill(&r, "Afficher les commandes", "Commandes tactiles pendant le jeu", CR_ICON_SETTINGS, ACT_SHOW_INPUT, 0);
+        r.toggle = true; r.checked = u->show_input;
+    } else if (u->page == CR_OVERLAY_SETTINGS && index == 2) {
+        fill(&r, "Taille et position", "Ajuster ou rétablir la disposition", CR_ICON_SETTINGS, ACT_PAGE, CR_OVERLAY_LAYOUT);
+    } else if (u->page == CR_OVERLAY_LAYOUT && index == 2) {
+        fill(&r, "Rétablir la disposition", "Taille et position automatiques", CR_ICON_SETTINGS, ACT_LAYOUT_RESET, 0);
+    } else if (u->page == CR_CONTROLLER_SETTINGS) {
+        char name[192] = {0};
+        if (index < 2) {
+            char label[64]; snprintf(label, sizeof(label), "Port du joueur %d", index + 1);
+            bool connected = u->platform.controller_info &&
+                u->platform.controller_info(u->platform.context, (unsigned)index, name, sizeof(name));
+            fill(&r, label, connected ? name : "Aucune manette connectée", CR_ICON_CONTENT, ACT_NONE, 0);
+        } else fill(&r, "Affectation des touches", "Profil commun aux manettes", CR_ICON_SETTINGS, ACT_PAGE, CR_CONTROLLER_BINDINGS);
+    } else if (u->page == CR_CONTROLLER_BINDINGS) {
+        if (index == 10) fill(&r, "Rétablir les touches", "Revenir au profil automatique", CR_ICON_SETTINGS, ACT_BIND_RESET, 0);
+        else {
+            char name[96]; cr_controller_binding_name(u->controller_bindings[index], name, sizeof(name));
+            fill(&r, binding_labels[index], u->controller_capture == index ? "Bouton de manette, ou Retour" : name,
+                 CR_ICON_SETTINGS, ACT_BIND_CAPTURE, index);
+        }
+    } else if (u->page == CR_SAVE_SETTINGS && index == 1) {
+        fill(&r, settings[SET_AUTO_STATE].label, "Créé à la fermeture si compatible", CR_ICON_SETTINGS, ACT_SETTING_TOGGLE, SET_AUTO_STATE);
+        r.toggle = true; r.checked = u->auto_state != 0;
+    } else if (u->page == CR_SETTING_VALUES) {
+        const setting_spec *spec = &settings[u->editing_setting];
+        int value = spec->minimum + index * spec->step;
+        char label[96]; setting_label(u->editing_setting, value, label, sizeof(label));
+        fill(&r, label, value == spec->fallback ? "Valeur par défaut" : "Appliquer ce réglage", CR_ICON_SETTINGS, ACT_SETTING_VALUE, value);
+        r.checked = value == setting_get(u, u->editing_setting);
+    } else if (u->page == CR_VIDEO_SETTINGS || u->page == CR_AUDIO_SETTINGS ||
+               u->page == CR_OVERLAY_SETTINGS || u->page == CR_OVERLAY_LAYOUT || u->page == CR_SAVE_SETTINGS) {
+        int id = u->page == CR_VIDEO_SETTINGS ? (index == 1 ? SET_INTEGER : SET_FILTER) :
+                 u->page == CR_AUDIO_SETTINGS ? SET_VOLUME : u->page == CR_OVERLAY_SETTINGS ? SET_OPACITY :
+                 u->page == CR_OVERLAY_LAYOUT ? (index ? SET_POSITION : SET_SIZE) : SET_BACKUPS;
+        char value[96]; setting_label(id, setting_get(u, id), value, sizeof(value));
+        fill(&r, settings[id].label, value, CR_ICON_SETTINGS, ACT_SETTING_VALUES, id);
     } else if (u->page == CR_INFORMATION) {
         if (index == 0)
             fill(&r, "À propos de CorvusRetro", "Application native de CorvusSoftware",
@@ -446,11 +559,12 @@ static void clamp_scroll(cr_ui *u) {
     u->scroll = fminf(max, fmaxf(0, u->scroll));
 }
 static void view(cr_ui *u, int p) {
+    u->controller_capture = -1;
     u->page = p;
     u->tab =
         p == CR_PLAY                     ? u->tab
         : p == CR_LISTS || p == CR_GAMES ? 1
-        : p == CR_SETTINGS || p == CR_THEMES || p == CR_ACHIEVEMENTS || (p >= CR_UI_SETTINGS && p <= CR_OVERLAY_SETTINGS)
+        : p == CR_SETTINGS || p == CR_THEMES || p == CR_ACHIEVEMENTS || (p >= CR_NOTIFICATIONS_SETTINGS && p <= CR_RA_ACCOUNT) || (p >= CR_UI_SETTINGS && p <= CR_OVERLAY_SETTINGS)
             ? 2
             : 0;
     u->scroll = 0;
@@ -532,11 +646,13 @@ static void achievement_notification(void *context, const cr_cheevos_notificatio
     char detail[256];
     switch (event->type) {
     case CR_CHEEVOS_GAME_READY:
+        if (!u->notify_cards) break;
         snprintf(detail, sizeof(detail), "%u/%u succès - Mode normal", event->unlocked, event->total);
         cr_notifications_push(&u->notifications, CR_NOTIFICATION_GAME, 0,
                               event->title, detail, event->image_url);
         break;
     case CR_CHEEVOS_UNLOCKED:
+        if (!u->notify_cards) break;
         snprintf(detail, sizeof(detail), "%s", event->title);
         char title[96];
         snprintf(title, sizeof(title), "Succès débloqué - %u points", event->points);
@@ -544,6 +660,7 @@ static void achievement_notification(void *context, const cr_cheevos_notificatio
                               title, detail, event->image_url);
         break;
     case CR_CHEEVOS_PROGRESS:
+        if (!u->notify_progress) break;
         cr_notifications_progress(&u->notifications, event->id, event->detail,
                                   event->image_url, event->percent);
         break;
@@ -551,6 +668,7 @@ static void achievement_notification(void *context, const cr_cheevos_notificatio
         cr_notifications_hide_progress(&u->notifications, event->id);
         break;
     case CR_CHEEVOS_COMPLETED:
+        if (!u->notify_cards) break;
         cr_notifications_push(&u->notifications, CR_NOTIFICATION_UNLOCK, 0,
                               "Tous les succès débloqués", event->title, event->image_url);
         break;
@@ -616,6 +734,21 @@ void cr_ui_init(cr_ui *u, cr_platform p, const char *root) {
     u->menu_pointer = u->feedback_target = -1;
     u->show_input = true;
     cr_engine_init(&u->engine, root);
+    u->pixel_density = 1;
+    u->controller_capture = -1;
+    for (int i = 0; i < SET_COUNT; ++i) {
+        const setting_spec *spec = &settings[i];
+        int value = p.preference ? p.preference(p.context, spec->key, spec->fallback) : spec->fallback;
+        *setting_value(u, i) = value < spec->minimum || value > spec->maximum ||
+            (value - spec->minimum) % spec->step ? spec->fallback : value;
+    }
+    cr_engine_set_save_policy(&u->engine, (unsigned)u->backup_count, u->auto_state != 0);
+    for (unsigned i = 0; i < 10; ++i) {
+        char key[48]; snprintf(key, sizeof(key), "controller_bind_%u", i);
+        int value = cr_controller_binding_default(i);
+        u->controller_bindings[i] = p.preference ? p.preference(p.context, key, value) : value;
+    }
+    cr_controller_bindings_sanitize(u->controller_bindings);
     if (p.preference) {
         u->theme = cr_theme_valid(p.preference(p.context, "theme", CR_THEME_CORVUS));
         u->audio = p.preference(p.context, "audio", 1) != 0;
@@ -815,12 +948,13 @@ static void finish_save_transfer(cr_ui *u) {
     if (request && u->platform.finish_save_transfer)
         u->platform.finish_save_transfer(u->platform.context, request);
 }
-static void begin_save_transfer(cr_ui *u, int operation) {
+static void begin_save_transfer(cr_ui *u, int operation, int backup) {
     if (u->save_request || u->importing || u->installing || !u->platform.save_transfer ||
         !cr_engine_battery_size(&u->engine, u->save_player)) return;
     uint8_t *bytes = NULL; size_t size = 0;
     if (operation != CR_SAVE_IMPORT &&
-        !result(u, cr_engine_export_battery(&u->engine, u->save_player, &bytes, &size))) return;
+        !result(u, backup >= 0 ? cr_engine_export_backup(&u->engine, u->save_player, (unsigned)backup, &bytes, &size) :
+                cr_engine_export_battery(&u->engine, u->save_player, &bytes, &size))) return;
     u->save_request = atomic_fetch_add(&save_nonce, 1) + 1;
     u->save_revision = u->core_revision; u->save_handle = u->engine.handle;
     u->save_operation = operation;
@@ -829,6 +963,10 @@ static void begin_save_transfer(cr_ui *u, int operation) {
     char title[600];
     snprintf(title, sizeof(title), "%s%s", u->title[0] ? u->title : u->engine.id,
              u->save_player ? " - Joueur 2" : "");
+    if (backup >= 0) {
+        size_t used = strlen(title);
+        snprintf(title + used, sizeof(title) - used, " - copie %d", backup + 1);
+    }
     bool started = u->platform.save_transfer(u->platform.context, u->save_request,
                                             operation, title, bytes, size);
     free(bytes);
@@ -896,11 +1034,12 @@ static bool import_save_file(cr_ui *u) {
     return ok;
 }
 static void activate(cr_ui *u, row r) {
+    if (u->controller_capture >= 0) return;
     if (u->save_request && (r.action == ACT_SELECT || r.action == ACT_UNLOAD ||
         r.action == ACT_GAME || r.action == ACT_PICK || r.action == ACT_FOLDER ||
         r.action == ACT_INSTALL_CORE_PACK || r.action == ACT_OPTION_VALUE ||
         r.action == ACT_SUBSYSTEM_START || r.action == ACT_SUBSYSTEM_IMPORT ||
-        r.action == ACT_SAVE_STATE || r.action == ACT_LOAD_STATE || r.action == ACT_SAVE_PLAYER)) {
+        r.action == ACT_SAVE_STATE || r.action == ACT_LOAD_STATE || r.action == ACT_LOAD_AUTO_STATE || r.action == ACT_SAVE_PLAYER)) {
         cr_ui_message(u, "Transfert de sauvegarde en cours"); return;
     }
     if (r.disabled && r.action == ACT_QUICK_ACTION) return;
@@ -919,11 +1058,68 @@ static void activate(cr_ui *u, row r) {
         return;
     }
     switch (r.action) {
+    case ACT_SETTING_VALUES: {
+        u->editing_setting = r.value;
+        push_page(u, CR_SETTING_VALUES);
+        const setting_spec *spec = &settings[r.value];
+        u->focus = (setting_get(u, r.value) - spec->minimum) / spec->step;
+        cr_ui_move(u, 0);
+        break;
+    }
+    case ACT_SETTING_VALUE:
+        apply_setting(u, u->editing_setting, r.value);
+        pop_page(u);
+        break;
+    case ACT_SETTING_TOGGLE:
+        apply_setting(u, r.value, !setting_get(u, r.value));
+        break;
+    case ACT_LAYOUT_RESET:
+        apply_setting(u, SET_SIZE, 100); apply_setting(u, SET_POSITION, 0);
+        cr_ui_message(u, "Disposition rétablie");
+        break;
+    case ACT_BIND_CAPTURE: {
+        char name[192];
+        if (!u->platform.controller_info ||
+            (!u->platform.controller_info(u->platform.context, 0, name, sizeof(name)) &&
+             !u->platform.controller_info(u->platform.context, 1, name, sizeof(name)))) {
+            cr_ui_message(u, "Connectez une manette pour affecter ses touches"); break;
+        }
+        cr_ui_clear_input(u); u->controller_capture = r.value;
+        cr_ui_message(u, "Appuyez sur un bouton de la manette");
+        break;
+    }
+    case ACT_BIND_RESET:
+        for (unsigned i = 0; i < 10; ++i) {
+            char key[48]; snprintf(key, sizeof(key), "controller_bind_%u", i);
+            u->controller_bindings[i] = cr_controller_binding_default(i);
+            if (u->platform.set_preference) u->platform.set_preference(u->platform.context, key, u->controller_bindings[i]);
+        }
+        cr_ui_clear_input(u); cr_ui_message(u, "Touches rétablies");
+        break;
+    case ACT_LOAD_AUTO_STATE:
+        if (u->auto_state_available && result(u, cr_engine_load_auto_state(&u->engine))) {
+            cr_cheevos_reset(u->achievements); page(u, CR_PLAY);
+            cr_ui_message(u, "État automatique chargé");
+        }
+        break;
     case ACT_SAVE_PLAYER:
         u->save_player = u->save_player ? 0 : 1;
         break;
     case ACT_SAVE_TRANSFER:
-        if (!r.disabled) begin_save_transfer(u, r.value);
+        if (!r.disabled) begin_save_transfer(u, r.value, -1);
+        break;
+    case ACT_BACKUP_MENU:
+        u->backup_available = 0;
+        for (unsigned i = 0; i < (unsigned)u->backup_count; ++i) {
+            uint8_t *bytes = NULL; size_t size = 0;
+            if (cr_engine_export_backup(&u->engine, u->save_player, i, &bytes, &size))
+                u->backup_available |= 1u << i;
+            free(bytes);
+        }
+        push_page(u, CR_GAME_BACKUPS);
+        break;
+    case ACT_EXPORT_BACKUP:
+        if (!r.disabled) begin_save_transfer(u, CR_SAVE_EXPORT_SAV, r.value);
         break;
     case ACT_SAVE_CANCEL:
         finish_save_transfer(u); pop_page(u); cr_ui_message(u, "Importation annulée");
@@ -1288,7 +1484,9 @@ static void quick_action(cr_ui *u, int action) {
             u->save_player = 0; push_page(u, CR_GAME_SAVES);
         }
         break;
-    case CR_QUICK_STATES: push_page(u, CR_SAVESTATES); break;
+    case CR_QUICK_STATES:
+        u->auto_state_available = cr_engine_has_auto_state(&u->engine);
+        push_page(u, CR_SAVESTATES); break;
     case CR_QUICK_CORE_OPTIONS: push_page(u, CR_CORE_OPTIONS); break;
     case CR_QUICK_CONTROLS: push_page(u, CR_OVERLAY_SETTINGS); break;
     case CR_QUICK_ACHIEVEMENTS: push_page(u, CR_ACHIEVEMENTS); break;
@@ -1302,6 +1500,10 @@ static void quick_action(cr_ui *u, int action) {
     cr_ui_clear_input(u);
 }
 void cr_ui_back(cr_ui *u) {
+    if (u->controller_capture >= 0) {
+        u->controller_capture = -1;
+        cr_ui_clear_input(u); cr_ui_message(u, "Affectation annulée"); return;
+    }
     cr_ui_clear_input(u);
     if (u->save_request) {
         finish_save_transfer(u);
@@ -1344,6 +1546,19 @@ void cr_ui_confirm(cr_ui *u) {
         quick_action(u, get_row(u, u->focus).value);
     else if (u->page != CR_PLAY && u->focus >= 0 && u->focus < rows(u))
         activate(u, get_row(u, u->focus));
+}
+bool cr_ui_controller_key(cr_ui *u, int key) {
+    if (u->controller_capture < 0 || u->controller_capture >= 10) return false;
+    unsigned button = (unsigned)u->controller_capture;
+    if (!cr_controller_bindings_assign(u->controller_bindings, button, key)) {
+        cr_ui_message(u, "Touche réservée ou déjà affectée"); return true;
+    }
+    char pref[48]; snprintf(pref, sizeof(pref), "controller_bind_%u", button);
+    if (u->platform.set_preference)
+        u->platform.set_preference(u->platform.context, pref, key);
+    u->controller_capture = -1;
+    cr_ui_clear_input(u); cr_ui_message(u, "Touche affectée");
+    return true;
 }
 void cr_ui_move(cr_ui *u, int direction) {
     int count = rows(u);
@@ -1388,9 +1603,12 @@ void cr_ui_release_player(cr_ui *u, unsigned player) {
     if (player < 2) u->hardware_keys[player] = u->hardware_pulses[player] = 0;
 }
 static cr_play_layout play_layout(const cr_ui *u) {
-    return cr_play_layout_make(u->width, u->height,
+    cr_play_layout layout = cr_play_layout_configured(u->width, u->height,
                                cr_registry_legacy_system(u->engine.system), u->engine.width,
-                               u->engine.height);
+                               u->engine.height, u->overlay_size, u->overlay_position);
+    if (u->video_integer)
+        layout.video = cr_play_video_integer(layout.video, u->engine.width, u->engine.height, u->pixel_density);
+    return layout;
 }
 static unsigned button_at(const cr_ui *u, float x, float y) {
     if (!u->show_input) return 0;
@@ -1636,7 +1854,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
                 menu_down |= u->pointers[i].target == -3 && !u->pointers[i].dragged;
                 hide_down |= u->pointers[i].target == -5 && !u->pointers[i].dragged;
             }
-        cr_overlay_draw(&layout, p, input, u->control_feedback, u->show_input, menu_down, hide_down);
+        cr_overlay_draw_configured(&layout, p, input, u->control_feedback, u->show_input, menu_down, hide_down, u->overlay_opacity);
     } else {
         const char *title = u->quick ? "Menu rapide" : "Menu principal";
         switch (u->page) {
@@ -1651,6 +1869,9 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
             break;
         case CR_GAME_SAVES:
             title = "Sauvegardes du jeu";
+            break;
+        case CR_GAME_BACKUPS:
+            title = "Copies de secours";
             break;
         case CR_SAVE_CONFIRM:
             title = "Confirmer l’importation";
@@ -1711,10 +1932,34 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
             title = "Audio";
             break;
         case CR_OSD_SETTINGS:
-            title = "Affichage à l’écran";
+            title = "Commandes";
             break;
         case CR_OVERLAY_SETTINGS:
-            title = "Surimpression tactile";
+            title = "Commandes tactiles";
+            break;
+        case CR_NOTIFICATIONS_SETTINGS:
+            title = "Notifications";
+            break;
+        case CR_SETTING_VALUES:
+            title = settings[u->editing_setting].label;
+            break;
+        case CR_OVERLAY_LAYOUT:
+            title = "Taille et position";
+            break;
+        case CR_CONTROLLER_SETTINGS:
+            title = "Manettes";
+            break;
+        case CR_CONTROLLER_BINDINGS:
+            title = "Affectation des touches";
+            break;
+        case CR_SAVE_SETTINGS:
+            title = "Sauvegardes";
+            break;
+        case CR_RA_SETTINGS:
+            title = "RetroAchievements";
+            break;
+        case CR_RA_ACCOUNT:
+            title = "Compte RetroAchievements";
             break;
         case CR_INFORMATION:
             title = "Informations";
@@ -1748,7 +1993,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
                 toggle(p, theme, w - 72, y + 24, r.checked);
             } else if (r.checked)
                 text(p, "✓", w - 36, y + 41, 20, accent, 28);
-            else
+            else if (r.action != ACT_NONE)
                 p->icon(p->context, CR_ICON_NEXT, w - 36, y + 29, 18, muted);
             rect(p, 66, y + 75, w - 66, 1, line);
         }
@@ -1771,7 +2016,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         if (u->page == CR_ABOUT)
             u->text_height = paragraphs(
                 p,
-                "CorvusRetro 0.19.0\n\nFrontend original en C, rendu OpenGL ES et audio "
+                "CorvusRetro 0.20.0\n\nFrontend original en C, rendu OpenGL ES et audio "
                 "AAudio.\n\nCorvusSoftware\nCœurs officiels CorvusCore 0.15.0 : Game Boy, Game "
                 "Boy Color, Game Boy Advance (expérimental).\n\nNavigation inspirée de "
                 "MaterialUI. Thèmes CorvusRetro, ASUS et NVIDIA Shield.\n\nCopyright (C) 2026 "

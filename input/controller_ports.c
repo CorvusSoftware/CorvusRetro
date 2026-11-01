@@ -2,6 +2,7 @@
 // Copyright (C) 2026 CorvusSoftware
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "controller_ports.h"
+#include <stdio.h>
 #include <string.h>
 void cr_controller_ports_init(cr_controller_ports *ports) {
     memset(ports, 0, sizeof(*ports));
@@ -76,4 +77,70 @@ void cr_controller_axes(cr_controller_ports *ports, unsigned port, unsigned mask
 void cr_controller_ports_clear(cr_controller_ports *ports) {
     memset(ports->buttons, 0, sizeof(ports->buttons));
     memset(ports->axes, 0, sizeof(ports->axes));
+}
+int cr_controller_binding_default(unsigned button) {
+    static const int keys[10] = {19, 20, 21, 22, 96, 97, 108, 109, 102, 103};
+    return button < 10 ? keys[button] : -1;
+}
+bool cr_controller_binding_valid(int key) {
+    return (key >= 19 && key <= 22) || (key >= 96 && key <= 110) ||
+        (key >= 188 && key <= 203) || key == 54 || key == 52 || key == 66 || key == 62;
+}
+void cr_controller_bindings_sanitize(int bindings[10]) {
+    bool valid = true;
+    for (unsigned i = 0; i < 10; ++i) {
+        if (!cr_controller_binding_valid(bindings[i])) valid = false;
+        for (unsigned j = 0; j < i; ++j) if (bindings[j] == bindings[i]) valid = false;
+    }
+    if (!valid)
+        for (unsigned i = 0; i < 10; ++i) bindings[i] = cr_controller_binding_default(i);
+}
+int cr_controller_binding_button(const int bindings[10], int key) {
+    if (!cr_controller_binding_valid(key)) return -1;
+    for (unsigned i = 0; i < 10; ++i) if (bindings[i] == key) return (int)i;
+    /* Retain the former keyboard-style aliases unless explicitly reassigned. */
+    static const int aliases[4] = {54, 52, 66, 62};
+    for (unsigned i = 0; i < 4; ++i)
+        if (key == aliases[i] && bindings[i + 4] == cr_controller_binding_default(i + 4))
+            return (int)i + 4;
+    return -1;
+}
+bool cr_controller_bindings_assign(int bindings[10], unsigned button, int key) {
+    if (button >= 10 || !cr_controller_binding_valid(key)) return false;
+    for (unsigned i = 0; i < 10; ++i)
+        if (i != button && bindings[i] == key) return false;
+    bindings[button] = key;
+    return true;
+}
+void cr_controller_binding_name(int key, char *name, size_t capacity) {
+    const char *label = NULL;
+    switch (key) {
+    case 19: label = "Croix haut"; break;
+    case 20: label = "Croix bas"; break;
+    case 21: label = "Croix gauche"; break;
+    case 22: label = "Croix droite"; break;
+    case 96: label = "Bouton A"; break;
+    case 97: label = "Bouton B"; break;
+    case 98: label = "Bouton C"; break;
+    case 99: label = "Bouton X"; break;
+    case 100: label = "Bouton Y"; break;
+    case 101: label = "Bouton Z"; break;
+    case 102: label = "L1"; break;
+    case 103: label = "R1"; break;
+    case 104: label = "L2"; break;
+    case 105: label = "R2"; break;
+    case 106: label = "L3"; break;
+    case 107: label = "R3"; break;
+    case 108: label = "Start"; break;
+    case 109: label = "Select"; break;
+    case 110: label = "Mode"; break;
+    case 54: label = "Touche Z"; break;
+    case 52: label = "Touche X"; break;
+    case 66: label = "Entrée"; break;
+    case 62: label = "Espace"; break;
+    default: break;
+    }
+    if (label) snprintf(name, capacity, "%s", label);
+    else if (key >= 188 && key <= 203) snprintf(name, capacity, "Bouton %d", key - 187);
+    else snprintf(name, capacity, "Non définie");
 }

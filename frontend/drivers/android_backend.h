@@ -12,6 +12,8 @@ typedef struct {
     JNIEnv *env;
     jclass cls;
     bool attached;
+    bool controller_connected[CR_CONTROLLER_PORT_COUNT];
+    char controller_names[CR_CONTROLLER_PORT_COUNT][128];
     jmethodID density, safe_area, atlas, advances, glyph, advance, games, root, credits, preference,
         set_preference, pick, finish, touch, appearance, quit, refresh_catalog, install_pack,
         installed_modules, install_pending, achievement_request, achievement_credentials,
@@ -28,6 +30,7 @@ bool cr_android_core_catalog(cr_core_catalog *);
 bool cr_android_update_modules(void);
 bool cr_android_core_status(char *, size_t, bool *);
 bool cr_android_text_result(int *, char *, size_t, bool *);
-bool cr_android_controller_devices(cr_controller_device devices[CR_CONTROLLER_DEVICE_CAP], size_t *count);
+bool cr_android_controller_devices(cr_controller_device devices[CR_CONTROLLER_DEVICE_CAP],
+                                   char names[CR_CONTROLLER_DEVICE_CAP][128], size_t *count);
 bool cr_android_clear_error(cr_android *);
 #endif

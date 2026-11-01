@@ -91,13 +91,14 @@ public final class MainActivity extends NativeActivity {
     static native void coreModulesUpdated(String[] paths);
     static native void coreInstallStatus(String message, boolean finished);
     private static native void saveTransferResult(long request, String path, String error, boolean cancelled);
-    private static native void controllerDevicesChanged(int[] deviceIds, long[] generations);
+    private static native void controllerDevicesChanged(int[] deviceIds, long[] generations, String[] names);
 
     private void publishControllerDevices() {
         if (destroyed || inputManager == null) return;
         // Bound the service snapshot; devices outside this bound remain unassigned.
         int[] controllers = new int[64];
         long[] generations = new long[64];
+        String[] names = new String[64];
         int count = 0;
         for (int id : inputManager.getInputDeviceIds()) {
             InputDevice device = inputManager.getInputDevice(id);
@@ -110,9 +111,12 @@ public final class MainActivity extends NativeActivity {
                 controllerGenerations.put(id, generation);
             }
             controllers[count] = id;
+            String name = device.getName();
+            names[count] = name == null ? "Manette" : name.replaceAll("\\p{Cntrl}", " ").trim();
             generations[count++] = generation;
         }
-        controllerDevicesChanged(Arrays.copyOf(controllers, count), Arrays.copyOf(generations, count));
+        controllerDevicesChanged(Arrays.copyOf(controllers, count), Arrays.copyOf(generations, count),
+                Arrays.copyOf(names, count));
     }
 
     @Override public void onCreate(Bundle state) {

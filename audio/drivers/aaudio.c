@@ -2,6 +2,7 @@
 // Copyright (C) 2026 CorvusSoftware
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "aaudio.h"
+#include "volume.h"
 #include <string.h>
 static aaudio_data_callback_result_t output(AAudioStream *stream, void *ctx, void *buffer,
                                             int32_t frames) {
@@ -9,10 +10,11 @@ static aaudio_data_callback_result_t output(AAudioStream *stream, void *ctx, voi
     cr_audio *a = ctx;
     int16_t *out = buffer;
     size_t needed = (size_t)frames * 2;
+    int volume = atomic_load_explicit(&a->volume, memory_order_relaxed);
     pthread_mutex_lock(&a->mutex);
     for (size_t i = 0; i < needed; i++) {
         if (a->count) {
-            out[i] = a->ring[a->read];
+            out[i] = cr_audio_gain(a->ring[a->read], volume);
             a->read = (a->read + 1) % 32768;
             a->count--;
         } else
@@ -31,6 +33,7 @@ void cr_audio_init(cr_audio *a) {
     memset(a, 0, sizeof(*a));
     pthread_mutex_init(&a->mutex, NULL);
     atomic_init(&a->failed, false);
+    atomic_init(&a->volume, 100);
 }
 void cr_audio_close(cr_audio *a) {
     if (a->stream) {
@@ -92,6 +95,10 @@ void cr_audio_pause(cr_audio *a) {
     a->count = 0;
     a->read = 0;
     pthread_mutex_unlock(&a->mutex);
+}
+void cr_audio_set_volume(cr_audio *a, int percent) {
+    int value = percent < 0 ? 0 : percent > 100 ? 100 : percent;
+    atomic_store_explicit(&a->volume, value, memory_order_relaxed);
 }
 void cr_audio_write(cr_audio *a, const int16_t *samples, size_t count) {
     if (!a->stream || !a->playing)

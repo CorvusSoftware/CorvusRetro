@@ -6,12 +6,15 @@
 static cr_control control(float x, float y, float w, float h, unsigned mask, const char *label) {
     return (cr_control){{x, y, w, h}, mask, label};
 }
-cr_play_layout cr_play_layout_make(float width, float height, int system, int vw, int vh) {
+cr_play_layout cr_play_layout_configured(float width, float height, int system, int vw, int vh,
+                                         int size_percent, int vertical_percent) {
     cr_play_layout p = {0};
     float w = fmaxf(1, width), h = fmaxf(1, height);
     p.portrait = h >= w;
     float base = (p.portrait ? w : h) / 360;
     float s = fminf(1.4f, fmaxf(1, base));
+    int size = size_percent < 100 ? 100 : size_percent > 130 ? 130 : size_percent;
+    s *= size / 100.f;
     /* Shrink only multi-window surfaces; phone controls retain 48dp targets. */
     s = fminf(s, fminf(w / 320, h / (p.portrait ? 384 : 320)));
     p.scale = s;
@@ -43,6 +46,29 @@ cr_play_layout cr_play_layout_make(float width, float height, int system, int vw
         p.controls[p.count++] = control(margin, top, 72 * s, cell, 256, "L");
         p.controls[p.count++] = control(w - margin - 72 * s, top, 72 * s, cell, 512, "R");
     }
+    int position = vertical_percent < -15 ? -15 : vertical_percent > 15 ? 15 : vertical_percent;
+    float shift = position * h / 100.f;
+    if (p.portrait) {
+        float bottom = p.menu.y + p.menu.h;
+        for (int i = 0; i < p.count; ++i)
+            bottom = fmaxf(bottom, p.controls[i].area.y + p.controls[i].area.h);
+        shift = fmaxf(-p.panel.y, fminf(shift, fmaxf(0, h - margin - bottom)));
+        p.panel.y += shift;
+        p.panel.h -= shift;
+        p.menu.y += shift;
+        p.dpad.y += shift;
+        for (int i = 0; i < p.count; ++i) p.controls[i].area.y += shift;
+        panel = p.panel.h;
+    } else {
+        float top = p.dpad.y, bottom = p.dpad.y + p.dpad.h;
+        for (int i = 4; i < 6; ++i) {
+            top = fminf(top, p.controls[i].area.y);
+            bottom = fmaxf(bottom, p.controls[i].area.y + p.controls[i].area.h);
+        }
+        shift = fmaxf(fminf(0, 68 * s - top), fminf(shift, fmaxf(0, footer - 8 * s - bottom)));
+        p.dpad.y += shift;
+        for (int i = 0; i < 6; ++i) p.controls[i].area.y += shift;
+    }
     if (vw <= 0 || vh <= 0) {
         vw = system == 2 ? 240 : 160;
         vh = system == 2 ? 160 : 144;
@@ -53,6 +79,24 @@ cr_play_layout cr_play_layout_make(float width, float height, int system, int vw
     p.video = (cr_area){(w - vw * fit) / 2, (video_height - vh * fit) / 2,
                        vw * fit, vh * fit};
     return p;
+}
+cr_play_layout cr_play_layout_make(float width, float height, int system, int vw, int vh) {
+    return cr_play_layout_configured(width, height, system, vw, vh, 100, 0);
+}
+cr_area cr_play_video_integer(cr_area reserved, int vw, int vh, float density) {
+    if (vw <= 0 || vh <= 0 || !isfinite(density) || density <= 0 ||
+        !isfinite(reserved.x) || !isfinite(reserved.y) ||
+        !isfinite(reserved.w) || !isfinite(reserved.h)) return reserved;
+    float left = ceilf(reserved.x * density - .00001f);
+    float top = ceilf(reserved.y * density - .00001f);
+    float right = floorf((reserved.x + reserved.w) * density + .00001f);
+    float bottom = floorf((reserved.y + reserved.h) * density + .00001f);
+    float scale = floorf(fminf((right - left) / vw, (bottom - top) / vh));
+    if (scale < 1) return reserved;
+    float width = vw * scale, height = vh * scale;
+    return (cr_area){floorf((left + right - width) / 2) / density,
+                     floorf((top + bottom - height) / 2) / density,
+                     width / density, height / density};
 }
 bool cr_area_contains(cr_area a, float x, float y) {
     return x >= a.x && x < a.x + a.w && y >= a.y && y < a.y + a.h;

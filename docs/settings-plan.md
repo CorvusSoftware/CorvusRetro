@@ -1,218 +1,151 @@
-# Plan des réglages
+# Paramètres et sous-paramètres
 
-Ce document propose le rangement des préférences de CorvusRetro sur Android.
-Il ne décrit pas une nouvelle interface déjà livrée. L'état de référence est
-le code de `menu/menu_driver.c`, les préférences Android et les documents
-[navigation](navigation.md), [interface de jeu](game-interface.md),
-[menus du cœur](core-menus.md), [thèmes](themes.md) et
-[RetroAchievements](retroachievements.md).
+Le rangement de ce document est implémenté dans les menus natifs de CorvusRetro.
+Les réglages globaux sont conservés après redémarrage, même sans cœur chargé.
+Les actions propres à une partie restent dans le Menu rapide.
 
-## Principes
+## Arborescence
 
-- **Existant** : comportement ou préférence effectivement présent dans le code.
-- **Déplacement proposé** : fonction existante, avec un nouvel emplacement.
-- **À développer** : fonction absente, à afficher seulement après réalisation
-  complète de son action, de sa persistance et de ses erreurs.
-- Les réglages globaux définissent les préférences de l'application. Le Menu
-  rapide contient les actions et informations du jeu ou de la session en cours.
-- Une catégorie ne doit pas être créée vide pour annoncer des fonctions futures.
-  Une page d'information sur une capacité absente du cœur reste possible ; elle
-  ne doit pas présenter de faux interrupteur.
-- Conserver les trois onglets Menu principal, Listes de lecture et Réglages,
-  ainsi que le retour avec sélection, filtre et défilement restaurés.
+| Catégorie | Sous-paramètres |
+| --- | --- |
+| Interface utilisateur | Thèmes ; Notifications |
+| Vidéo | Garder l'écran allumé ; Présentation de l'image ; Filtrage |
+| Audio | Activer le son ; Volume du jeu |
+| Commandes | Commandes tactiles ; Manettes |
+| Sauvegardes | Copies de sécurité ; État automatique |
+| RetroAchievements | Activer RetroAchievements ; Compte |
 
-## Arborescence cible
+Une sélection de valeur affiche la valeur courante et la valeur par défaut.
+Retour restaure la page, la sélection et le défilement précédents. Depuis le
+Menu rapide, le retour conserve la partie en pause jusqu'à sa reprise.
 
-Ordre proposé : apparence, image, son, commandes, sauvegardes, compte. Les
-sous-pages ne sont utiles que lorsqu'elles regroupent plusieurs contrôles.
-Une page contenant un seul interrupteur reste une liste courte, sans étage
-supplémentaire.
+## Interface utilisateur
 
-| Ordre | Catégorie | Sous-réglages cibles | État |
-| --- | --- | --- | --- |
-| 1 | Interface utilisateur | Thèmes ; Notifications | Thèmes existants ; notifications configurables à développer |
-| 2 | Vidéo | Garder l'écran allumé ; présentation de l'image | Veille existante ; présentation configurable à développer |
-| 3 | Audio | Activer le son ; volume du jeu | Son existant ; volume à développer |
-| 4 | Commandes | Commandes tactiles ; Manettes | Visibilité tactile existante à déplacer ; configuration des manettes à développer |
-| 5 | Sauvegardes | Copies de sécurité ; sauvegardes d'état automatiques | Catégorie et préférences à développer ; ne pas l'afficher avant une première fonction réelle |
-| 6 | RetroAchievements | Activation ; Compte | Existants ; séparer la liste des succès du jeu lors du rangement |
+**Thèmes** : CorvusRetro, NVIDIA Shield et ASUS. Les anciens choix sont conservés.
 
-Au premier rangement, cinq catégories sont donc suffisantes : Interface
-utilisateur, Vidéo, Audio, Commandes et RetroAchievements. Sauvegardes rejoint
-la liste lorsqu'une préférence globale utile est effectivement disponible.
+**Notifications** : deux interrupteurs indépendants :
 
-### Interface utilisateur
+- Cartes de jeu et de succès : cartes de lancement, de déblocage et de complétion des succès.
+- Progression des succès : indicateur avec badge et pourcentage mesuré.
 
-| Chemin cible | Contenu et comportement | État |
-| --- | --- | --- |
-| Interface utilisateur > Thèmes | CorvusRetro, NVIDIA Shield, ASUS ; conserver les choix et leur ordre | Existant ; le libellé actuel est « Thème de l'interface » |
-| Interface utilisateur > Notifications > Cartes de jeu et de succès | Afficher les cartes déjà produites lors de l'identification et des déblocages | Affichage existant ; interrupteur à développer |
-| Interface utilisateur > Notifications > Progression des succès | Afficher l'indicateur de progression mesurée | Affichage existant ; interrupteur à développer |
+Ces préférences concernent les affichages du frontend pendant le jeu. Elles
+ne désactivent ni l'évaluation des succès ni leurs envois. Les messages d'erreur
+restent visibles. Désactiver un affichage retire aussi ses notifications en cours.
 
-Les notifications concernées sont dessinées dans le jeu par le frontend.
-Ne pas les confondre avec les notifications du système Android. Les réglages
-d'affichage doivent laisser fonctionner l'évaluation et l'envoi des succès.
-Conserver les erreurs de sauvegarde, de connexion et de chargement visibles,
-même si les cartes de succès sont masquées. Ne pas ajouter de réglage de son
-de notification tant qu'un tel son n'existe pas.
+## Vidéo
 
-### Vidéo
+- **Garder l'écran allumé** : activé par défaut pendant le jeu.
+- **Présentation de l'image** : ratio natif adapté, par défaut ; ou échelle entière.
+  Le calcul entier utilise les pixels physiques de l'écran et conserve les
+  marges Android et l'espace des commandes. Si aucun facteur entier ne tient,
+  le frontend revient au ratio adapté.
+- **Filtrage** : pixels nets, par défaut ; ou interpolation. Le filtrage change
+  la texture du jeu, sans lisser les textes ou les icônes de l'interface.
 
-| Chemin cible | Contenu et comportement | État |
-| --- | --- | --- |
-| Vidéo > Garder l'écran allumé | Empêcher la veille pendant le jeu | Existant, activé par défaut |
-| Vidéo > Présentation de l'image | Taille adaptée au ratio natif ; option de mise à l'échelle entière si elle tient dans la fenêtre | À développer ; le ratio natif est déjà le comportement automatique |
-| Vidéo > Filtrage | Choix explicite entre pixels nets et interpolation, après prise en charge dans le rendu | À développer |
+Les palettes, couleurs de compatibilité et autres options déclarées par un
+cœur restent dans **Menu rapide > Options du cœur**.
 
-Le portrait, le paysage et les fenêtres étroites doivent continuer de réserver
-l'espace nécessaire aux commandes et aux marges Android. La palette d'un jeu,
-ses couleurs de compatibilité et les autres traitements déclarés par le cœur
-restent dans Options du cœur. Pas de sélecteur de pilote graphique, de shaders
-ou de fréquence d'écran sans prise en charge effective.
+## Audio
 
-### Audio
+- **Activer le son** : activé par défaut.
+- **Volume du jeu** : 0 à 100 %, par pas de 10, défaut 100 %. Le gain s'applique
+  à la sortie PCM du frontend, sans changer le volume système Android.
 
-| Chemin cible | Contenu et comportement | État |
-| --- | --- | --- |
-| Audio > Activer le son | Activer la sortie audio du jeu | Existant, activé par défaut |
-| Audio > Volume du jeu | Régler le gain du frontend, sans changer le volume système Android | À développer |
+La source audio d'un câble link reste une option du cœur. Le volume du frontend
+s'applique à la sortie sélectionnée par ce cœur.
 
-La source audio d'une session câble link reste une option du cœur lorsqu'il
-la déclare. Aucun réglage de latence, de rééchantillonnage ou de pilote n'est
-proposé avant de disposer d'un véritable choix pris en charge et vérifié.
+## Commandes
 
-### Commandes
+### Commandes tactiles
 
-| Chemin cible | Contenu et comportement | État |
-| --- | --- | --- |
-| Commandes > Commandes tactiles > Afficher les commandes | Même préférence globale depuis les Réglages et le Menu rapide ; relâcher les touches lors du masquage | Existant, déplacement proposé |
-| Commandes > Commandes tactiles > Opacité | Régler la visibilité au repos en conservant le retour visuel à l'appui | À développer |
-| Commandes > Commandes tactiles > Taille et position | Ajuster la disposition et rétablir la disposition automatique ; conserver des cibles tactiles utilisables | À développer, après l'opacité |
-| Commandes > Manettes > Appareils connectés | Identifier les manettes et afficher leur port courant | Entrées physiques et ports automatiques existants ; page à développer |
-| Commandes > Manettes > Affectation des touches | Configurer et rétablir les correspondances d'une manette | À développer |
+- **Afficher les commandes** : même préférence depuis Réglages et Menu rapide.
+  Les touches sont relâchées lorsque les commandes sont masquées.
+- **Intensité au repos** : 10 à 100 % du style de base, par pas de 10. Le défaut
+  100 % conserve les contours discrets existants. Le retour visuel à l'appui et
+  les boutons menu/masquage restent lisibles.
+- **Taille et position > Taille des commandes** : 100 à 130 % par pas de 10.
+- **Taille et position > Position verticale** : de -15 à +15 % par pas de 5 ;
+  0 correspond à la disposition automatique.
+- **Taille et position > Rétablir la disposition** : rétablit taille et position,
+  sans effacer l'intensité ni la visibilité choisies.
 
-Ne pas créer la page Manettes avant qu'elle fournisse au moins les informations
-réelles des appareils connectés. Le choix du joueur commandé par le tactile et
-le clavier appartient au Menu rapide pendant une session à plusieurs joueurs.
-Les ports des manettes concernent cette session ; ils ne deviennent pas une
-préférence globale par simple déplacement de menu.
+La géométrie est bornée par l'espace disponible : portrait, paysage et petite
+fenêtre adaptent la disposition. Les zones touchées suivent les dessins.
+GB/GBC conservent leurs boutons ; GBA conserve en plus L/R.
 
-### Sauvegardes
+### Manettes
 
-Cette catégorie future contient des politiques globales, pas les boutons
-Importer, Exporter, Sauvegarder l'état ou Charger l'état d'un jeu.
+La page montre les appareils réellement affectés aux ports des joueurs 1 et 2.
+Un port vide indique qu'aucune manette n'est connectée.
 
-| Chemin cible | Contenu et comportement | État |
-| --- | --- | --- |
-| Sauvegardes > Copies de sécurité | Définir la conservation d'une batterie précédente lors d'un remplacement, avec une limite explicite | Politique configurable à développer ; la copie de sécurité fixe avant import est décrite dans [Sauvegardes du jeu](save-files.md) |
-| Sauvegardes > Sauvegardes d'état automatiques | Créer un état à la fermeture lorsque le cœur et la session permettent une sérialisation complète | À développer ; ne pas confondre avec l'écriture automatique de la batterie |
+**Affectation des touches** propose un profil numérique commun aux manettes :
+Haut, Bas, Gauche, Droite, A, B, Start, Select, L et R. Sélectionner une entrée,
+puis appuyer sur le bouton physique souhaité. Retour annule la capture. Une
+manette doit être connectée pour capturer une touche ; les touches système ou
+déjà affectées sont refusées. **Rétablir les touches** restaure le profil de base.
 
-L'enregistrement de la batterie lors de la pause, du remplacement et de la
-fermeture est un comportement existant à conserver. Il ne faut pas en faire
-un interrupteur permettant de perdre les progrès par inadvertance. Les chemins
-historiques, les identités de contenu et les batteries distinctes des joueurs
-doivent rester compatibles. Une future politique d'états automatiques doit
-préserver les états manuels et signaler une erreur sans décharger le jeu.
+La navigation des menus reste accessible indépendamment du profil. Les axes
+analogiques et les chapeaux directionnels gardent leur correspondance
+automatique. Le profil ne prétend pas offrir une calibration des axes ou des
+profils différents par appareil. Déconnexion, pause et rotation annulent une
+capture et relâchent les touches maintenues.
 
-### RetroAchievements
+Le joueur des commandes tactiles et du clavier se choisit dans le Menu rapide
+d'une session à deux joueurs. Les deux premières manettes conservent leurs
+ports distincts.
 
-| Chemin cible | Contenu et comportement | État |
-| --- | --- | --- |
-| RetroAchievements > Activer RetroAchievements | Activation globale, mode normal | Existant, désactivé par défaut |
-| RetroAchievements > Compte | Identifiant, mot de passe éphémère, connexion ou déconnexion, état du compte | Existants, regroupement proposé |
-| Menu rapide > Succès | Identification du jeu, compteurs, liste des succès et état de compatibilité de la session | Existants ; actuellement partagés avec la page globale |
+## Sauvegardes
 
-Le compte et l'activation restent accessibles sans cœur ni jeu chargé.
-Les notifications se règlent dans Interface utilisateur ; leur masquage ne
-désactive pas RetroAchievements. Le mode Hardcore reste absent tant que ses
-restrictions ne sont pas implémentées et qualifiées. Les capacités mémoire et
-les restrictions du câble link doivent rester clairement indiquées.
+**Copies de sécurité** : conserver 1, 2 ou 3 versions de la batterie précédant
+un import, par joueur. Le défaut reste une copie. Cette préférence s'applique
+au prochain import confirmé et réussi ; elle ne supprime rien lors de sa
+sélection. La copie la plus récente reste le fichier de secours historique,
+les versions précédentes sont conservées dans un historique borné. Une
+transaction groupée protège les batteries et les copies pendant leur remplacement.
 
-## Actions du jeu et menus du cœur
+Pour récupérer une version, ouvrir **Menu rapide > Sauvegardes du jeu > Copies
+de secours**. Les copies disponibles peuvent être exportées en `.sav`, puis
+importées avec la confirmation habituelle. En câble link, choisir d'abord le
+joueur dans Sauvegardes du jeu. Les copies absentes ou illisibles sont désactivées.
 
-Le Menu rapide garde ses actions contextuelles. Ce plan ne transforme pas ces
-actions en préférences globales.
+**État automatique** : désactivé par défaut. Lors d'une fermeture ou d'un
+remplacement du contenu, créer un état distinct si la session permet une
+sérialisation complète. Les modules officiels en câble link ne fournissent pas
+cette capacité ; ils conservent leurs batteries sans créer de faux état groupé.
+L'état automatique n'écrase jamais l'état manuel. Il se charge explicitement
+avec **Menu rapide > Sauvegardes d'état > Charger l'état automatique** ; aucune
+reprise automatique n'est imposée. Un échec d'écriture lors d'une fermeture
+explicite conserve le contenu et affiche l'erreur.
 
-| Emplacement | Contenu | État et limite |
-| --- | --- | --- |
-| Menu rapide > Sauvegardes du jeu | Importer une sauvegarde `.sav` ou `.srm` ; exporter la sauvegarde batterie du jeu | Disponible dans cette évolution ; fichiers batterie bruts, choix du joueur en câble link, confirmation avant remplacement |
-| Menu rapide > Sauvegardes d'état | Sauvegarder l'état ; charger l'état | Existant, distinct des fichiers batterie ; dépend des capacités du cœur et de la session |
-| Menu rapide > Options du cœur | Options et valeurs déclarées par les métadonnées publiques du cœur | Existant ; conserver les clés par cœur et les indications d'application immédiate ou au redémarrage |
-| Menu rapide > Commandes | Accès rapide aux commandes tactiles ; joueur contrôlé en session multiple | Existant ; même préférence de visibilité que les réglages globaux |
-| Menu rapide > Succès | Succès du jeu et informations de compatibilité | Existant |
-| Menu principal > Sous-système | Choisir un sous-système du cœur, ses contenus et démarrer la session | Existant ; libellé « Sous-système » |
+L'enregistrement normal de la batterie à la pause et à la fermeture reste
+obligatoire, indépendamment de l'état automatique. Les identités historiques
+et les batteries séparées P1/P2 sont préservées. Voir [Sauvegardes du jeu](save-files.md).
 
-« Sous-système » est le libellé du menu principal. Cette entrée reste présente dès qu'un
-cœur est chargé, y compris sans jeu, et disparaît quand il est déchargé. Sa
-présence ne dépend pas du nombre de déclarations du module ; une page vide
-explique l'absence de sous-système. Les options et sous-systèmes ne doivent
-pas être recopiés en listes fixes GB, GBC ou GBA dans les réglages globaux.
+## RetroAchievements
 
-L'import/export batterie utilise le sélecteur de documents Android, indique
-le jeu concerné et conserve la partie et les données existantes en cas
-d'annulation ou d'erreur. L'import confirmé redémarre les contenus avec la
-nouvelle batterie. En câble link, le joueur est choisi dans Sauvegardes du jeu et les données de l'autre
-joueur sont conservées. L'extension `.srm` n'en fait pas un état instantané.
+L'activation et **Compte** restent accessibles sans cœur ni contenu. Compte
+regroupe identifiant, mot de passe éphémère, connexion/déconnexion et état du
+compte. Les mots de passe ne sont pas enregistrés ; les jetons et les succès en
+attente conservent leur stockage chiffré.
 
-## Correspondance avec les cinq menus actuels
+La liste des succès et les informations du jeu sont dans **Menu rapide > Succès**.
+Les filtres de notification se trouvent dans Interface utilisateur. Le mode
+normal et les limites des sessions restent indiqués ; aucun réglage Hardcore
+n'est ajouté sans son implémentation.
 
-| Menu actuel | Destination proposée | Conservation |
-| --- | --- | --- |
-| Interface utilisateur > Thème de l'interface | Interface utilisateur > Thèmes | Mêmes palettes et identifiants |
-| Vidéo > Garder l'écran allumé | Vidéo > Garder l'écran allumé | Même comportement et défaut |
-| Audio > Activer le son | Audio > Activer le son | Même comportement et défaut |
-| Affichage à l'écran > Surimpression tactile > Afficher les commandes | Commandes > Commandes tactiles > Afficher les commandes | Retirer l'étage général « Affichage à l'écran » ; conserver l'accès du Menu rapide |
-| RetroAchievements | RetroAchievements pour l'activation et le compte ; Menu rapide > Succès pour le jeu | Conserver le compte, les succès et les opérations en attente |
+## Persistance et compatibilité
 
-## Persistance et navigation
+Le stockage SharedPreferences `corvus` et les clés historiques restent inchangés :
+`theme` est une chaîne, `audio` et `keep_awake` des booléens, `show_input` et
+`achievements_enabled` des entiers. Le thème conserve les identifiants
+0/Shield, 2/CorvusRetro, 3/ASUS et le repli de l'ancien thème dark.
 
-Déplacer ou renommer une ligne ne justifie aucune migration de données. Garder
-le stockage SharedPreferences `corvus` et les clés existantes :
+Les nouvelles clés sont des entiers : `audio_volume`, `video_integer`,
+`video_smooth`, `overlay_opacity`, `overlay_size`, `overlay_position`,
+`notify_cards`, `notify_progress`, `backup_count`, `auto_state` et
+`controller_bind_0` à `controller_bind_9`. Les valeurs hors plage reviennent aux
+défauts ; un profil de touches invalide revient au profil de base.
 
-| Clé | Type Android existant | Règle à préserver |
-| --- | --- | --- |
-| `theme` | Chaîne | `corvus`, `shield`, `asus` ; conserver les identifiants natifs `2`, `0`, `3` et le repli de `dark` vers `corvus` |
-| `audio` | Booléen | Défaut activé |
-| `keep_awake` | Booléen | Défaut activé |
-| `show_input` | Entier | `0` ou `1`, défaut activé ; ne pas le convertir implicitement en booléen |
-| `achievements_enabled` | Entier | `0` ou `1`, défaut désactivé |
-
-Ne pas renommer `games`, modifier les identités stables de contenu, déplacer
-les sauvegardes ou réinitialiser les options persistées par cœur. Les jetons
-et les succès en attente restent dans le stockage chiffré RetroAchievements,
-pas dans de nouvelles préférences en clair. Définir les nouvelles clés avec
-leur type, leur défaut et leur portée seulement lors de l'implémentation.
-
-Conserver la restauration par appui long des trois interrupteurs existants
-(son, veille, visibilité tactile). Un accès depuis le Menu rapide doit revenir
-au jeu suspendu et à la ligne précédente ; un accès depuis Réglages doit revenir
-à cette catégorie. Vérifier cette différence lors de tout changement d'étages.
-
-## Priorités d'implémentation
-
-1. **Rangement sans nouvelle préférence** : remplacer Affichage à l'écran par
-   Commandes, raccourcir le parcours tactile, conserver les clés et les retours ;
-   distinguer le compte global et les succès du jeu sans perdre les informations.
-2. **Actions batterie (lot livré)** : conserver Sauvegardes du jeu séparément
-   des états, avec traitement réel des fichiers, annulations et erreurs. Le
-   libellé Sous-système est harmonisé dans les écrans et la documentation.
-3. **Réglages courants** : filtres d'affichage des notifications, volume du jeu,
-   présentation et filtrage vidéo, opacité tactile. Introduire chaque contrôle
-   uniquement avec son comportement, sa persistance et une valeur par défaut.
-4. **Commandes avancées** : page réelle des manettes, affectation des touches,
-   puis taille et position tactiles avec restauration de la disposition.
-5. **Politiques de sauvegarde** : définir et tester copies bornées et états
-   automatiques avant de créer leur catégorie globale.
-
-Ne pas ajouter une catégorie Système : Informations, licences, chargement et
-téléchargement des cœurs ont déjà un emplacement dans le Menu principal.
-Bibliothèque et fichiers pourra devenir une catégorie seulement lorsqu'une
-préférence durable, telle qu'une règle de tri, sera implémentée. L'import de
-contenu, la sélection d'un dossier et l'ouverture d'un jeu restent des actions
-de bibliothèque, sans détour par les Réglages.
-
-Pour chaque lot de menus, vérifier navigation aller-retour, accès depuis les
-deux contextes, portrait et paysage, libellés sur petit écran, persistance après
-redémarrage, absence de cœur et capacités absentes. Les nouvelles fonctions
-de sauvegarde exigent en plus des vérifications de non-perte des données et
-de maintien du jeu chargé après erreur.
+Les trois interrupteurs historiques son, veille et visibilité tactile gardent
+la restauration par appui long. Les réglages globaux ne déplacent ni les jeux,
+ni leurs sauvegardes, ni les options persistées par cœur.

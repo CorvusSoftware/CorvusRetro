@@ -39,8 +39,10 @@ static int text_field;
 static bool text_ready, text_accepted;
 static pthread_mutex_t controller_mutex = PTHREAD_MUTEX_INITIALIZER;
 static cr_controller_device controller_devices[CR_CONTROLLER_DEVICE_CAP];
+static char controller_names[CR_CONTROLLER_DEVICE_CAP][128];
 static size_t controller_count;
 static bool controller_ready;
+static void string_copy(JNIEnv *, jstring, char *, size_t);
 static void wake_frontend(void) {
     pthread_mutex_lock(&import_mutex);
     if (import_looper) ALooper_wake(import_looper);
@@ -48,34 +50,47 @@ static void wake_frontend(void) {
 }
 
 JNIEXPORT void JNICALL Java_com_corvussoftware_corvusretro_MainActivity_controllerDevicesChanged(
-    JNIEnv *env, jclass cls, jintArray devices, jlongArray generations) {
+    JNIEnv *env, jclass cls, jintArray devices, jlongArray generations, jobjectArray names) {
     (void)cls;
-    if (!devices || !generations) return;
+    if (!devices || !generations || !names) return;
     jsize count = (*env)->GetArrayLength(env, devices);
     if (count < 0 || count > CR_CONTROLLER_DEVICE_CAP ||
-        (*env)->GetArrayLength(env, generations) != count) return;
+        (*env)->GetArrayLength(env, generations) != count ||
+        (*env)->GetArrayLength(env, names) != count) return;
     jint next[CR_CONTROLLER_DEVICE_CAP];
     jlong epochs[CR_CONTROLLER_DEVICE_CAP];
+    char descriptions[CR_CONTROLLER_DEVICE_CAP][128];
     if (count) (*env)->GetIntArrayRegion(env, devices, 0, count, next);
     if ((*env)->ExceptionCheck(env)) return;
     if (count) (*env)->GetLongArrayRegion(env, generations, 0, count, epochs);
     if ((*env)->ExceptionCheck(env)) return;
+    for (jsize i = 0; i < count; ++i) {
+        if (next[i] < 0 || epochs[i] <= 0) return;
+        jstring name = (jstring)(*env)->GetObjectArrayElement(env, names, i);
+        string_copy(env, name, descriptions[i], sizeof(descriptions[i]));
+        if (name) (*env)->DeleteLocalRef(env, name);
+        if ((*env)->ExceptionCheck(env)) return;
+        if (!descriptions[i][0]) snprintf(descriptions[i], sizeof(descriptions[i]), "Manette");
+    }
     pthread_mutex_lock(&controller_mutex);
     controller_count = (size_t)count;
     for (jsize i = 0; i < count; ++i) {
         controller_devices[i].id = next[i];
         controller_devices[i].generation = (uint64_t)epochs[i];
+        memcpy(controller_names[i], descriptions[i], sizeof(controller_names[i]));
     }
     controller_ready = true;
     pthread_mutex_unlock(&controller_mutex);
     wake_frontend();
 }
-bool cr_android_controller_devices(cr_controller_device devices[CR_CONTROLLER_DEVICE_CAP], size_t *count) {
+bool cr_android_controller_devices(cr_controller_device devices[CR_CONTROLLER_DEVICE_CAP],
+                                   char names[CR_CONTROLLER_DEVICE_CAP][128], size_t *count) {
     pthread_mutex_lock(&controller_mutex);
     bool ready = controller_ready;
     if (ready) {
         *count = controller_count;
         memcpy(devices, controller_devices, controller_count * sizeof(*devices));
+        memcpy(names, controller_names, controller_count * sizeof(*names));
         controller_ready = false;
     }
     pthread_mutex_unlock(&controller_mutex);
@@ -668,9 +683,16 @@ static void finish_save_transfer(void *context, uint64_t request) {
     (*p->env)->CallVoidMethod(p->env, p->app->activity->clazz, p->finish_save_transfer, (jlong)request);
     cr_android_clear_error(p);
 }
+static bool controller_info(void *context, unsigned port, char *name, size_t capacity) {
+    cr_android *p = context;
+    if (capacity) name[0] = 0;
+    if (port >= CR_CONTROLLER_PORT_COUNT || !p->controller_connected[port]) return false;
+    snprintf(name, capacity, "%s", p->controller_names[port]);
+    return true;
+}
 cr_platform cr_android_services(cr_android *p) {
     return (cr_platform){p, pref, set_pref, pick, finish, games, touch, credits,
                          appearance, quit, refresh_catalog, install_pack, install_pending,
                          achievement_request, achievement_credentials, save_achievement_credentials, edit_text,
-                         pick_folder, save_transfer, finish_save_transfer};
+                         pick_folder, save_transfer, finish_save_transfer, controller_info};
 }

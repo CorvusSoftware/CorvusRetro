@@ -23,6 +23,8 @@ typedef struct cr_engine {
     unsigned players;
     int system;
     bool loaded;
+    unsigned backup_count;
+    bool auto_state;
     int width, height, rate;
     double fps;
     uint32_t *pixels;
@@ -34,6 +36,7 @@ typedef struct cr_engine {
 
 /* All operations for an engine run on its owning frontend thread. */
 void cr_engine_init(cr_engine *engine, const char *root);
+void cr_engine_set_save_policy(cr_engine *engine, unsigned backup_count, bool auto_state);
 bool cr_game_id_valid(const char *id);
 bool cr_engine_select(cr_engine *engine, int system);
 bool cr_engine_core_info(const cr_engine *engine, corvus_core_info *out);
@@ -55,10 +58,16 @@ bool cr_engine_step_players(cr_engine *engine, const unsigned masks[2]);
 bool cr_engine_reset(cr_engine *engine);
 bool cr_engine_save_state(cr_engine *engine);
 bool cr_engine_load_state(cr_engine *engine);
+bool cr_engine_save_auto_state(cr_engine *engine);
+bool cr_engine_load_auto_state(cr_engine *engine);
+/* Filesystem query for opening the state menu, never the draw loop. */
+bool cr_engine_has_auto_state(cr_engine *engine);
 bool cr_engine_save_battery(cr_engine *engine);
 /* Fresh owner-thread snapshots; caller owns the bytes. No dirty acknowledgement. */
 size_t cr_engine_battery_size(const cr_engine *engine, unsigned player);
 bool cr_engine_export_battery(cr_engine *engine, unsigned player, uint8_t **bytes, size_t *size);
+bool cr_engine_export_backup(cr_engine *engine, unsigned player, unsigned index,
+                             uint8_t **bytes, size_t *size);
 /* Validates a fresh candidate before committing battery files and replacing the session. */
 bool cr_engine_import_battery(cr_engine *engine, unsigned player, const uint8_t *bytes, size_t size);
 /* Close only the content; the selected core and its callback context stay loaded. */

@@ -62,6 +62,7 @@ Les modules officiels sont disponibles pour **arm64-v8a** et **x86_64**.
 - **Câble link local :** deux jeux, écrans côte à côte, commandes et batteries séparées ; configuration visible tant que le cœur reste chargé.
 - **Historique et sauvegardes :** historique seul dans les listes de lecture, import/export batterie `.sav` et `.srm`, choix du joueur en câble link, états instantanés séparés selon le moteur.
 - **Gestion du contenu :** cœur compatible chargé avant le jeu ; fermer le contenu conserve le cœur chargé.
+- **Paramètres et sous-paramètres :** six catégories, notifications, vidéo, volume, commandes tactiles, manettes, copies de sécurité et états automatiques persistants.
 - **Thèmes :** CorvusRetro, NVIDIA Shield et ASUS.
 - **Cœurs téléchargeables :** installation et mise à jour indépendantes de l'application.
 - **RetroAchievements :** identification des jeux et suivi des succès dans le mode normal.
@@ -124,7 +125,7 @@ Ces commandes couvrent les tests natifs, les vérifications mémoire et le proje
 | [Commandes tactiles](docs/controls.md) | Boutons, gestes et orientation |
 | [Interface de jeu](docs/game-interface.md) | Profils par console et menu rapide |
 | [Sauvegardes du jeu](docs/save-files.md) | Import et export batterie `.sav` et `.srm` |
-| [Plan des réglages](docs/settings-plan.md) | Proposition de catégories et sous-réglages |
+| [Paramètres et sous-paramètres](docs/settings-plan.md) | Catégories, valeurs et fonctionnement |
 | [Menus du cœur](docs/core-menus.md) | Sous-systèmes, options et capacités actuelles |
 | [Téléchargement des cœurs](docs/individual-cores.md) | Modules natifs et installation |
 | [RetroAchievements](docs/retroachievements.md) | Compte, succès et limitations |
