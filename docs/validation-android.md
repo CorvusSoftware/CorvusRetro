@@ -125,7 +125,7 @@ un renommage atomique. Les tests reproduisent cette interdiction et les
 erreurs de synchronisation, y compris après publication du fichier.
 
 Les états groupés et les succès pendant le link sont indisponibles dans les
-modules officiels. Le link GBA reste expérimental. Aucun runtime ARM64,
+modules officiels. Aucun runtime ARM64,
 appareil physique ou compte RetroAchievements personnel n'est revendiqué.
 
 ## Distribution indépendante des cœurs
@@ -331,3 +331,27 @@ La [release v0.20.0](https://github.com/CorvusSoftware/CorvusRetro/releases/tag/
 est publiée par [41316487558](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41316487558).
 L'APK public retéléchargé est identique octet par octet au fichier qualifié,
 avec le SHA-256 ci-dessus.
+
+### Interface 0.21.0
+
+La référence de dimensions et d'ordre est RetroArch `b28b8a4`, consultée dans
+ses sources Android, son calcul DPI et son pilote tactile. L'implémentation
+CorvusRetro reste originale. Le thème MaterialUI n'est pas réintroduit.
+
+- 32 icônes originales partagent les mêmes indices C/Java dans l'atlas réservé.
+  L'icône APK fournie par l'utilisateur est conservée.
+- Les menus utilisent les proportions Android de référence, les métriques de
+  la police Android et les avances réelles du cache GL pour replier les textes.
+  Une ligne peut grandir ; dessin, toucher et défilement utilisent sa même hauteur.
+- Navigation à trois onglets, en bas en portrait et à droite en paysage ; les
+  marges Android restent appliquées. Le pied de page permanent est supprimé.
+- Le menu rapide regroupe états et batteries, puis options du cœur, commandes,
+  succès et informations. Les identifiants internes d'actions restent stables.
+- Les libellés GBA ne portent plus la mention expérimentale. Cela ne modifie
+  ni les moteurs distribués séparément ni le statut de l'ABI CorvusAPI.
+
+Preuves locales : 16 suites natives, 16 suites ASan/UBSan, démarrage sans cœur,
+compilation Android deux ABI, lint, tests JVM, base APK sans module et alignement
+16 Ko. Le test d'atlas a exécuté 100 contrôles de rasterisation, unicité et
+isolation sur l'émulateur Android. Les captures sont des artefacts de travail,
+pas des fichiers source. Aucun test sur téléphone physique n'est revendiqué.

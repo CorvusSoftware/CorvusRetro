@@ -28,7 +28,7 @@
 
 L'application propose une bibliothèque de jeux, des commandes tactiles, plusieurs thèmes, des sauvegardes et l'intégration RetroAchievements. **L'APK de base ne contient aucun moteur ni aucun jeu.**
 
-> **Version actuelle : 0.20.0 (préversion).** Les cœurs officiels sont distribués séparément en version 0.15.0. L'émulation GBA et l'ABI CorvusAPI 0 restent expérimentales.
+> **Version actuelle : 0.20.0 (préversion).** Les cœurs officiels sont distribués séparément en version 0.15.0. CorvusAPI 0 reste une ABI expérimentale.
 
 ## Installation
 
@@ -47,7 +47,7 @@ Le téléchargement installe un module natif vérifié dans le stockage privé d
 | :-- | :-- | :-- |
 | **CorvusGB** | Game Boy | Moteur natif |
 | **CorvusGBC** | Game Boy Color | Moteur natif |
-| **CorvusGBA** | Game Boy Advance | Expérimental |
+| **CorvusGBA** | Game Boy Advance | Moteur natif |
 
 Les modules officiels sont disponibles pour **arm64-v8a** et **x86_64**.
 

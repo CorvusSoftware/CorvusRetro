@@ -36,8 +36,8 @@ Fermer le contenu conserve le cœur, ses options et l'entrée de configuration.
 
 Les modules officiels ne proposent pas d'états instantanés groupés ni de
 lecture mémoire RetroAchievements pendant le link. Ces actions sont désactivées ;
-le compte et les succès en attente sont conservés. Le link GBA reste expérimental :
-les transferts synthétiques sont testés, sans garantie de compatibilité de chaque jeu.
+le compte et les succès en attente sont conservés. Les transferts GBA synthétiques sont testés, sans garantie de compatibilité
+de chaque jeu.
 
 Les extensions publiques optionnelles version 1 sont définies dans
 [CorvusAPI/CONFIGURATION.md](https://github.com/CorvusSoftware/CorvusAPI/blob/main/docs/CONFIGURATION.md).

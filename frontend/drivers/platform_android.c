@@ -79,9 +79,15 @@ static void command(struct android_app *app, int32_t cmd) {
     switch (cmd) {
     case APP_CMD_INIT_WINDOW:
         if (app->window) {
+            a->ui.font_advance = NULL;
+            a->ui.font_context = NULL;
             if (a->window)
                 cr_gl_destroy(&a->gl);
             a->window = cr_gl_init(&a->gl, &a->platform);
+            if (a->window) {
+                a->ui.font_advance = cr_gl_glyph_advance;
+                a->ui.font_context = &a->gl;
+            }
             a->last_draw = now();
             if (!a->window) {
                 cr_gl_destroy(&a->gl);
@@ -93,6 +99,8 @@ static void command(struct android_app *app, int32_t cmd) {
         break;
     case APP_CMD_TERM_WINDOW:
         a->ui.controller_capture = -1;
+        a->ui.font_advance = NULL;
+        a->ui.font_context = NULL;
         if (a->window)
             cr_gl_destroy(&a->gl);
         a->window = false;
@@ -315,6 +323,8 @@ void android_main(struct android_app *app) {
     a->applied_theme = -1;
 #ifndef NDEBUG
     unsigned last_players = ~0u, last_controlled = ~0u;
+    float last_width = -1, last_height = -1, last_scroll = -1;
+    int last_focus = -1, layout_page = -1, layout_quick = -1;
     int last_page = -1, last_core = -2, last_content = -1, last_quick = -1, last_theme = -1,
         last_active = -1, last_show_input = -1, last_installing = -1;
 #endif
@@ -396,6 +406,20 @@ void android_main(struct android_app *app) {
             last_players = a->ui.engine.players;
             last_controlled = a->ui.input_player;
         }
+        float menu_scroll = a->ui.quick ? a->ui.quick_scroll : a->ui.scroll;
+        if (last_width != a->ui.width || last_height != a->ui.height || last_scroll != menu_scroll ||
+            last_focus != a->ui.focus || layout_page != a->ui.page || layout_quick != a->ui.quick) {
+            cr_menu_layout m = cr_menu_layout_make(a->ui.width, a->ui.height, a->ui.pixel_density,
+                a->ui.display_width, a->ui.display_height, a->ui.menu_dpi,
+                a->ui.font_line_ratio, a->ui.font_ascent_ratio, a->ui.font_glyph_ratio);
+            cr_area row = cr_ui_row_area(&a->ui, a->ui.focus);
+            __android_log_print(ANDROID_LOG_DEBUG, "CorvusRetro",
+                "menu_layout width=%g height=%g header=%g bottom=%g content_width=%g nav=%g side=%d focus=%d row_y=%g row_h=%g label=%g hint=%g icon=%g",
+                m.width, m.height, m.header, m.body_bottom, m.content_width, m.nav_size, m.side_nav,
+                a->ui.focus, row.y, row.h, m.label_font, m.hint_font, m.icon);
+            last_width = a->ui.width; last_height = a->ui.height; last_scroll = menu_scroll;
+            last_focus = a->ui.focus; layout_page = a->ui.page; layout_quick = a->ui.quick;
+        }
 #endif
         if (running != a->was_running) {
             if (!running) {
@@ -440,13 +464,23 @@ void android_main(struct android_app *app) {
         if (a->window && a->resumed) {
             cr_gl_set_smoothing(&a->gl, a->ui.video_smooth);
             cr_gl_begin(&a->gl, cr_theme_get(a->ui.theme)->system_bar);
+            a->ui.pixel_density = a->gl.density;
+            a->ui.display_width = a->gl.full_width;
+            a->ui.display_height = a->gl.full_height;
+            a->ui.menu_dpi = a->gl.menu_dpi;
+            a->ui.font_line_ratio = a->gl.font_line_ratio;
+            a->ui.font_ascent_ratio = a->gl.font_ascent_ratio;
+            a->ui.font_glyph_ratio = a->gl.font_glyph_ratio;
+            a->ui.font_advance = cr_gl_glyph_advance;
+            a->ui.font_context = &a->gl;
             if (fabsf(a->ui.width - a->gl.width) > .1f || fabsf(a->ui.height - a->gl.height) > .1f)
                 cr_ui_size(&a->ui, a->gl.width, a->gl.height);
-            a->ui.pixel_density = a->gl.density;
             cr_ui_update(&a->ui, time - a->last_draw);
             cr_painter painter = cr_gl_painter(&a->gl);
             cr_ui_draw(&a->ui, &painter);
             if (!cr_gl_end(&a->gl)) {
+                a->ui.font_advance = NULL;
+                a->ui.font_context = NULL;
                 cr_gl_destroy(&a->gl);
                 a->window = false;
                 cr_audio_pause(&a->audio);
@@ -455,6 +489,8 @@ void android_main(struct android_app *app) {
         }
     }
     cr_audio_destroy(&a->audio);
+    a->ui.font_advance = NULL;
+    a->ui.font_context = NULL;
     cr_ui_destroy(&a->ui);
     if (a->window)
         cr_gl_destroy(&a->gl);

@@ -24,6 +24,7 @@ typedef struct {
     GLint dimensions, mode;
     int full_width, full_height, left, top, pixel_width, pixel_height, game_width, game_height;
     float width, height, density;
+    float menu_dpi, font_line_ratio, font_ascent_ratio, font_glyph_ratio;
     bool smoothing;
     GLint game_filter;
     cr_vertex vertices[12288];
@@ -39,4 +40,5 @@ void cr_gl_destroy(cr_gl *);
 void cr_gl_begin(cr_gl *, uint32_t system_bar);
 bool cr_gl_end(cr_gl *);
 cr_painter cr_gl_painter(cr_gl *);
+float cr_gl_glyph_advance(void *context, uint32_t codepoint, float font_size);
 #endif

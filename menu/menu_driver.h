@@ -10,6 +10,8 @@
 #include "cheevos.h"
 #include "notifications.h"
 #include "controller_ports.h"
+#include "menu_layout.h"
+#include "play_layout.h"
 enum {
     CR_MAIN,
     CR_LISTS,
@@ -98,6 +100,10 @@ typedef struct {
     int notify_cards, notify_progress, backup_count, auto_state, editing_setting;
     int controller_bindings[10], controller_capture;
     float pixel_density;
+    float display_width, display_height, menu_dpi;
+    float font_line_ratio, font_ascent_ratio, font_glyph_ratio;
+    cr_menu_glyph_advance font_advance;
+    void *font_context;
     bool auto_state_available;
     unsigned backup_available;
     unsigned input_player;
@@ -151,4 +157,7 @@ void cr_ui_text_result(cr_ui *, int, const char *, bool);
 void cr_ui_achievement_frame(cr_ui *);
 void cr_ui_update(cr_ui *, double);
 bool cr_ui_controller_key(cr_ui *, int);
+int cr_ui_quick_row(const cr_ui *, int action);
+cr_area cr_ui_row_area(const cr_ui *, int row);
+cr_area cr_ui_tab_area(const cr_ui *, int tab);
 #endif

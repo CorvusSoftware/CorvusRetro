@@ -2,6 +2,8 @@
 // Copyright (C) 2026 CorvusSoftware
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "menu_driver.h"
+#include "menu_layout.h"
+#include <math.h>
 #include "viewport.h"
 #include "play_layout.h"
 #include <stdio.h>
@@ -36,6 +38,21 @@ static void tap(cr_ui *u, float x, float y) {
     cr_ui_touch(u, 0, CR_TOUCH_DOWN, x, y);
     cr_ui_touch(u, 0, CR_TOUCH_UP, x, y);
 }
+static void row(cr_ui *u, int index) {
+    cr_area area = cr_ui_row_area(u, index);
+    check(area.w > 0 && area.h > 0, "menu row has a valid hit target");
+    tap(u, area.x + area.w / 2, area.y + area.h / 2);
+}
+static cr_menu_layout menu_layout(const cr_ui *u) {
+    return cr_menu_layout_make(u->width, u->height, u->pixel_density,
+        u->display_width, u->display_height, u->menu_dpi,
+        u->font_line_ratio, u->font_ascent_ratio, u->font_glyph_ratio);
+}
+static bool focused_row_visible(const cr_ui *u) {
+    cr_area area = cr_ui_row_area(u, u->focus);
+    cr_menu_layout layout = menu_layout(u);
+    return area.y >= layout.body_top - .02f && area.y + area.h <= layout.body_bottom + .02f;
+}
 static int fixture_reset(void *handle) { (void)handle; return 1; }
 static size_t fixture_state_size(void *handle) { (void)handle; return 1; }
 static int fixture_serialize(void *handle, uint8_t *out, size_t size) {
@@ -67,21 +84,23 @@ int main(void) {
               cr_theme_at(1) == CR_THEME_SHIELD && cr_theme_at(2) == CR_THEME_ASUS &&
               cr_theme_at(3) == CR_THEME_CORVUS,
           "three active themes only");
-    tap(&u, 100, 100);
+    row(&u, 0);
     check(u.page == CR_CORES, "touch opens native core list");
     cr_ui_move(&u, 1);
     cr_ui_confirm(&u);
     check(u.page == CR_MAIN && u.engine.system == 1 && u.engine.handle,
           "controller selects real idle GBC");
-    tap(&u, 100, 100);
+    row(&u, 0);
     check(!u.engine.handle, "native unload releases engine");
-    cr_ui_touch(&u, 0, CR_TOUCH_DOWN, 100, 100);
-    cr_ui_touch(&u, 0, CR_TOUCH_MOVE, 100, 150);
-    cr_ui_touch(&u, 0, CR_TOUCH_UP, 100, 150);
+    cr_area target = cr_ui_row_area(&u, 0);
+    float row_x = target.x + target.w / 2, row_y = target.y + target.h / 2;
+    cr_ui_touch(&u, 0, CR_TOUCH_DOWN, row_x, row_y);
+    cr_ui_touch(&u, 0, CR_TOUCH_MOVE, row_x, row_y + 50);
+    cr_ui_touch(&u, 0, CR_TOUCH_UP, row_x, row_y + 50);
     check(u.page == CR_MAIN, "drag does not activate row");
-    tap(&u, 100, 170);
+    row(&u, 1);
     check(u.page == CR_CONTENT, "content page offers library and direct import");
-    tap(&u, 100, 100);
+    row(&u, 0);
     check(picked == -1 && !u.importing && strstr(u.message, "Chargez un cœur"),
           "installed modules alone cannot open the content picker");
     cr_import late = {.system = 0, .title = "Original.gb", .path = "/missing/original.gb"};
@@ -110,29 +129,30 @@ int main(void) {
     free(u.games); u.games = NULL; u.game_count = 0;
     check(cr_engine_close(&u.engine), "release incompatible core");
     u.page = CR_MAIN;
-    tap(&u, 100, 100); tap(&u, 100, 100);
-    tap(&u, 100, 170);
+    row(&u, 0); row(&u, 0);
+    row(&u, 1);
     check(u.page == CR_CONTENT, "content page retains loaded core");
-    tap(&u, 100, 100);
+    row(&u, 0);
     check(picked == 0 && u.importing, "content picker dispatched to platform");
     cr_import cancel = {.system = -1};
     cr_ui_import(&u, &cancel);
     check(!u.importing, "cancel releases importer");
     check(cr_engine_close(&u.engine), "release core before input-only fixtures");
-    tap(&u, 330, 670);
+    cr_area settings = cr_ui_tab_area(&u, 2);
+    tap(&u, settings.x + settings.w / 2, settings.y + settings.h / 2);
     check(u.page == CR_SETTINGS, "native bottom tab");
-    tap(&u, 100, 100);
+    row(&u, 0);
     check(u.page == CR_UI_SETTINGS, "interface settings category");
-    tap(&u, 100, 100);
+    row(&u, 0);
     check(u.page == CR_THEMES, "native theme list");
-    tap(&u, 100, 176);
+    row(&u, 1);
     check(theme == CR_THEME_SHIELD && u.theme == CR_THEME_SHIELD && u.page == CR_UI_SETTINGS,
           "Shield selection remains stable");
-    tap(&u, 100, 100);
-    tap(&u, 100, 252);
+    row(&u, 0);
+    row(&u, 2);
     check(theme == CR_THEME_ASUS && u.theme == CR_THEME_ASUS, "ASUS is selectable and saved");
-    tap(&u, 100, 100);
-    tap(&u, 100, 100);
+    row(&u, 0);
+    row(&u, 0);
     check(theme == CR_THEME_CORVUS && u.theme == CR_THEME_CORVUS, "Corvus is selectable and saved");
     cr_ui_back(&u);
     check(u.page == CR_SETTINGS, "back restores settings root");
@@ -174,29 +194,32 @@ int main(void) {
     check(!u.quick && cr_ui_running(&u), "back resumes native loop");
     cr_ui_size(&u, 700, 300);
     cr_ui_back(&u);
-    for (int i = 0; i < CR_QUICK_ACHIEVEMENTS; i++)
-        cr_ui_move(&u, 1);
-    check(u.focus == CR_QUICK_ACHIEVEMENTS && u.quick_scroll >= 6 * 76 - (300 - 100 - 64),
+    int achievements_row = cr_ui_quick_row(&u, CR_QUICK_ACHIEVEMENTS);
+    for (int i = 0; i < achievements_row; i++) cr_ui_move(&u, 1);
+    check(u.focus == achievements_row && u.quick_scroll > 0 && focused_row_visible(&u),
           "quick menu controller focus stays visible in landscape");
     cr_ui_size(&u, 384, 700);
-    check(u.quick_scroll <= CR_QUICK_COUNT * 76 - (700 - 100 - 64) &&
-              u.focus * 76 >= u.quick_scroll && u.focus * 76 + 76 <= u.quick_scroll + 700 - 100 - 64,
+    cr_menu_layout portrait = menu_layout(&u);
+    cr_area first = cr_ui_row_area(&u, 0), last = cr_ui_row_area(&u, cr_ui_quick_row(&u, CR_QUICK_MAIN));
+    float content_height = last.y + last.h - first.y;
+    float maximum_scroll = fmaxf(0, content_height - (portrait.body_bottom - portrait.body_top));
+    check(u.quick_scroll >= 0 && u.quick_scroll <= maximum_scroll + .02f && focused_row_visible(&u),
           "quick menu scroll clamps on rotation while keeping the focused row visible");
-    u.focus = CR_QUICK_STATES;
+    u.focus = cr_ui_quick_row(&u, CR_QUICK_STATES);
     cr_ui_confirm(&u);
     check(u.page == CR_SAVESTATES && !u.quick && !cr_ui_running(&u),
           "supported state actions open their own paused submenu");
     cr_ui_back(&u);
-    check(u.page == CR_PLAY && u.quick && u.focus == CR_QUICK_STATES && u.depth == 0,
+    check(u.page == CR_PLAY && u.quick && u.focus == cr_ui_quick_row(&u, CR_QUICK_STATES) && u.depth == 0,
           "state submenu back restores the quick-menu selection");
     cr_ui_size(&u, 700, 300);
-    u.focus = CR_QUICK_CORE_INFO;
+    u.focus = cr_ui_quick_row(&u, CR_QUICK_CORE_INFO);
     cr_ui_move(&u, 0);
     float quick_scroll = u.quick_scroll;
     cr_ui_confirm(&u);
     check(u.page == CR_CORE_INFO && !cr_ui_running(&u), "quick core information stays paused");
     cr_ui_back(&u);
-    check(u.quick && u.focus == CR_QUICK_CORE_INFO && u.quick_scroll == quick_scroll,
+    check(u.quick && u.focus == cr_ui_quick_row(&u, CR_QUICK_CORE_INFO) && u.quick_scroll == quick_scroll,
           "core information back restores landscape focus and scroll");
     cr_ui_touch(&u, 0, CR_TOUCH_DOWN, 350, 150);
     cr_ui_touch(&u, 0, CR_TOUCH_MOVE, 350, 220);
@@ -206,13 +229,13 @@ int main(void) {
     cr_play_layout layout = cr_play_layout_make(u.width, u.height, 2, 0, 0);
     tap(&u, layout.menu.x + layout.menu.w / 2, layout.menu.y + layout.menu.h / 2);
     check(u.quick, "landscape menu hit follows the gutter layout");
-    u.focus = CR_QUICK_MAIN;
+    u.focus = cr_ui_quick_row(&u, CR_QUICK_MAIN);
     cr_ui_confirm(&u);
     check(u.page == CR_MAIN && !u.quick && u.engine.loaded && !cr_ui_running(&u),
           "quick main-menu action preserves paused content");
     cr_ui_confirm(&u);
     check(u.page == CR_PLAY && u.quick, "main menu reopens the quick menu");
-    u.focus = CR_QUICK_RESUME;
+    u.focus = cr_ui_quick_row(&u, CR_QUICK_RESUME);
     cr_ui_confirm(&u);
     check(cr_ui_running(&u) && cr_ui_input(&u) == 0, "explicit resume releases menu input");
     // Detach the opaque input-only fixture before normal engine teardown.

@@ -128,6 +128,33 @@ static void apply_setting(cr_ui *u, int id, int value) {
         cr_engine_set_save_policy(&u->engine, (unsigned)u->backup_count, u->auto_state != 0);
 }
 static const char *binding_labels[10] = {"Haut", "Bas", "Gauche", "Droite", "A", "B", "Start", "Select", "L", "R"};
+static const int quick_order[CR_QUICK_COUNT] = {
+    CR_QUICK_RESUME, CR_QUICK_RESTART, CR_QUICK_CLOSE, CR_QUICK_STATES,
+    CR_QUICK_GAME_SAVES, CR_QUICK_CORE_OPTIONS, CR_QUICK_CONTROLS, CR_QUICK_PLAYER,
+    CR_QUICK_ACHIEVEMENTS, CR_QUICK_CORE_INFO, CR_QUICK_MAIN
+};
+int cr_ui_quick_row(const cr_ui *u, int action) {
+    int row = 0;
+    for (int i = 0; i < CR_QUICK_COUNT; ++i) {
+        if (quick_order[i] == CR_QUICK_PLAYER && u->engine.players < 2) continue;
+        if (quick_order[i] == action) return row;
+        ++row;
+    }
+    return -1;
+}
+static int quick_at(const cr_ui *u, int row) {
+    for (int i = 0; i < CR_QUICK_COUNT; ++i) {
+        if (quick_order[i] == CR_QUICK_PLAYER && u->engine.players < 2) continue;
+        if (!row--) return quick_order[i];
+    }
+    return CR_QUICK_RESUME;
+}
+static int setting_icon(int id) {
+    static const int icons[SET_COUNT] = {CR_ICON_VOLUME, CR_ICON_DISPLAY, CR_ICON_VIDEO,
+        CR_ICON_TOUCH, CR_ICON_TOUCH, CR_ICON_TOUCH, CR_ICON_NOTIFICATIONS,
+        CR_ICON_NOTIFICATIONS, CR_ICON_BACKUP, CR_ICON_SAVES};
+    return icons[id];
+}
 static void quick_action(cr_ui *u, int action);
 static void quick_clamp(cr_ui *u);
 static void finish_save_transfer(cr_ui *u);
@@ -174,8 +201,12 @@ static void press_controls(cr_ui *u, unsigned mask) {
         if (mask & (1u << i))
             u->control_feedback[i] = 1;
 }
-static float body_bottom(const cr_ui *u) {
-    return u->height - 100;
+static cr_menu_layout menu_layout(const cr_ui *u) {
+    cr_menu_layout m = cr_menu_layout_make(u->width, u->height, u->pixel_density,
+        u->display_width, u->display_height, u->menu_dpi,
+        u->font_line_ratio, u->font_ascent_ratio, u->font_glyph_ratio);
+    m.glyph_advance = u->font_advance; m.glyph_context = u->font_context;
+    return m;
 }
 static int rows(const cr_ui *u) {
     if (u->quick) return CR_QUICK_COUNT - (u->engine.players > 1 ? 0 : 1);
@@ -249,7 +280,7 @@ static row get_row(const cr_ui *u, int index) {
     row r;
     fill(&r, "", "", CR_ICON_FILE, ACT_NONE, 0);
     if (u->quick) {
-        if (u->engine.players < 2 && index >= CR_QUICK_PLAYER) ++index;
+        index = quick_at(u, index);
         static const char *labels[CR_QUICK_COUNT] = {
             "Reprendre le contenu", "Redémarrer le contenu", "Fermer le contenu",
             "Sauvegardes d’état", "Options du cœur", "Commandes", "Succès", "Informations sur le cœur",
@@ -262,8 +293,9 @@ static row get_row(const cr_ui *u, int index) {
             "Choisir le joueur du tactile et du clavier", "Importer ou exporter la mémoire batterie (.sav / .srm)"
         };
         static const int icons[CR_QUICK_COUNT] = {
-            CR_ICON_CONTENT, CR_ICON_CONTENT, CR_ICON_UNLOAD, CR_ICON_FILE,
-            CR_ICON_CORE, CR_ICON_SETTINGS, CR_ICON_INFO, CR_ICON_CORE, CR_ICON_HOME, CR_ICON_CONTENT, CR_ICON_FILE
+            CR_ICON_PLAY, CR_ICON_RESTART, CR_ICON_CLOSE, CR_ICON_SAVES,
+            CR_ICON_CORE, CR_ICON_INPUT, CR_ICON_ACHIEVEMENTS, CR_ICON_INFO,
+            CR_ICON_HOME, CR_ICON_INPUT, CR_ICON_SAVES
         };
         fill(&r, labels[index], hints[index], icons[index], ACT_QUICK_ACTION, index);
         r.disabled = (index == CR_QUICK_RESTART && !cr_engine_can_reset(&u->engine)) ||
@@ -292,7 +324,7 @@ static row get_row(const cr_ui *u, int index) {
         corvus_subsystem_info subsystem;
         if (cr_engine_subsystem(&u->engine, (size_t)index, &subsystem)) {
             fill(&r, subsystem.label, "Configurer les contenus et les joueurs",
-                 CR_ICON_CORE, ACT_SUBSYSTEM, index);
+                 CR_ICON_SUBSYSTEM, ACT_SUBSYSTEM, index);
             r.disabled = subsystem.game_count != 2 || subsystem.num_players != 2;
             if (r.disabled) snprintf(r.hint, sizeof(r.hint), "Configuration non prise en charge");
         }
@@ -301,17 +333,17 @@ static row get_row(const cr_ui *u, int index) {
         if (selected_subsystem(u, &subsystem)) {
             if (index < 2)
                 fill(&r, subsystem.games[index].label, u->link_ids[index][0] ? u->link_titles[index] :
-                     "Choisir un contenu", CR_ICON_CONTENT, ACT_SUBSYSTEM_SLOT, index);
+                     "Choisir un contenu", CR_ICON_INPUT, ACT_SUBSYSTEM_SLOT, index);
             else {
                 fill(&r, "Démarrer les contenus", "Lancer les deux consoles reliées",
-                     CR_ICON_CONTENT, ACT_SUBSYSTEM_START, 0);
+                     CR_ICON_PLAY, ACT_SUBSYSTEM_START, 0);
                 r.disabled = !u->link_ids[0][0] || !u->link_ids[1][0];
             }
         }
     } else if (u->page == CR_SUBSYSTEM_CONTENTS) {
         if (!index) {
             fill(&r, "Importer un contenu", "Ouvrir un fichier compatible avec le cœur",
-                 CR_ICON_CONTENT, ACT_SUBSYSTEM_IMPORT, 0);
+                 CR_ICON_FOLDER, ACT_SUBSYSTEM_IMPORT, 0);
         } else {
             int n = 1;
             for (size_t i = 0; i < u->game_count; ++i)
@@ -327,7 +359,7 @@ static row get_row(const cr_ui *u, int index) {
             fill(&r, "Joueur de la sauvegarde", u->save_player ? "Joueur 2" : "Joueur 1",
                  CR_ICON_CONTENT, ACT_SAVE_PLAYER, 0);
         } else if (index - (u->engine.players > 1) == 3) {
-            fill(&r, "Copies de secours", "Exporter une batterie avant import", CR_ICON_FILE, ACT_BACKUP_MENU, 0);
+            fill(&r, "Copies de secours", "Exporter une batterie avant import", CR_ICON_BACKUP, ACT_BACKUP_MENU, 0);
         } else {
             int operation = index - (u->engine.players > 1);
             static const char *labels[] = {"Importer une sauvegarde", "Exporter en .sav", "Exporter en .srm"};
@@ -340,7 +372,7 @@ static row get_row(const cr_ui *u, int index) {
         char label[64]; snprintf(label, sizeof(label), "Copie de secours %d", index + 1);
         bool available = (u->backup_available & (1u << index)) != 0;
         fill(&r, label, available ? "Exporter en .sav" : "Absente ou illisible pour ce joueur",
-             CR_ICON_FILE, ACT_EXPORT_BACKUP, index);
+             CR_ICON_BACKUP, ACT_EXPORT_BACKUP, index);
         r.disabled = !available;
     } else if (u->page == CR_SAVE_CONFIRM) {
         fill(&r, index ? "Annuler" : "Importer et redémarrer le contenu",
@@ -368,7 +400,7 @@ static row get_row(const cr_ui *u, int index) {
                  CR_ICON_CONTENT, ACT_PAGE, CR_CONTENT);
         if (u->engine.handle && index == n++)
             fill(&r, "Sous-système", "Sous-systèmes du cœur chargé",
-                 CR_ICON_CORE, ACT_PAGE, CR_SUBSYSTEMS);
+                 CR_ICON_SUBSYSTEM, ACT_PAGE, CR_SUBSYSTEMS);
         if (index == n)
             fill(&r, "Informations", "Application, cœur et licences", CR_ICON_INFO, ACT_PAGE,
                  CR_INFORMATION);
@@ -387,7 +419,7 @@ static row get_row(const cr_ui *u, int index) {
             fill(&r, "Importer un dossier", u->import_folder ? "Importation du dossier en cours..." :
                  (u->engine.handle ? "Importer les jeux compatibles avec le cœur chargé" :
                                     "Chargez un cœur pour importer un dossier"),
-                 CR_ICON_CONTENT, ACT_FOLDER, 0);
+                 CR_ICON_FOLDER, ACT_FOLDER, 0);
             r.disabled = !u->engine.handle || u->importing;
         } else if ((size_t)(index - 1) < u->game_count) {
             const cr_game *game = &u->games[index - 1];
@@ -398,11 +430,9 @@ static row get_row(const cr_ui *u, int index) {
     } else if (u->page == CR_CORES) {
         if (index == (int)cr_registry_count()) {
             fill(&r, "Téléchargeur de cœurs", "Catalogue officiel CorvusSoftware",
-                 CR_ICON_CORE, ACT_OPEN_DOWNLOADER, 0);
+                 CR_ICON_DOWNLOAD, ACT_OPEN_DOWNLOADER, 0);
         } else {
             fill(&r, core_name(index), system_name(index), CR_ICON_CORE, ACT_SELECT, index);
-            if (strcmp(cr_registry_get(index)->id, "corvus.gba") == 0)
-                snprintf(r.hint, sizeof(r.hint), "%s · Expérimental", system_name(index));
             r.checked = u->engine.handle && u->engine.system == index;
         }
     } else if (u->page == CR_CORE_DOWNLOADS) {
@@ -411,7 +441,7 @@ static row get_row(const cr_ui *u, int index) {
                  u->catalog_loading ? "Récupération en cours..." :
                  (u->core_catalog.error[0] ? u->core_catalog.error :
                   "Rechercher les cœurs CorvusSoftware"),
-                 CR_ICON_CORE, ACT_REFRESH_CATALOG, 0);
+                 CR_ICON_DOWNLOAD, ACT_REFRESH_CATALOG, 0);
         } else {
             const cr_core_pack *pack = &u->core_catalog.packs[index - 1];
             const cr_core_descriptor *installed = cr_registry_get(cr_registry_find(pack->core_id));
@@ -427,10 +457,11 @@ static row get_row(const cr_ui *u, int index) {
         const char *hints[] = {"Thèmes et notifications", "Présentation de l'image", "Son et volume du jeu",
                               "Tactile et manettes", "Copies et états automatiques", "Activation et compte"};
         const int pages[] = {CR_UI_SETTINGS, CR_VIDEO_SETTINGS, CR_AUDIO_SETTINGS, CR_OSD_SETTINGS, CR_SAVE_SETTINGS, CR_RA_SETTINGS};
-        fill(&r, labels[index], hints[index], CR_ICON_SETTINGS, ACT_PAGE, pages[index]);
+        const int icons[] = {CR_ICON_DISPLAY, CR_ICON_VIDEO, CR_ICON_AUDIO, CR_ICON_INPUT, CR_ICON_SAVES, CR_ICON_ACHIEVEMENTS};
+        fill(&r, labels[index], hints[index], icons[index], ACT_PAGE, pages[index]);
     } else if (u->page == CR_RA_SETTINGS) {
         fill(&r, index ? "Compte" : "Activer RetroAchievements", index ? "Connexion et état du compte" :
-             "Mode normal", CR_ICON_SETTINGS, index ? ACT_PAGE : ACT_RA_ENABLE, CR_RA_ACCOUNT);
+             "Mode normal", CR_ICON_ACCOUNT, index ? ACT_PAGE : ACT_RA_ENABLE, CR_RA_ACCOUNT);
         if (!index) { r.toggle = true; r.checked = u->ra_enabled; }
     } else if (u->page == CR_ACHIEVEMENTS || u->page == CR_RA_ACCOUNT) {
         index += u->page == CR_RA_ACCOUNT ? 1 : 4;
@@ -438,13 +469,13 @@ static row get_row(const cr_ui *u, int index) {
         cr_cheevos_get_status(u->achievements, &status);
         if (index == 1) {
             const char *user = status.connected ? status.username : (u->ra_editing == 1 ? u->ra_preview : u->ra_username);
-            fill(&r, "Identifiant", user[0] ? user : "Saisir le nom du compte", CR_ICON_INFO, status.connected || status.pending ? ACT_NONE : ACT_RA_USER, 0);
+            fill(&r, "Identifiant", user[0] ? user : "Saisir le nom du compte", CR_ICON_ACCOUNT, status.connected || status.pending ? ACT_NONE : ACT_RA_USER, 0);
         } else if (index == 2) {
             fill(&r, "Mot de passe", u->ra_password[0] || (u->ra_editing == 2 && u->ra_preview[0])
-                    ? "Saisi, jamais enregistré" : "Saisir avec le clavier Android", CR_ICON_INFO, status.connected || status.pending ? ACT_NONE : ACT_RA_PASSWORD, 0);
+                    ? "Saisi, jamais enregistré" : "Saisir avec le clavier Android", CR_ICON_ACCOUNT, status.connected || status.pending ? ACT_NONE : ACT_RA_PASSWORD, 0);
         } else if (index == 3) {
             fill(&r, status.connected ? "Se déconnecter" : "Se connecter", status.pending ? "Connexion en cours..." :
-                    "Le jeton de session est chiffré sur cet appareil", CR_ICON_INFO, ACT_RA_CONNECT, 0);
+                    "Le jeton de session est chiffré sur cet appareil", CR_ICON_ACCOUNT, ACT_RA_CONNECT, 0);
         } else if (index == 4) {
             fill(&r, "État", u->engine.players > 1 ? "Succès indisponibles en liaison locale" :
                  (status.message[0] ? status.message : "Connectez votre compte pour activer les succès"), CR_ICON_INFO, ACT_NONE, 0);
@@ -458,57 +489,57 @@ static row get_row(const cr_ui *u, int index) {
                 char hint[256];
                 snprintf(hint, sizeof(hint), "%s, %u points - %.180s", achievement.unlocked ? "Déverrouillé" : "Verrouillé",
                          achievement.points, achievement.description);
-                fill(&r, achievement.title, hint, CR_ICON_INFO, ACT_NONE, 0);
+                fill(&r, achievement.title, hint, CR_ICON_ACHIEVEMENTS, ACT_NONE, 0);
                 r.checked = achievement.unlocked;
             }
         }
     } else if (u->page == CR_UI_SETTINGS) {
         fill(&r, index ? "Notifications" : "Thèmes", index ? "Cartes et progression des succès" : cr_theme_get(u->theme)->name,
-             index ? CR_ICON_SETTINGS : CR_ICON_THEME, index ? ACT_PAGE : ACT_THEME, CR_NOTIFICATIONS_SETTINGS);
+             index ? CR_ICON_NOTIFICATIONS : CR_ICON_THEME, index ? ACT_PAGE : ACT_THEME, CR_NOTIFICATIONS_SETTINGS);
     } else if (u->page == CR_NOTIFICATIONS_SETTINGS) {
         int id = index ? SET_PROGRESS : SET_CARDS;
-        fill(&r, settings[id].label, "Affichage dans le jeu", CR_ICON_SETTINGS, ACT_SETTING_TOGGLE, id);
+        fill(&r, settings[id].label, "Affichage dans le jeu", CR_ICON_NOTIFICATIONS, ACT_SETTING_TOGGLE, id);
         r.toggle = true; r.checked = setting_get(u, id) != 0;
     } else if (u->page == CR_VIDEO_SETTINGS && !index) {
-        fill(&r, "Garder l’écran allumé", "Empêcher la veille pendant le jeu", CR_ICON_SETTINGS, ACT_AWAKE, 0);
+        fill(&r, "Garder l’écran allumé", "Empêcher la veille pendant le jeu", CR_ICON_DISPLAY, ACT_AWAKE, 0);
         r.toggle = true; r.checked = u->awake;
     } else if (u->page == CR_AUDIO_SETTINGS && !index) {
-        fill(&r, "Activer le son", "Sortie audio pendant le jeu", CR_ICON_SETTINGS, ACT_AUDIO, 0);
+        fill(&r, "Activer le son", "Sortie audio pendant le jeu", CR_ICON_AUDIO, ACT_AUDIO, 0);
         r.toggle = true; r.checked = u->audio;
     } else if (u->page == CR_OSD_SETTINGS) {
         fill(&r, index ? "Manettes" : "Commandes tactiles", index ? "Appareils et affectation des touches" :
-             "Visibilité, opacité et disposition", CR_ICON_SETTINGS, ACT_PAGE,
+             "Visibilité, opacité et disposition", index ? CR_ICON_INPUT : CR_ICON_TOUCH, ACT_PAGE,
              index ? CR_CONTROLLER_SETTINGS : CR_OVERLAY_SETTINGS);
     } else if (u->page == CR_OVERLAY_SETTINGS && !index) {
-        fill(&r, "Afficher les commandes", "Commandes tactiles pendant le jeu", CR_ICON_SETTINGS, ACT_SHOW_INPUT, 0);
+        fill(&r, "Afficher les commandes", "Commandes tactiles pendant le jeu", CR_ICON_TOUCH, ACT_SHOW_INPUT, 0);
         r.toggle = true; r.checked = u->show_input;
     } else if (u->page == CR_OVERLAY_SETTINGS && index == 2) {
-        fill(&r, "Taille et position", "Ajuster ou rétablir la disposition", CR_ICON_SETTINGS, ACT_PAGE, CR_OVERLAY_LAYOUT);
+        fill(&r, "Taille et position", "Ajuster ou rétablir la disposition", CR_ICON_TOUCH, ACT_PAGE, CR_OVERLAY_LAYOUT);
     } else if (u->page == CR_OVERLAY_LAYOUT && index == 2) {
-        fill(&r, "Rétablir la disposition", "Taille et position automatiques", CR_ICON_SETTINGS, ACT_LAYOUT_RESET, 0);
+        fill(&r, "Rétablir la disposition", "Taille et position automatiques", CR_ICON_RESTORE, ACT_LAYOUT_RESET, 0);
     } else if (u->page == CR_CONTROLLER_SETTINGS) {
         char name[192] = {0};
         if (index < 2) {
             char label[64]; snprintf(label, sizeof(label), "Port du joueur %d", index + 1);
             bool connected = u->platform.controller_info &&
                 u->platform.controller_info(u->platform.context, (unsigned)index, name, sizeof(name));
-            fill(&r, label, connected ? name : "Aucune manette connectée", CR_ICON_CONTENT, ACT_NONE, 0);
-        } else fill(&r, "Affectation des touches", "Profil commun aux manettes", CR_ICON_SETTINGS, ACT_PAGE, CR_CONTROLLER_BINDINGS);
+            fill(&r, label, connected ? name : "Aucune manette connectée", CR_ICON_INPUT, ACT_NONE, 0);
+        } else fill(&r, "Affectation des touches", "Profil commun aux manettes", CR_ICON_INPUT, ACT_PAGE, CR_CONTROLLER_BINDINGS);
     } else if (u->page == CR_CONTROLLER_BINDINGS) {
-        if (index == 10) fill(&r, "Rétablir les touches", "Revenir au profil automatique", CR_ICON_SETTINGS, ACT_BIND_RESET, 0);
+        if (index == 10) fill(&r, "Rétablir les touches", "Revenir au profil automatique", CR_ICON_RESTORE, ACT_BIND_RESET, 0);
         else {
             char name[96]; cr_controller_binding_name(u->controller_bindings[index], name, sizeof(name));
             fill(&r, binding_labels[index], u->controller_capture == index ? "Bouton de manette, ou Retour" : name,
-                 CR_ICON_SETTINGS, ACT_BIND_CAPTURE, index);
+                 CR_ICON_INPUT, ACT_BIND_CAPTURE, index);
         }
     } else if (u->page == CR_SAVE_SETTINGS && index == 1) {
-        fill(&r, settings[SET_AUTO_STATE].label, "Créé à la fermeture si compatible", CR_ICON_SETTINGS, ACT_SETTING_TOGGLE, SET_AUTO_STATE);
+        fill(&r, settings[SET_AUTO_STATE].label, "Créé à la fermeture si compatible", CR_ICON_SAVES, ACT_SETTING_TOGGLE, SET_AUTO_STATE);
         r.toggle = true; r.checked = u->auto_state != 0;
     } else if (u->page == CR_SETTING_VALUES) {
         const setting_spec *spec = &settings[u->editing_setting];
         int value = spec->minimum + index * spec->step;
         char label[96]; setting_label(u->editing_setting, value, label, sizeof(label));
-        fill(&r, label, value == spec->fallback ? "Valeur par défaut" : "Appliquer ce réglage", CR_ICON_SETTINGS, ACT_SETTING_VALUE, value);
+        fill(&r, label, value == spec->fallback ? "Valeur par défaut" : "Appliquer ce réglage", setting_icon(u->editing_setting), ACT_SETTING_VALUE, value);
         r.checked = value == setting_get(u, u->editing_setting);
     } else if (u->page == CR_VIDEO_SETTINGS || u->page == CR_AUDIO_SETTINGS ||
                u->page == CR_OVERLAY_SETTINGS || u->page == CR_OVERLAY_LAYOUT || u->page == CR_SAVE_SETTINGS) {
@@ -516,7 +547,7 @@ static row get_row(const cr_ui *u, int index) {
                  u->page == CR_AUDIO_SETTINGS ? SET_VOLUME : u->page == CR_OVERLAY_SETTINGS ? SET_OPACITY :
                  u->page == CR_OVERLAY_LAYOUT ? (index ? SET_POSITION : SET_SIZE) : SET_BACKUPS;
         char value[96]; setting_label(id, setting_get(u, id), value, sizeof(value));
-        fill(&r, settings[id].label, value, CR_ICON_SETTINGS, ACT_SETTING_VALUES, id);
+        fill(&r, settings[id].label, value, setting_icon(id), ACT_SETTING_VALUES, id);
     } else if (u->page == CR_INFORMATION) {
         if (index == 0)
             fill(&r, "À propos de CorvusRetro", "Application native de CorvusSoftware",
@@ -550,12 +581,64 @@ static row get_row(const cr_ui *u, int index) {
     }
     return r;
 }
+static float row_text_width(const cr_menu_layout *m, bool toggle) {
+    return fmaxf(1, m->content_width - m->margin * 2 - m->icon -
+                 (toggle ? m->icon : m->icon * .55f) - m->hint_padding);
+}
+static float hint_height(const cr_menu_layout *m, const char *hint, bool toggle) {
+    unsigned lines = cr_menu_wrap_hint(hint, row_text_width(m, toggle), m->hint_font,
+                                       m->glyph_ratio, m->glyph_advance, m->glyph_context, NULL);
+    return fmaxf(48, m->label_line + lines * m->hint_line + m->padding);
+}
+/* History is scanned once, including its core-dependent hint, for long lists. */
+static float row_offset(const cr_ui *u, int stop, float position, int *hit) {
+    cr_menu_layout m = menu_layout(u);
+    float total = 0;
+    int count = rows(u), index = 0;
+    if (hit) *hit = -1;
+    for (size_t game = 0; index < count && index < stop;) {
+        char hint[256]; bool toggle = false;
+        if (!u->quick && u->page == CR_GAMES) {
+            while (game < u->game_count && !(u->filter < 0 ? u->games[game].played > 0 :
+                   u->games[game].system == u->filter)) ++game;
+            if (game == u->game_count) break;
+            if (!u->engine.handle)
+                snprintf(hint, sizeof(hint), "Chargez un cœur avant de lancer ce jeu");
+            else if (u->engine.system != u->games[game].system)
+                snprintf(hint, sizeof(hint), "Chargez le cœur associé : %.180s", core_name(u->games[game].system));
+            else snprintf(hint, sizeof(hint), "%s", core_name(u->games[game].system));
+            ++game;
+        } else {
+            row r = get_row(u, index); toggle = r.toggle;
+            memcpy(hint, r.hint, sizeof(hint)); hint[sizeof(hint)-1] = 0;
+        }
+        float height = hint_height(&m, hint, toggle);
+        if (hit && position >= total && position < total + height) { *hit = index; return total; }
+        total += height; ++index;
+    }
+    return total;
+}
+cr_area cr_ui_row_area(const cr_ui *u, int index) {
+    cr_menu_layout m = menu_layout(u);
+    if (index < 0 || index >= rows(u)) return (cr_area){0};
+    row r = get_row(u, index);
+    return (cr_area){0, m.header + row_offset(u, index, 0, NULL) -
+        (u->quick ? u->quick_scroll : u->scroll), m.content_width,
+        hint_height(&m, r.hint, r.toggle)};
+}
+cr_area cr_ui_tab_area(const cr_ui *u, int tab) {
+    cr_menu_layout m = menu_layout(u);
+    if (tab < 0 || tab > 2) return (cr_area){0};
+    return m.side_nav ? (cr_area){m.content_width, m.height * tab / 3, m.nav_size, m.height / 3} :
+        (cr_area){m.width * tab / 3, m.body_bottom, m.width / 3, m.nav_size};
+}
 static void clamp_scroll(cr_ui *u) {
-    float content = (float)rows(u) * 76;
+    cr_menu_layout m = menu_layout(u);
+    float content = row_offset(u, rows(u), 0, NULL);
     if (u->page == CR_ABOUT || u->page == CR_LICENSE || u->page == CR_CORE_INFO ||
         ((u->page == CR_SUBSYSTEMS || u->page == CR_CORE_OPTIONS) && !rows(u)))
-        content = fmaxf(400, u->text_height);
-    float max = fmaxf(0, content - fmaxf(1, body_bottom(u) - 64));
+        content = u->text_height + 2 * m.margin;
+    float max = fmaxf(0, content - fmaxf(1, m.body_bottom - m.header));
     u->scroll = fminf(max, fmaxf(0, u->scroll));
 }
 static void view(cr_ui *u, int p) {
@@ -735,6 +818,10 @@ void cr_ui_init(cr_ui *u, cr_platform p, const char *root) {
     u->show_input = true;
     cr_engine_init(&u->engine, root);
     u->pixel_density = 1;
+    u->menu_dpi = 160;
+    u->font_line_ratio = 1.2f;
+    u->font_ascent_ratio = .93f;
+    u->font_glyph_ratio = .556f;
     u->controller_capture = -1;
     for (int i = 0; i < SET_COUNT; ++i) {
         const setting_spec *spec = &settings[i];
@@ -789,7 +876,7 @@ void cr_ui_size(cr_ui *u, float w, float h) {
     u->height = fmaxf(1, h);
     cr_ui_clear_input(u);
     clamp_scroll(u);
-    if (u->quick)
+    if (u->quick || u->page != CR_PLAY)
         cr_ui_move(u, 0);
 }
 void cr_ui_clear_input(cr_ui *u) {
@@ -1565,23 +1652,12 @@ void cr_ui_move(cr_ui *u, int direction) {
     if (count <= 0)
         return;
     u->focus = (u->focus + direction + count) % count;
-    if (u->quick) {
-        float top = u->focus * 76;
-        float view = fmaxf(1, body_bottom(u) - 64);
-        if (top < u->quick_scroll)
-            u->quick_scroll = top;
-        if (top + 76 > u->quick_scroll + view)
-            u->quick_scroll = top + 76 - view;
-        quick_clamp(u);
-    } else {
-        float top = u->focus * 76;
-        float view = fmaxf(1, body_bottom(u) - 64);
-        if (top < u->scroll)
-            u->scroll = top;
-        if (top + 76 > u->scroll + view)
-            u->scroll = top + 76 - view;
-        clamp_scroll(u);
-    }
+    cr_menu_layout m = menu_layout(u);
+    cr_area area = cr_ui_row_area(u, u->focus);
+    float *scroll = u->quick ? &u->quick_scroll : &u->scroll;
+    if (area.y < m.header) *scroll -= m.header - area.y;
+    if (area.y + area.h > m.body_bottom) *scroll += area.y + area.h - m.body_bottom;
+    if (u->quick) quick_clamp(u); else clamp_scroll(u);
 }
 void cr_ui_key(cr_ui *u, unsigned mask, bool down) {
     if (down) {
@@ -1616,8 +1692,9 @@ static unsigned button_at(const cr_ui *u, float x, float y) {
     return cr_play_hit(&layout, x, y);
 }
 static void quick_clamp(cr_ui *u) {
+    cr_menu_layout m = menu_layout(u);
     u->quick_scroll = fmaxf(0, fminf(u->quick_scroll,
-                       rows(u) * 76 - fmaxf(1, body_bottom(u) - 64)));
+        row_offset(u, rows(u), 0, NULL) - fmaxf(1, m.body_bottom - m.header)));
 }
 static int target(const cr_ui *u, float x, float y) {
     if (x < 0 || y < 0 || x >= u->width || y >= u->height)
@@ -1627,14 +1704,14 @@ static int target(const cr_ui *u, float x, float y) {
         return cr_area_contains(layout.menu, x, y) ? -3 :
                cr_area_contains(layout.hide, x, y) ? -5 : -1;
     }
-    if (y < 56)
-        return x < 56 && has_back(u) ? -2 : -1;
-    if (y >= u->height - 72)
-        return -100 - (int)fminf(2, fmaxf(0, floorf(x / u->width * 3)));
-    if (y < 64 || y >= body_bottom(u))
-        return -1;
-    int i = (int)((y - 64 + (u->quick ? u->quick_scroll : u->scroll)) / 76);
-    return i < rows(u) ? (u->quick ? 10000 + i : i) : -1;
+    cr_menu_layout m = menu_layout(u);
+    for (int tab = 0; tab < 3; ++tab)
+        if (cr_area_contains(cr_ui_tab_area(u, tab), x, y)) return -100 - tab;
+    if (y < m.header) return x < m.header && has_back(u) ? -2 : -1;
+    if (x >= m.content_width || y >= m.body_bottom) return -1;
+    int index;
+    row_offset(u, rows(u), y - m.header + (u->quick ? u->quick_scroll : u->scroll), &index);
+    return index < 0 ? -1 : u->quick ? 10000 + index : index;
 }
 void cr_ui_touch(cr_ui *u, int id, int phase, float x, float y) {
     cr_ui_touch_at(u, id, phase, x, y, u->time);
@@ -1772,12 +1849,12 @@ static void rect(const cr_painter *p, float x, float y, float w, float h, uint32
     if (w > 0 && h > 0)
         p->rect(p->context, x, y, w, h, c);
 }
-static void toggle(const cr_painter *p, const cr_theme *theme, float x, float y, bool checked) {
+static void toggle(const cr_painter *p, const cr_theme *theme, float x, float y, float scale, bool checked) {
     uint32_t track = checked ? theme->accent : theme->divider;
-    p->circle(p->context, x + 14, y + 14, 14, track);
-    rect(p, x + 14, y, 20, 28, track);
-    p->circle(p->context, x + 34, y + 14, 14, track);
-    p->circle(p->context, x + (checked ? 34 : 14), y + 14, 10,
+    p->circle(p->context, x + 14*scale, y + 14*scale, 14*scale, track);
+    rect(p, x + 14*scale, y, 20*scale, 28*scale, track);
+    p->circle(p->context, x + 34*scale, y + 14*scale, 14*scale, track);
+    p->circle(p->context, x + (checked ? 34 : 14)*scale, y + 14*scale, 10*scale,
               checked ? 0xffffffff : theme->muted);
 }
 static void text(const cr_painter *p, const char *s, float x, float y, float size, uint32_t c,
@@ -1787,11 +1864,8 @@ static void text(const cr_painter *p, const char *s, float x, float y, float siz
 static float width(const cr_painter *p, const char *s, float size) {
     return p->measure(p->context, s, size);
 }
-static void center(const cr_painter *p, const char *s, float x, float y, float size, uint32_t c) {
-    text(p, s, x - width(p, s, size) / 2, y, size, c, 10000);
-}
 static float paragraphs(const cr_painter *p, const char *s, float x, float top, float w, float line,
-                        uint32_t color, float scroll, float bottom) {
+                        uint32_t color, float scroll, float bottom, const cr_menu_layout *m) {
     char buffer[1024];
     size_t at = 0;
     float y = top - scroll;
@@ -1805,9 +1879,9 @@ static float paragraphs(const cr_painter *p, const char *s, float x, float top, 
         size_t part = len < sizeof(next) - 1 ? len : sizeof(next) - 1;
         memcpy(next, word, part);
         next[part] = 0;
-        if (at && width(p, buffer, 14) + width(p, next, 14) > w) {
-            if (y >= 56 && y <= bottom + line)
-                text(p, buffer, x, y, 14, color, w);
+        if (at && width(p, buffer, m->label_font) + width(p, next, m->label_font) > w) {
+            if (y >= m->header && y <= bottom + line)
+                text(p, buffer, x, y, m->label_font, color, w);
             y += line;
             at = 0;
             buffer[0] = 0;
@@ -1818,8 +1892,8 @@ static float paragraphs(const cr_painter *p, const char *s, float x, float top, 
         at += len;
         buffer[at] = 0;
         if (*end == '\n') {
-            if (y >= 56 && y <= bottom + line)
-                text(p, buffer, x, y, 14, color, w);
+            if (y >= m->header && y <= bottom + line)
+                text(p, buffer, x, y, m->label_font, color, w);
             y += line;
             at = 0;
             buffer[0] = 0;
@@ -1829,8 +1903,8 @@ static float paragraphs(const cr_painter *p, const char *s, float x, float top, 
         }
         word = *end ? end + 1 : end;
     }
-    if (at && y >= 56 && y <= bottom + line)
-        text(p, buffer, x, y, 14, color, w);
+    if (at && y >= m->header && y <= bottom + line)
+        text(p, buffer, x, y, m->label_font, color, w);
     return y + scroll - top + line;
 }
 void cr_ui_draw(cr_ui *u, const cr_painter *p) {
@@ -1839,6 +1913,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
     uint32_t fg = theme->text, muted = theme->muted, accent = theme->accent;
     uint32_t line = theme->divider, focus = theme->focus;
     float w = u->width, h = u->height;
+    cr_menu_layout m = menu_layout(u);
     rect(p, 0, 0, w, h, bg);
     if (u->page == CR_PLAY && !u->quick) {
         rect(p, 0, 0, w, h, 0xff000000);
@@ -1970,58 +2045,67 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         default:
             break;
         }
-        if (p->clip)
-            p->clip(p->context, 0, 56, w, fmaxf(1, body_bottom(u) - 56));
-        int count = rows(u);
+        if (p->clip) p->clip(p->context, 0, m.header, m.content_width, m.body_bottom - m.header);
+        int count = rows(u), first = -1;
         float scroll = u->quick ? u->quick_scroll : u->scroll;
-        int first = (int)fmaxf(0, floorf((scroll - 84) / 76));
-        int end = (int)fminf(count, floorf((scroll + body_bottom(u) - 64) / 76) + 1);
-        for (int i = first; i < end; i++) {
-            float y = 64 + i * 76 - scroll;
-            if (y + 76 < 56 || y > body_bottom(u))
-                continue;
+        float offset = row_offset(u, count, scroll, &first);
+        float y = m.header + offset - scroll;
+        for (int i = first; i >= 0 && i < count && y < m.body_bottom; ++i) {
             row r = get_row(u, i);
-            if (i == u->focus)
-                rect(p, 0, y, w, 76, focus);
+            char hints[CR_MENU_MAX_HINT_LINES][CR_MENU_HINT_BYTES];
+            float text_width = row_text_width(&m, r.toggle);
+            unsigned lines = cr_menu_wrap_hint(r.hint, text_width, m.hint_font, m.glyph_ratio, m.glyph_advance, m.glyph_context, hints);
+            float row_height = hint_height(&m, r.hint, r.toggle);
+            float text_height = m.label_line + lines * m.hint_line;
+            float top = y + (row_height - text_height) / 2 - m.gap + 1 / u->pixel_density;
+            float label_center = top + m.label_line / 2;
+            if (i == u->focus) rect(p, 0, y, m.content_width, row_height, focus);
             else if (u->feedback_target == (u->quick ? 10000 + i : i) && u->feedback_alpha > 0)
-                rect(p, 0, y, w, 76, alpha_color(focus, u->feedback_alpha));
-            p->icon(p->context, r.icon, 20, y + 22, 32, r.disabled ? muted : theme->icon);
-            float text_width = w - (r.toggle ? 150 : 110);
-            text(p, r.label, 66, y + 29, 16, r.disabled ? muted : fg, text_width);
-            text(p, r.hint, 66, y + 53, 13, muted, text_width);
+                rect(p, 0, y, m.content_width, row_height, alpha_color(focus, u->feedback_alpha));
+            p->icon(p->context, r.icon, 0, y + (row_height-m.icon)/2, m.icon, r.disabled ? muted : theme->icon);
+            float text_x = m.margin + m.icon;
+            text(p, r.label, text_x, top + m.label_font*m.ascent_ratio, m.label_font,
+                 r.disabled ? muted : fg, text_width);
+            for (unsigned j = 0; j < lines; ++j)
+                text(p, hints[j], text_x, top + m.label_line + m.gap +
+                     m.hint_font*m.ascent_ratio + j*m.hint_line, m.hint_font, muted, text_width);
             if (r.toggle) {
-                toggle(p, theme, w - 72, y + 24, r.checked);
+                float scale = m.icon/48;
+                toggle(p, theme, m.content_width-m.margin-48*scale, label_center-14*scale, scale, r.checked);
             } else if (r.checked)
-                text(p, "✓", w - 36, y + 41, 20, accent, 28);
+                text(p, "✓", m.content_width-m.margin-m.icon*.5f, top+m.label_font*m.ascent_ratio,
+                     m.label_font, accent, m.icon*.5f);
             else if (r.action != ACT_NONE)
-                p->icon(p->context, CR_ICON_NEXT, w - 36, y + 29, 18, muted);
-            rect(p, 66, y + 75, w - 66, 1, line);
+                p->icon(p->context, CR_ICON_NEXT, m.content_width-m.margin-m.icon*.5f,
+                        label_center-m.icon*.25f, m.icon*.5f, muted);
+            rect(p, text_x, y+row_height-1/u->pixel_density, m.content_width-text_x, 1/u->pixel_density, line);
+            y += row_height;
         }
         if (u->page == CR_CORE_DOWNLOADS && u->core_catalog.count == 0) {
             text(p, u->catalog_loading ? "Recherche des cœurs officiels..." :
                     "Aucun cœur disponible pour cette version.",
-                 20, 236, 14, fg, w - 40);
+                 m.margin, m.header+row_offset(u,count,0,NULL)+m.margin+m.label_font*m.ascent_ratio, m.label_font, fg, m.content_width-2*m.margin);
         }
         if (u->page == CR_LIBRARY && count == 1) {
             text(p, "Aucun jeu dans la bibliothèque.",
-                 20, 246, 14, fg, w - 40);
+                 m.margin, m.header+row_offset(u,count,0,NULL)+m.margin+m.label_font*m.ascent_ratio, m.label_font, fg, m.content_width-2*m.margin);
         }
         if (u->page == CR_GAMES && !count) {
             text(p,
                  u->filter < 0 ? "Aucun contenu dans l’historique."
                                : "Aucun contenu dans cette liste.",
-                 20, 106, 15, fg, w - 40);
-            text(p, "Utilisez Charger du contenu.", 20, 137, 13, muted, w - 40);
+                 m.margin, m.header+m.margin+m.label_font*m.ascent_ratio, m.label_font, fg, m.content_width-2*m.margin);
+            text(p, "Utilisez Charger du contenu.", m.margin, m.header+m.margin+m.label_line+m.hint_line+m.hint_font*m.ascent_ratio, m.hint_font, muted, m.content_width-2*m.margin);
         }
         if (u->page == CR_ABOUT)
             u->text_height = paragraphs(
                 p,
-                "CorvusRetro 0.20.0\n\nFrontend original en C, rendu OpenGL ES et audio "
+                "CorvusRetro 0.21.0\n\nFrontend original en C, rendu OpenGL ES et audio "
                 "AAudio.\n\nCorvusSoftware\nCœurs officiels CorvusCore 0.15.0 : Game Boy, Game "
-                "Boy Color, Game Boy Advance (expérimental).\n\nNavigation inspirée de "
+                "Boy Color, Game Boy Advance.\n\nNavigation inspirée de "
                 "MaterialUI. Thèmes CorvusRetro, ASUS et NVIDIA Shield.\n\nCopyright (C) 2026 "
                 "CorvusSoftware\nSPDX-License-Identifier: AGPL-3.0-only",
-                20, 92, w - 40, 24, fg, u->scroll, body_bottom(u));
+                m.margin, m.header+m.margin+m.label_font*m.ascent_ratio, m.content_width-2*m.margin, m.label_line, fg, u->scroll, m.body_bottom, &m);
         if ((u->page == CR_SUBSYSTEMS || u->page == CR_CORE_OPTIONS) && !count) {
             const char *empty = !u->engine.handle ? "Aucun cœur chargé." :
                 u->page == CR_SUBSYSTEMS ?
@@ -2029,7 +2113,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
                     "Ce module ne déclare pas de configuration de plusieurs contenus." :
                     "Aucune option de cœur disponible.\n\n"
                     "Ce module ne déclare pas de réglage modifiable.";
-            u->text_height = paragraphs(p, empty, 20, 92, w - 40, 24, fg, u->scroll, body_bottom(u));
+            u->text_height = paragraphs(p, empty, m.margin, m.header+m.margin+m.label_font*m.ascent_ratio, m.content_width-2*m.margin, m.label_line, fg, u->scroll, m.body_bottom, &m);
         }
         if (u->page == CR_CORE_INFO) {
             char info[2048];
@@ -2051,50 +2135,41 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
             }
             else
                 snprintf(info, sizeof(info), "Aucun cœur chargé");
-            u->text_height = paragraphs(p, info, 20, 92, w - 40, 24, fg, u->scroll, body_bottom(u));
+            u->text_height = paragraphs(p, info, m.margin, m.header+m.margin+m.label_font*m.ascent_ratio, m.content_width-2*m.margin, m.label_line, fg, u->scroll, m.body_bottom, &m);
         }
         if (u->page == CR_LICENSE)
-            u->text_height = paragraphs(p, u->license ? u->license : "Licence indisponible", 20, 92,
-                                        w - 40, 23, fg, u->scroll, body_bottom(u));
+            u->text_height = paragraphs(p, u->license ? u->license : "Licence indisponible", m.margin, m.header+m.margin+m.label_font*m.ascent_ratio,
+                                        m.content_width-2*m.margin, m.label_line, fg, u->scroll, m.body_bottom, &m);
         if (p->clip)
             p->clip(p->context, 0, 0, w, h);
-        // Cover scrolled content before drawing the fixed header and navigation.
-        rect(p, 0, 0, w, 56, header);
+        rect(p, 0, 0, m.content_width, m.header, header);
         if (has_back(u) && u->feedback_target == -2 && u->feedback_alpha > 0)
-            p->circle(p->context, 28, 28, 22, alpha_color(focus, u->feedback_alpha));
-        if (has_back(u))
-            p->icon(p->context, CR_ICON_BACK, 12, 16, 24, theme->header_text);
-        text(p, title, has_back(u) ? 56 : 20, 35, 19, theme->header_text, w - 100);
-        rect(p, 0, body_bottom(u), w, 100, bg);
-        char footer[256];
-        if (u->engine.handle) {
-            corvus_core_info info = {.struct_size = sizeof(info)};
-            bool known = cr_engine_core_info(&u->engine, &info);
-            snprintf(footer, sizeof(footer), "Cœur chargé : %s · %s", known ? info.name : "?",
-                     known ? info.version : "?");
-        } else
-            snprintf(footer, sizeof(footer), "Aucun cœur");
-        text(p, footer, 20, h - 84, 11, muted, w - 40);
-        rect(p, 0, h - 72, w, 72, nav);
-        rect(p, 0, h - 72, w, 1, line);
-        const char *labels[] = {"Menu principal", "Listes de lecture", "Réglages"};
-        int icons[] = {CR_ICON_HOME, CR_ICON_LIST, CR_ICON_SETTINGS};
-        int selected = u->tab;
+            p->circle(p->context, m.header/2, m.header/2, m.header*.4f, alpha_color(focus, u->feedback_alpha));
+        if (has_back(u)) p->icon(p->context, CR_ICON_BACK, 0, 0, m.header, theme->header_text);
+        float title_x = has_back(u) ? m.header : m.margin;
+        text(p, title, title_x, m.header/2 + m.title_font*(m.ascent_ratio-u->font_line_ratio/2),
+             m.title_font, theme->header_text, m.content_width-title_x-m.margin);
+        if (m.side_nav) rect(p, m.content_width, 0, m.nav_size, h, nav);
+        else rect(p, 0, m.body_bottom, w, m.nav_size, nav);
+        const int icons[] = {CR_ICON_HOME, CR_ICON_LIST, CR_ICON_SETTINGS};
         for (int i = 0; i < 3; i++) {
-            float x = w * (i + .5f) / 3;
-            uint32_t c = i == selected ? theme->navigation_active : theme->navigation_passive;
-            if (u->feedback_target == -100 - i && u->feedback_alpha > 0)
-                rect(p, i * w / 3, h - 72, w / 3, 72, alpha_color(focus, u->feedback_alpha));
-            p->icon(p->context, icons[i], x - 12, h - 61, 24, c);
-            center(p, labels[i], x, h - 17, 10, c);
+            cr_area a = cr_ui_tab_area(u, i);
+            uint32_t c = i == u->tab ? theme->navigation_active : theme->navigation_passive;
+            if (u->feedback_target == -100-i && u->feedback_alpha > 0)
+                rect(p, a.x, a.y, a.w, a.h, alpha_color(focus, u->feedback_alpha));
+            p->icon(p->context, icons[i], a.x+(a.w-m.icon)/2, a.y+(a.h-m.icon)/2, m.icon, c);
+            if (i == u->tab) {
+                if (m.side_nav) rect(p, a.x, a.y, 2/u->pixel_density, a.h, c);
+                else rect(p, a.x, a.y, a.w, 2/u->pixel_density, c);
+            }
         }
     }
     if (u->message_time > 0 && u->message[0]) {
-        float y = u->page == CR_PLAY ? h - 108 : h - 142;
+        float y = u->page == CR_PLAY && !u->quick ? h-108 : m.body_bottom-52-m.margin;
         rect(p, 12, y, w - 24, 52, 0xf0333333);
         text(p, u->message, 24, y + 32, 13, 0xffffffff, w - 48);
     }
-    float popup_left = 0, popup_right = w, popup_top = 56, popup_bottom = h - 72;
+    float popup_left = 0, popup_right = m.content_width, popup_top = m.header, popup_bottom = m.body_bottom;
     if (u->page == CR_PLAY && !u->quick) {
         cr_play_layout layout = play_layout(u);
         popup_top = 0;
@@ -2106,7 +2181,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         }
     }
     if (u->message_time > 0)
-        popup_bottom = fminf(popup_bottom, h - (u->page == CR_PLAY ? 112 : 146));
+        popup_bottom = fminf(popup_bottom, (u->page == CR_PLAY && !u->quick ? h-112 : m.body_bottom-56-m.margin));
     cr_notifications_prepare(&u->notifications, p);
     cr_notifications_draw_region(&u->notifications, p, popup_left, popup_top, popup_right, popup_bottom, theme);
     if (u->notifications.count && p->clip) p->clip(p->context, 0, 0, w, h);

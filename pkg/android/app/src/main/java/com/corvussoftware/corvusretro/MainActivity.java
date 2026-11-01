@@ -46,7 +46,12 @@ public final class MainActivity extends NativeActivity {
     private static final int[] ICONS = {R.drawable.ic_core, R.drawable.ic_corvus, R.drawable.ic_content,
             R.drawable.ic_library, R.drawable.ic_settings, R.drawable.ic_history, R.drawable.ic_info,
             R.drawable.ic_unload, R.drawable.ic_theme, R.drawable.ic_menu, R.drawable.ic_next,
-            R.drawable.ic_back, R.drawable.ic_file, R.drawable.ic_home};
+            R.drawable.ic_back, R.drawable.ic_file, R.drawable.ic_home,
+            R.drawable.ic_video, R.drawable.ic_audio, R.drawable.ic_input, R.drawable.ic_saves,
+            R.drawable.ic_achievements, R.drawable.ic_download, R.drawable.ic_restart, R.drawable.ic_play,
+            R.drawable.ic_close, R.drawable.ic_notifications, R.drawable.ic_account, R.drawable.ic_subsystem,
+            R.drawable.ic_folder, R.drawable.ic_display, R.drawable.ic_touch, R.drawable.ic_volume,
+            R.drawable.ic_backup, R.drawable.ic_restore};
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final Object importLock = new Object();
     private GameLibrary library;
@@ -481,6 +486,13 @@ public final class MainActivity extends NativeActivity {
         paint.setColor(Color.WHITE); paint.setTextSize(40);
         paint.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
         return paint;
+    }
+    public float[] menuMetrics() {
+        Paint paint = font();
+        Paint.FontMetrics metrics = paint.getFontMetrics();
+        int dpi = getResources().getDisplayMetrics().densityDpi;
+        return new float[] {dpi > 0 ? dpi : 90, (metrics.descent - metrics.ascent) / 40,
+                -metrics.ascent / 40, paint.measureText("a") / 40};
     }
     private static String character(int codepoint) {
         return new String(Character.toChars(Character.isValidCodePoint(codepoint) ? codepoint : 0xfffd));
