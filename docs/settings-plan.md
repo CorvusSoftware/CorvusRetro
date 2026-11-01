@@ -150,10 +150,9 @@ pas être recopiés en listes fixes GB, GBC ou GBA dans les réglages globaux.
 
 L'import/export batterie utilise le sélecteur de documents Android, indique
 le jeu concerné et conserve la partie et les données existantes en cas
-d'annulation ou d'erreur. Les contraintes de remplacement d'une batterie en
-cours d'utilisation et de sélection du joueur d'une session multiple relèvent
-de l'implémentation réelle ; le menu ne doit pas annoncer ces variantes avant
-leur prise en charge. L'extension `.srm` n'en fait pas un état instantané.
+d'annulation ou d'erreur. L'import confirmé redémarre les contenus avec la
+nouvelle batterie. En câble link, le joueur est choisi dans Sauvegardes du jeu et les données de l'autre
+joueur sont conservées. L'extension `.srm` n'en fait pas un état instantané.
 
 ## Correspondance avec les cinq menus actuels
 
@@ -194,9 +193,9 @@ au jeu suspendu et à la ligne précédente ; un accès depuis Réglages doit re
 1. **Rangement sans nouvelle préférence** : remplacer Affichage à l'écran par
    Commandes, raccourcir le parcours tactile, conserver les clés et les retours ;
    distinguer le compte global et les succès du jeu sans perdre les informations.
-2. **Actions batterie** : livrer et vérifier Sauvegardes du jeu séparément des
-   états, avec traitement réel des fichiers, annulations et erreurs. Harmoniser
-   le libellé Sous-système dans les écrans et la documentation concernés.
+2. **Actions batterie (lot livré)** : conserver Sauvegardes du jeu séparément
+   des états, avec traitement réel des fichiers, annulations et erreurs. Le
+   libellé Sous-système est harmonisé dans les écrans et la documentation.
 3. **Réglages courants** : filtres d'affichage des notifications, volume du jeu,
    présentation et filtrage vidéo, opacité tactile. Introduire chaque contrôle
    uniquement avec son comportement, sa persistance et une valeur par défaut.

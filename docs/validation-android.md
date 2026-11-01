@@ -182,3 +182,69 @@ remplace pas la qualification du parcours complet depuis un jeu. Ce fournisseur
 est absent des APK de l'application et ne doit jamais être ajouté au manifeste
 principal. Les tests natifs vérifient séparément les moteurs réels et la
 persistance avant et après import, y compris en câble link.
+
+## Qualification 0.19.0
+
+Source de l'APK : `dac599e42e1bfdd26a49d93e77dcf0d2141d8da2` (PR #17).
+Les dépendances restent CorvusCore `063cf1f674788aa5913cebe184457a10b5946edd`,
+CorvusAPI `39c927c5a1a55b78ab55758a41cd16b0971c4684` et rcheevos
+`1433173220a7eaede6a9ed7a18e94117be1821e0`.
+
+- 13 tests natifs puis 13 tests ASan/UBSan réussis, et 2 tests sans cœur.
+  Les compléments link P1 passent également en normal et avec sanitizers.
+- Tests d'import avec les vrais moteurs GB/GBC/GBA, solo et link P1/P2 :
+  sauvegardes exactes, autre joueur inchangé, options conservées, backup de la
+  SRAM live même sans fichier existant, rollback des erreurs d'écriture.
+- Arrêts réels de processus via `fork` à chaque frontière `fsync` de l'import,
+  puis récupération cohérente des deux joueurs et du backup. Ces tests ne
+  simulent pas une panne matérielle ou une perte d'alimentation du stockage.
+- 8 tests JVM, build debug/release et instrumentation, lint et contrôle de la
+  base sans cœur réussis. Le fournisseur de documents synthétiques est absent
+  du manifeste de la base distribuée.
+- `SaveTransfersInstrumentation` : 38 contrôles API29 x86_64 réussis sur le vrai
+  ContentResolver, dont octets `.sav`/`.srm`, taille/extension, annulations,
+  destruction et réponses périmées. L'export vers un document existant plus long
+  a été reproduit rouge puis corrigé avec le mode de troncature `wt`.
+- Phase `savetransfer` de `RetroAchievementsInstrumentation` : 546 contrôles
+  API29 x86_64 (GB portrait136/paysage136, GBC portrait137/paysage137).
+  Elle vérifie le menu natif, JNI, les exports de SRAM, l'import confirmé et le
+  rechargement réel des octets par le cœur, le backup, les annulations, le cœur
+  conservé après fermeture et Sous-système retiré après déchargement.
+  ActivityMonitor remplace uniquement la sélection dans DocumentsUI ; le moteur
+  et les accès au fournisseur de documents sont réels.
+- Catalogue : 40 contrôles des réponses publiques gelées, avec les trois cœurs
+  affichés dans le téléchargeur. Cette preuve distingue le parseur et l'interface
+  d'une connexion Internet depuis un téléphone.
+- CI du commit fusionné : [41290648163](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41290648163).
+  Build signé qualifié : [41290806524](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41290806524).
+- Mise à jour signée 0.18.1/code23 vers 0.19.0/code25 sans désinstallation :
+  même UID, dossier et date d'installation initiale, thème ASUS et historique
+  Corvus-preserved.gba conservés. Les pixels de la ligne d'historique sont
+  identiques ; aucun nouveau crash applicatif observé. Ce profil signé ne
+  contient aucun cœur installé ; les essais avec cœur utilisent le profil debug.
+
+Certificat durable SHA-256 :
+`cb431e5abf3ae73ddd5c706a9c485ff6e627be2135bb2557b6191f04ac3a5211`.
+APK qualifié SHA-256 :
+`24d07ad24098a0f9d4ac697a93d9f52be57562ccc032d784d0f784f8f4bef063`.
+Les sources et sommes de contrôle de l'artefact signé ont été vérifiées, ainsi
+que les deux bibliothèques frontend, les segments ELF et l'alignement16Ko.
+
+Aucune exécution ARM64 ou sur appareil physique n'a été réalisée pour ce lot.
+Les épisodes SystemUI non réactif au démarrage des émulateurs ont été inspectés
+puis traités via leur bouton Attendre avant de relancer les parcours inchangés.
+
+La [release v0.19.0](https://github.com/CorvusSoftware/CorvusRetro/releases/tag/v0.19.0)
+a été publiée par [41291144366](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41291144366).
+L'APK a été retéléchargé depuis son URL publique et comparé octet par octet au
+fichier signé qualifié : identité exacte, SHA-256 ci-dessus.
+
+L'essai Internet direct avec l'APK signé dans cet émulateur n'est pas validé :
+le catalogue reste indisponible, et une sonde utilisant la même connexion HTTPS
+Android standard échoue avec `java.net.ConnectException` vers
+`raw.githubusercontent.com/2606:50c0:8001::154:443`. Depuis le worker cloud,
+les deux URL officielles répondent HTTP200 et le JSON officiel est identique
+aux données du test gelé. Cette limite de connexion de l'émulateur reste
+distincte de la correction du parseur. Aucune modification de TLS ou du
+stockage de confiance n'a été faite pour cet essai. Le téléchargement Internet
+depuis un téléphone reste à qualifier.
