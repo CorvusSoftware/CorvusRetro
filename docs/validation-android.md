@@ -22,7 +22,7 @@ vide. Les tests de mémoire instrumentent le code portable original.
 ## Build Android
 
 ```sh
-./gradlew --no-daemon :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest
+./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest
 python3 tools/check_core_apks.py \
   --apksigner "$ANDROID_HOME/build-tools/35.0.0/apksigner" \
   --aapt "$ANDROID_HOME/build-tools/35.0.0/aapt" \
@@ -158,3 +158,27 @@ client 0.18.0 a ensuite été identifié comme incompatible avec les URL central
 Le flux historique est restauré ; 0.18.1 corrige ce filtre et découvre
 `catalog/v1/`. Les régressions exécutent maintenant le vrai lecteur Java.
 Aucun essai sur téléphone physique ni runtime ARM64 n'est revendiqué.
+
+## Transferts de sauvegardes
+
+`SaveFilesTest` vérifie les noms, les octets bruts, la taille limite, les
+annulations et les fichiers temporaires exclusifs. Compiler le runner dédié :
+
+```sh
+./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest \
+  -PcorvusTestRunner=com.corvussoftware.corvusretro.SaveTransfersInstrumentation
+```
+
+Après installation de la base debug et de l'APK de test, exécuter :
+
+```sh
+adb shell am instrument -w \
+  com.corvussoftware.corvusretro.test/com.corvussoftware.corvusretro.SaveTransfersInstrumentation
+```
+
+Ce runner exerce le vrai ContentResolver avec un fournisseur limité à des
+documents synthétiques dans l'APK de test. Il ne charge pas de cœur et ne
+remplace pas la qualification du parcours complet depuis un jeu. Ce fournisseur
+est absent des APK de l'application et ne doit jamais être ajouté au manifeste
+principal. Les tests natifs vérifient séparément les moteurs réels et la
+persistance avant et après import, y compris en câble link.

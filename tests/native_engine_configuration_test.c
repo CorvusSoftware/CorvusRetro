@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 /* Android private storage denies hard links. Apply the same restriction to
@@ -22,9 +23,13 @@ int link(const char *existing, const char *created) {
 }
 
 #ifdef CR_TEST_WRAP_FSYNC
-static unsigned fail_sync_after, fail_sync_count;
+static unsigned fail_sync_after, fail_sync_count, crash_sync_after;
 int __real_fsync(int fd);
 int __wrap_fsync(int fd) {
+    if (crash_sync_after && !--crash_sync_after) {
+        int result = __real_fsync(fd);
+        _exit(result == 0 ? 77 : 78);
+    }
     if (fail_sync_after && !--fail_sync_after) {
         if (fail_sync_count > 1) { --fail_sync_count; fail_sync_after = 1; }
         else fail_sync_count = 0;
@@ -283,6 +288,163 @@ static void state_tests(const char *module) {
     cr_engine_destroy(&e);
 }
 
+#ifdef CR_TEST_WRAP_FSYNC
+static void import_crash_tests(cr_engine *e, unsigned player, const uint8_t *replacement,
+                                const uint8_t *original, size_t size,
+                                const uint8_t *other, size_t other_size,
+                                const char *saved, const char *backup) {
+    uint8_t *disk = malloc(size > other_size ? size : other_size);
+    check(disk != NULL, "crash comparison allocation", e);
+    char other_path[4352] = {0};
+    if (player) snprintf(other_path, sizeof(other_path), "%s/saves/%s.sav", e->root, e->id);
+    for (unsigned point = 1; point <= e->players + 8; ++point) {
+        memset(disk, 0x25, size); write_bytes(saved, disk, size);
+        memset(disk, 0x19, size); write_bytes(backup, disk, size);
+        if (player) { memset(disk, 0x26, other_size); write_bytes(other_path, disk, other_size); }
+        pid_t child = fork(); check(child >= 0, "fork interrupted import", e);
+        if (!child) {
+            crash_sync_after = point;
+            bool ok = cr_engine_import_battery(e, player, replacement, size);
+            _exit(ok ? 0 : 79);
+        }
+        int status = 0;
+        check(waitpid(child, &status, 0) == child && WIFEXITED(status) &&
+              (WEXITSTATUS(status) == 77 || WEXITSTATUS(status) == 0), "process dies at durable import boundary", e);
+        if (point == e->players + 4)
+            check(cr_engine_save_battery(e), "pause write recovers pending group before normal persistence", e);
+        cr_engine recovered; cr_engine_init(&recovered, e->root);
+        const char *ids[2] = {e->id, e->second_id};
+        const char *paths[2] = {e->content_paths[0], e->content_paths[1]};
+        check(player ? cr_engine_open_subsystem(&recovered, e->system, e->subsystem_id, ids, paths) :
+              cr_engine_open(&recovered, e->system, e->id, e->content_paths[0]),
+              "restart recovers every interrupted import boundary", &recovered);
+        check(read_bytes(saved, (char *)disk, size) == size, "read recovered selected disk", e);
+        bool committed = !memcmp(disk, replacement, size);
+        if (!committed) for (size_t i = 0; i < size; ++i)
+            check(disk[i] == 0x25, "selected slot fully rolls back before decision", e);
+        check(read_bytes(backup, (char *)disk, size) == size, "read recovered backup", e);
+        if (committed) check(!memcmp(disk, original, size), "committed backup is live SRAM rather than older disk", e);
+        else for (size_t i = 0; i < size; ++i)
+            check(disk[i] == 0x19, "rollback preserves previous user backup", e);
+        if (player) {
+            check(read_bytes(other_path, (char *)disk, other_size) == other_size, "read recovered other player", e);
+            if (committed) check(!memcmp(disk, other, other_size), "both players share commit decision", e);
+            else for (size_t i = 0; i < other_size; ++i)
+                check(disk[i] == 0x26, "both players share rollback decision", e);
+        }
+        cr_engine_destroy(&recovered);
+    }
+    write_bytes(saved, original, size);
+    if (player) write_bytes(other_path, other, other_size);
+    memset(disk, 0x19, size); write_bytes(backup, disk, size);
+    free(disk);
+}
+#endif
+
+static void transfer_tests(cr_engine *e, const char *rom, const char *option_key, uint32_t option_value) {
+    unsigned player = e->players - 1;
+    uint8_t *original = NULL, *other = NULL; size_t size = 0, other_size = 0;
+    check(cr_engine_export_battery(e, player, &original, &size) && size > 0,
+          "export freezes actual core battery bytes", e);
+    if (player) check(cr_engine_export_battery(e, 0, &other, &other_size), "snapshot other player", e);
+    uint8_t *replacement = malloc(size); check(replacement != NULL, "replacement battery", e);
+    memset(replacement, 0x4c, size);
+    check(cr_engine_save_battery(e), "persist before transfer rollback tests", e);
+    char saved[4352], backup[4352], temporary[4352];
+    int n = snprintf(saved, sizeof(saved), "%s/saves/%s%s", e->root,
+                     player ? e->second_id : e->id, player ? "-link-p2.sav" : ".sav");
+    check(n > 0 && n < (int)sizeof(saved), "transfer save path", e);
+    snprintf(backup, sizeof(backup), "%.*s.import-backup", 4300, saved);
+    snprintf(temporary, sizeof(temporary), "%.*s.import-new", 4300, saved);
+    uint8_t *disk = malloc(size); check(disk != NULL, "disk comparison buffer", e);
+    memset(disk, 0x19, size); write_bytes(backup, disk, size);
+    char incomplete[4352];
+    snprintf(incomplete, sizeof(incomplete), "%s/saves/.battery-import.new", e->root);
+    write_bytes(incomplete, "truncated", 9);
+    check(cr_engine_save_battery(e), "partial unpublished import record does not block battery writes", e);
+#ifdef CR_TEST_WRAP_FSYNC
+    import_crash_tests(e, player, replacement, original, size, other, other_size, saved, backup);
+#endif
+    void *active = e->handle;
+    check(!cr_engine_import_battery(e, player, replacement, size - 1) && e->handle == active &&
+          !cr_engine_import_battery(e, player, replacement, size + 1) && e->handle == active &&
+          !cr_engine_import_battery(e, e->players, replacement, size) && e->handle == active,
+          "invalid transfer sizes and slots retain live session", e);
+    char original_path[4096]; memcpy(original_path, e->content_paths[0], sizeof(original_path));
+    snprintf(e->content_paths[0], sizeof(e->content_paths[0]), "%.4000s/missing.rom", e->root);
+    check(!cr_engine_import_battery(e, player, replacement, size) && e->handle == active &&
+          read_bytes(saved, (char *)disk, size) == size && !memcmp(disk, original, size),
+          "candidate ROM load failure retains active game and stored bytes", e);
+    memcpy(e->content_paths[0], original_path, sizeof(original_path));
+    check(!mkdir(temporary, 0700), "obstruct transfer staging", e);
+    check(!cr_engine_import_battery(e, player, replacement, size) && e->handle == active &&
+          read_bytes(saved, (char *)disk, size) == size && !memcmp(disk, original, size),
+          "failed transfer write retains active game and stored bytes", e);
+    check(!rmdir(temporary), "remove transfer obstruction", e);
+#ifdef CR_TEST_WRAP_FSYNC
+    for (unsigned point = 1; point <= e->players + 6; ++point) {
+        fail_sync_after = point; fail_sync_count = 1;
+        check(!cr_engine_import_battery(e, player, replacement, size) && e->handle == active &&
+              read_bytes(saved, (char *)disk, size) == size && !memcmp(disk, original, size),
+              "every transfer fsync failure rolls back stored bytes before replacing active game", e);
+        fail_sync_after = fail_sync_count = 0;
+        check(read_bytes(backup, (char *)disk, size) == size, "failed transfer retains earlier backup", e);
+        for (size_t i = 0; i < size; ++i)
+            check(disk[i] == 0x19, "failed transfer preserves every earlier backup byte", e);
+    }
+#endif
+    memset(disk, 0x25, size); write_bytes(saved, disk, size);
+    check(cr_engine_import_battery(e, player, replacement, size) && e->handle != active &&
+          cr_engine_option_value(e, option_key) == option_value,
+          "battery import restarts a candidate and preserves core options", e);
+    uint8_t *actual = NULL; size_t actual_size = 0;
+    check(cr_engine_export_battery(e, player, &actual, &actual_size) && actual_size == size &&
+          !memcmp(actual, replacement, size), "real battery roundtrip is byte exact", e);
+    free(actual);
+    check(read_bytes(saved, (char *)disk, size) == size && !memcmp(disk, replacement, size) &&
+          read_bytes(backup, (char *)disk, size) == size && !memcmp(disk, original, size),
+          "import atomically stores raw bytes and retains previous .sav backup", e);
+    if (player) {
+        check(cr_engine_export_battery(e, 0, &actual, &actual_size) && actual_size == other_size &&
+              !memcmp(actual, other, other_size), "P2 import keeps all live P1 battery bytes", e);
+        free(actual);
+    }
+    check(!unlink(saved) && cr_engine_import_battery(e, player, replacement, size) &&
+          read_bytes(backup, (char *)disk, size) == size && !memcmp(disk, replacement, size),
+          "import retains pre-import live SRAM even when no durable save exists", e);
+    int system = e->system; char ids_copy[2][96], subsystem[96];
+    memcpy(ids_copy[0], e->id, 96); memcpy(ids_copy[1], e->second_id, 96);
+    memcpy(subsystem, e->subsystem_id, 96);
+    const char *ids[2] = {ids_copy[0], ids_copy[1]}, *paths[2] = {rom, rom};
+    bool linked = e->players > 1;
+    check(cr_engine_close(e) && (linked ? cr_engine_open_subsystem(e, system, subsystem, ids, paths) :
+          cr_engine_open(e, system, ids[0], rom)), "recreate imported battery session", e);
+    check(cr_engine_export_battery(e, player, &actual, &actual_size) && actual_size == size &&
+          !memcmp(actual, replacement, size), "import survives persistence and engine recreation", e);
+    free(actual);
+    if (linked) {
+        uint8_t *first = malloc(other_size), *previous = malloc(other_size);
+        check(first && previous, "P1 link transfer buffers", e);
+        memset(first, 0x5e, other_size);
+        check(cr_engine_import_battery(e, 0, first, other_size) && e->players == 2 &&
+              cr_engine_option_value(e, option_key) == option_value,
+              "P1 link import retains paired session and options", e);
+        check(cr_engine_export_battery(e, 0, &actual, &actual_size) && actual_size == other_size &&
+              !memcmp(actual, first, other_size), "P1 link raw import roundtrip", e);
+        free(actual);
+        check(cr_engine_export_battery(e, 1, &actual, &actual_size) && actual_size == size &&
+              !memcmp(actual, replacement, size), "P1 import leaves P2 live SRAM unchanged", e);
+        free(actual);
+        char first_backup[4352];
+        snprintf(first_backup, sizeof(first_backup), "%s/saves/%s.sav.import-backup", e->root, e->id);
+        check(read_bytes(first_backup, (char *)previous, other_size) == other_size &&
+              !memcmp(previous, other, other_size), "P1 link import keeps P1 pre-import backup", e);
+        check(read_bytes(saved, (char *)disk, size) == size && !memcmp(disk, replacement, size),
+              "P1 import leaves P2 durable SRAM unchanged", e);
+        free(first); free(previous);
+    }
+    free(original); free(replacement); free(other); free(disk);
+}
 static void real_engine_tests(void) {
     const char *cores[] = {"corvus.gb", "corvus.gbc", "corvus.gba"};
     for (unsigned s = 0; s < 3; ++s) {
@@ -331,6 +493,11 @@ static void real_engine_tests(void) {
             check(length > 0 && length < (int)sizeof(saved), "real slot save path", &e);
             memset(battery, slot ? 0x72 : 0x31, battery_size); write_bytes(saved, battery, battery_size);
         }
+        check(cr_engine_open(&e, system, ids[0], rom), "single player battery transfer fixture", &e);
+        transfer_tests(&e, rom, key, selected);
+        check(cr_engine_close(&e), "close single transfer fixture", &e);
+        char solo_saved[4352]; snprintf(solo_saved, sizeof(solo_saved), "%s/%s.sav", saves, ids[0]);
+        memset(battery, 0x31, battery_size); write_bytes(solo_saved, battery, battery_size);
         check(cr_engine_open_subsystem(&e, system, subsystem, ids, paths) && e.players == 2 &&
               e.width == (s == 2 ? 480 : 320) && e.height == (s == 2 ? 160 : 144) &&
               cr_engine_option_value(&e, key) == selected && cr_engine_step(&e, 0) && e.audio_count > 0,
@@ -351,6 +518,10 @@ static void real_engine_tests(void) {
         uint64_t generation = 0;
         check(e.subsystems.battery_copy(e.handle, 1, battery, battery_size, &generation) &&
               battery[1] == (s == 2 ? 0xff : 0x0f), "real P2 receives released buttons", &e);
+        transfer_tests(&e, rom, key, selected);
+        /* The ROM must make both fresh candidate slots dirty before the existing
+         * multi-slot persistence failure regression. */
+        check(cr_engine_step_players(&e, player_masks), "dirty both slots after transfer", &e);
         free(battery);
         char p2new[4096];
         int length = snprintf(p2new, sizeof(p2new), "%s/%s-link-p2.sav.new", saves, ids[1]);

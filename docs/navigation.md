@@ -14,11 +14,12 @@ Les pages sans capacité déclarée par le cœur affichent leur état indisponib
 
 | Chemin | Contenu |
 | --- | --- |
-| Menu principal | Menu rapide si un contenu est chargé, charger/décharger le cœur, charger du contenu, configuration du sous-système si un cœur est chargé, Informations |
+| Menu principal | Menu rapide si un contenu est chargé, charger/décharger le cœur, charger du contenu, Sous-système si un cœur est chargé, Informations |
 | Menu principal > Informations | À propos, informations du cœur chargé, licence et crédits |
 | Listes de lecture | Historique uniquement |
-| Menu rapide | Reprendre, Redémarrer, Fermer, Sauvegardes d'état, Options du cœur, Commandes, Succès, Informations sur le cœur, Menu principal |
+| Menu rapide | Reprendre, Redémarrer, Fermer, Sauvegardes d'état, Options du cœur, Commandes, Succès, Informations sur le cœur, Menu principal, joueur contrôlé en câble link, Sauvegardes du jeu |
 | Menu rapide > Sauvegardes d'état | Sauvegarder l'état, Charger l'état |
+| Menu rapide > Sauvegardes du jeu | Importer `.sav` ou `.srm`, exporter `.sav` ou `.srm`, choix du joueur en câble link |
 | Réglages > Interface utilisateur | Thème de l'interface |
 | Réglages > Vidéo | Garder l'écran allumé pendant le jeu |
 | Réglages > Audio | Activer le son |
@@ -58,3 +59,6 @@ informations d'un vrai cœur, les gestes tap/maintien/reset, une frame lente, le
 menu à un doigt, l'opacité dessinée d'un tap bref, son fondu et la désactivation
 des commandes tactiles. Voir [l'interface de jeu](game-interface.md) et [la validation Android](validation-android.md)
 pour les essais et captures sur émulateur.
+
+Le [plan des réglages](settings-plan.md) propose un rangement des catégories et
+sous-réglages. Il distingue les fonctions existantes des préférences à développer.

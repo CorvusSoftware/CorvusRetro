@@ -25,6 +25,12 @@ typedef struct {
     size_t count;
     char error[256];
 } cr_core_catalog;
+enum { CR_SAVE_IMPORT, CR_SAVE_EXPORT_SAV, CR_SAVE_EXPORT_SRM };
+typedef struct {
+    uint64_t request;
+    char path[4096], error[512];
+    bool cancelled;
+} cr_save_transfer_result;
 
 typedef struct {
     void *context;
@@ -45,5 +51,7 @@ typedef struct {
     void (*save_achievement_credentials)(void *, const char *, const char *);
     void (*edit_text)(void *, int, const char *, bool);
     void (*pick_folder)(void *, int, const char *);
+    bool (*save_transfer)(void *, uint64_t, int, const char *, const uint8_t *, size_t);
+    void (*finish_save_transfer)(void *, uint64_t);
 } cr_platform;
 #endif

@@ -185,7 +185,7 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     snprintf(u->title, sizeof(u->title), "Original GBA test");
     capture c = draw(u);
     check(strstr(c.text, "Menu rapide") && strstr(c.text, "Décharger le cœur") &&
-              strstr(c.text, "Configuration du sous-système") && !strstr(c.text, "Charger un cœur"),
+              strstr(c.text, "\nSous-système\n") && !strstr(c.text, "Charger un cœur"),
           "loaded content keeps one core action after the quick menu row");
     void *state_handle = u->engine.handle;
     for (int landscape = 0; landscape < 2; ++landscape) {
@@ -293,7 +293,7 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     c = draw(u);
     check(u->page == CR_MAIN && u->engine.handle == handle && !u->engine.loaded &&
               !u->title[0] && strstr(c.text, "Décharger le cœur") &&
-              strstr(c.text, "Configuration du sous-système") && !strstr(c.text, "Menu rapide"),
+              strstr(c.text, "\nSous-système\n") && !strstr(c.text, "Menu rapide"),
           "closing content preserves the selected core and returns to the main menu");
     check(!u->notifications.count && !u->notifications.progress.visible && !u->notifications_loaded,
           "content close clears notifications immediately while keeping the core");
@@ -301,7 +301,7 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     c = draw(u);
     check(!u->engine.handle && !u->engine.loaded && !u->title[0] &&
               strstr(c.text, "Charger un cœur") && !strstr(c.text, "Décharger le cœur") &&
-              !strstr(c.text, "Menu rapide") && !strstr(c.text, "Configuration du sous-système"),
+              !strstr(c.text, "Menu rapide") && !strstr(c.text, "\nSous-système\n"),
           "retry persists the game and restores the single load action");
     cr_ui_update(u, .01);
     check(!u->notifications.count && !u->notifications.progress.visible && !u->notifications_loaded,
@@ -376,7 +376,7 @@ int main(void) {
     free(long_history);
     check(strstr(c.text, "Charger un cœur") && strstr(c.text, "Informations") &&
               !strstr(c.text, "Historique") && !strstr(c.text, "Décharger le cœur") &&
-              !strstr(c.text, "Configuration du sous-système"),
+              !strstr(c.text, "\nSous-système\n"),
           "main contains loading and information, history lives in playlists");
     row(&u, 1);
     check(u.page == CR_CONTENT, "content entry opens import and library choices");
@@ -495,7 +495,7 @@ int main(void) {
     check(!u.engine.handle, "core unloaded");
     c = draw(&u);
     check(strstr(c.text, "Charger un cœur") && !strstr(c.text, "Décharger le cœur") &&
-              !strstr(c.text, "Configuration du sous-système"),
+              !strstr(c.text, "\nSous-système\n"),
           "successful unload restores the load action");
     loaded_core_lifecycle(&u, root);
     tab(&u, 1);

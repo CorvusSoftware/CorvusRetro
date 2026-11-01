@@ -2,7 +2,7 @@
 
 CorvusRetro conserve deux entrées distinctes :
 
-- **Menu principal > Configuration du sous-système** apparaît dès qu'un cœur
+- **Menu principal > Sous-système** apparaît dès qu'un cœur
   est chargé, même avant de charger un jeu. Fermer le contenu garde cette
   entrée, puisque le cœur reste chargé. Décharger le cœur la retire.
 - **Menu rapide > Options du cœur** se trouve entre les sauvegardes d'état
@@ -19,7 +19,7 @@ Les paramètres de surimpression restent dans **Commandes**.
 
 ## Deux joueurs (câble link)
 
-1. Charger un cœur, puis ouvrir **Configuration du sous-système**.
+1. Charger un cœur, puis ouvrir **Sous-système**.
 2. Choisir **Deux joueurs (câble link)**.
 3. Choisir ou importer un jeu compatible pour **Joueur 1**, puis **Joueur 2**.
 4. Choisir **Démarrer**. Cette action reste désactivée tant qu'un jeu manque.

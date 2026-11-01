@@ -51,6 +51,7 @@ public final class MainActivity extends NativeActivity {
     private final Object importLock = new Object();
     private GameLibrary library;
     private CoreRepository coreRepository;
+    private SaveTransfers saveTransfers;
     private RetroAchievementsService achievements;
     private RetroAchievementsImages achievementImages;
     private NativeTextInput textInput;
@@ -89,6 +90,7 @@ public final class MainActivity extends NativeActivity {
     static native void coreCatalogUpdated(String[] packages, String error);
     static native void coreModulesUpdated(String[] paths);
     static native void coreInstallStatus(String message, boolean finished);
+    private static native void saveTransferResult(long request, String path, String error, boolean cancelled);
     private static native void controllerDevicesChanged(int[] deviceIds, long[] generations);
 
     private void publishControllerDevices() {
@@ -117,6 +119,18 @@ public final class MainActivity extends NativeActivity {
         // NativeActivity starts android_main in super.onCreate. Services must already exist.
         library = new GameLibrary(this);
         coreRepository = new CoreRepository(this, io);
+        saveTransfers = new SaveTransfers(getContentResolver(), getFilesDir(), io, new SaveTransfers.Host() {
+            @Override public boolean alive() { return isAlive(); }
+            @Override public boolean canPick() {
+                synchronized (importLock) {
+                    return !destroyed && !pickerOpen && !copying && pending == null && folderFiles == null;
+                }
+            }
+            @Override public void pick(Intent intent, int code) { startActivityForResult(intent, code); }
+            @Override public void result(long request, String path, String error, boolean cancelled) {
+                if (isAlive()) saveTransferResult(request, path, error, cancelled);
+            }
+        });
         achievements = new RetroAchievementsService(this);
         achievementImages = new RetroAchievementsImages(this, MainActivity::achievementImageReady);
         textInput = new NativeTextInput(this);
@@ -190,12 +204,17 @@ public final class MainActivity extends NativeActivity {
             folderFiles = null;
         }
         textInput.cancel();
+        saveTransfers.close();
         achievements.close();
         achievementImages.close();
         io.shutdown();
         super.onDestroy();
     }
     boolean isAlive() { return !destroyed; }
+    public void saveTransfer(long request, int operation, String title, byte[] snapshot) {
+        runOnUiThread(() -> saveTransfers.request(request, operation, title, snapshot));
+    }
+    public void finishSaveTransfer(long request) { saveTransfers.finish(request); }
     public void refreshCoreCatalog() { coreRepository.refresh(); }
     public void installCorePack(String packId) { coreRepository.install(packId); }
     public boolean coreInstallPending() { return CoreRepository.downloading(); }
@@ -272,6 +291,7 @@ public final class MainActivity extends NativeActivity {
     }
     public void pickContent(int system) {
         runOnUiThread(() -> {
+            if (saveTransfers.busy()) { notifyError("Terminez le transfert de sauvegarde déjà ouvert"); return; }
             synchronized (importLock) { if (destroyed || pickerOpen || copying || pending != null || folderFiles != null) return; }
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE);
             try {
@@ -285,6 +305,7 @@ public final class MainActivity extends NativeActivity {
     }
     public void pickFolder(int system, String extensions) {
         runOnUiThread(() -> {
+            if (saveTransfers.busy()) { notifyError("Terminez le transfert de sauvegarde déjà ouvert"); return; }
             synchronized (importLock) {
                 if (destroyed || pickerOpen || copying || pending != null || folderFiles != null) return;
             }
@@ -303,6 +324,7 @@ public final class MainActivity extends NativeActivity {
     }
     @Override protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
+        if (saveTransfers.activityResult(request, result, data)) return;
         if (request == OPEN_FOLDER) {
             pickerOpen = false;
             if (result != RESULT_OK || data == null || data.getData() == null) {

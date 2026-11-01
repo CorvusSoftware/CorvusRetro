@@ -223,9 +223,13 @@ public final class CoreRepositoryInstrumentation extends Instrumentation {
         MainActivity activity = (MainActivity) startActivitySync(new Intent(getTargetContext(), MainActivity.class)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         try {
-            android.os.SystemClock.sleep(800);
+            long focusDeadline = android.os.SystemClock.uptimeMillis() + 15000;
+            while (!activity.hasWindowFocus() && android.os.SystemClock.uptimeMillis() < focusDeadline)
+                android.os.SystemClock.sleep(100);
+            check(activity.hasWindowFocus(), "native activity focused before downloader navigation");
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER);
-            for (int i = 0; i < 33; i++) sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_DOWN);
+            for (int i = 0; i < activity.installedCoreModules().length; i++)
+                sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_DOWN);
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER);
             long deadline = android.os.SystemClock.uptimeMillis() + 15000;
             while (!catalogRequests.contains(CoreCatalogDiscovery.FALLBACK) &&
