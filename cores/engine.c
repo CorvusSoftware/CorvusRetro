@@ -1143,10 +1143,11 @@ static bool recover_import(cr_engine *e) {
     else if (ok && status.st_size != (off_t)sizeof(r))
         ok = false;
     size_t offset = 0;
-    while (ok && offset < record_size) {
-        ssize_t n = read(fd, (uint8_t *)&r + offset, record_size - offset);
+    while (ok && offset < record_size && offset < sizeof(r)) {
+        /* Bound the syscall by object capacity, then enforce the selected format. */
+        ssize_t n = read(fd, (uint8_t *)&r + offset, sizeof(r) - offset);
         if (n < 0 && errno == EINTR) continue;
-        if (n <= 0) { ok = false; break; }
+        if (n <= 0 || (size_t)n > record_size - offset) { ok = false; break; }
         offset += (size_t)n;
     }
     if (close(fd) != 0) ok = false;
