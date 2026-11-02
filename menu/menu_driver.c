@@ -256,7 +256,7 @@ static bool library_grid(const cr_ui *u) {
     return !u->quick && u->page == CR_LIBRARY && u->width >= 300 && u->height > u->width;
 }
 static float library_top(const cr_ui *u) {
-    return u->library_query[0] || u->library_editing ? 207 : 184;
+    return u->library_query[0] || u->library_editing ? 166 : 136;
 }
 static int library_system(const cr_game *game) {
     if (!strcmp(game->system_id, "nintendo.game_boy") ||
@@ -688,7 +688,7 @@ static void clamp_scroll(cr_ui *u) {
     float content = home_cards(u) ? (u->engine.handle ? 695.f : 631.f) * home_scale(u) :
                     (float)rows(u) * 76;
     if (library_grid(u)) {
-        float total = ((library_count(u) + 1) / 2) * 208.f;
+        float total = ((library_count(u) + 1) / 2) * 156.f;
         u->scroll = fmaxf(0, fminf(u->scroll, total - fmaxf(1, body_bottom(u) - library_top(u))));
         return;
     }
@@ -1746,8 +1746,8 @@ void cr_ui_move(cr_ui *u, int direction) {
         float size = home_cards(u) ? 70 * home_scale(u) : 76;
         float view = fmaxf(1, body_bottom(u) - 64);
         if (library_grid(u)) {
-            top = u->focus ? ((u->focus - 1) / 2) * 208.f : 0;
-            size = u->focus ? 198 : 0;
+            top = u->focus ? ((u->focus - 1) / 2) * 156.f : 0;
+            size = u->focus ? 148 : 0;
             view = fmaxf(1, body_bottom(u) - library_top(u));
         }
         if (top < u->scroll)
@@ -1833,15 +1833,14 @@ static int library_target(const cr_ui *u, float x, float y) {
         if (x >= 16 && x < w - 16 && category >= 0 && category <= 3)
             return LIBRARY_ALL - category;
     }
-    if (y >= 127 && y < 169 && x >= 16 && x < w - 16) return LIBRARY_IMPORT;
     float top = library_top(u);
     if (y < top || y >= body_bottom(u) || x < 16 || x >= w - 16) return -1;
     float tile_width = (w - 44) / 2, column_x = x - 16;
     int column = column_x < tile_width ? 0 : column_x >= tile_width + 12 ? 1 : -1;
     if (column < 0) return -1;
     float offset = y - top + u->scroll;
-    int grid_row = (int)floorf(offset / 208);
-    if (grid_row < 0 || fmodf(offset, 208) >= 196) return -1;
+    int grid_row = (int)floorf(offset / 156);
+    if (grid_row < 0 || fmodf(offset, 156) >= 148) return -1;
     int position = grid_row * 2 + column;
     return position < library_count(u) ? LIBRARY_GAME_BASE - position : -1;
 }
@@ -2379,14 +2378,10 @@ static void draw_library(cr_ui *u, const cr_painter *p, const cr_theme *theme) {
         center(p, filters[i], x + cell / 2, 102, 13,
                selected ? 0xff160f30 : theme->text);
     }
-    rounded(p, 16, 128, w - 32, 40, 11,
-            u->focus == 0 ? 0xff3b3265 : 0xff202640);
-    p->icon(p->context, CR_ICON_FOLDER, 28, 138, 20, theme->accent);
-    text(p, "Importer un dossier", 58, 152, 13, theme->text, w - 102);
     if (u->library_query[0] || u->library_editing) {
-        rounded(p, 16, 172, w - 32, 23, 9, 0xff352957);
+        rounded(p, 16, 128, w - 32, 28, 10, 0xff36285d);
         text(p, u->library_editing ? u->library_preview : u->library_query,
-             26, 189, 11, 0xffe4d7ff, w - 56);
+             28, 147, 12, 0xffefdcff, w - 56);
     }
     float grid_top = library_top(u);
     float tile_w = (w - 44) / 2;
@@ -2395,17 +2390,17 @@ static void draw_library(cr_ui *u, const cr_painter *p, const cr_theme *theme) {
         text(p, u->game_count ? "Aucun jeu pour ce filtre." : "Aucun jeu dans la bibliothèque.",
              20, grid_top + 57, 15, theme->text, w - 40);
         text(p, u->game_count ? "Essayez un autre filtre ou une recherche." :
-             "Importez un dossier avec le cœur approprié.",
+             "Importer un dossier : icône en haut à droite.",
              20, grid_top + 85, 12, theme->muted, w - 40);
         return;
     }
     if (p->clip) p->clip(p->context, 0, grid_top, w, fmaxf(1, bottom - grid_top));
-    int first = (int)fmaxf(0, floorf(u->scroll / 208));
+    int first = (int)fmaxf(0, floorf(u->scroll / 156));
     int last = (int)fminf((total + 1) / 2,
-                          ceilf((u->scroll + bottom - grid_top) / 208) + 1);
+                          ceilf((u->scroll + bottom - grid_top) / 156) + 1);
     for (int line = first; line < last; ++line) {
-        float y = grid_top + line * 208 - u->scroll;
-        if (y + 196 < grid_top || y >= bottom) continue;
+        float y = grid_top + line * 156 - u->scroll;
+        if (y + 148 < grid_top || y >= bottom) continue;
         for (int col = 0; col < 2; ++col) {
             int position = line * 2 + col;
             if (position >= total) break;
@@ -2417,17 +2412,16 @@ static void draw_library(cr_ui *u, const cr_painter *p, const cr_theme *theme) {
 
             float x = 16 + col * (tile_w + 12);
             bool focused = u->focus == position + 1;
-            rounded(p, x, y, tile_w, 196, 13, focused ? theme->accent : 0xff1d2541);
-            art_cover(p, x + 3, y + 3, tile_w - 6, 154, art);
-            rect(p, x + 3, y + 157, tile_w - 6, 36, 0xff11182b);
-            text(p, game->title, x + 11, y + 175, 12, theme->text, tile_w - 22);
+            rounded(p, x, y, tile_w, 148, 12, focused ? theme->accent : 0xff222048);
+            art_cover(p, x + 3, y + 3, tile_w - 6, 142, art);
+            rect(p, x + 3, y + 3, tile_w - 6, 34, 0xcc0e1535);
+            text(p, game->title, x + 10, y + 24, 13, 0xfff6f1ff, tile_w - 20);
             const char *label = system == 0 ? "GB" : system == 1 ? "GBC" :
                                 system == 2 ? "GBA" : "Autre";
-            text(p, label, x + 11, y + 190, 10,
-                 game->system == u->engine.system && u->engine.handle ?
-                 theme->accent : theme->muted, tile_w - 22);
+            rounded(p, x + 8, y + 121, 39, 21, 10, 0xee111b36);
+            text(p, label, x + 16, y + 136, 11, 0xfff1efff, 30);
             if (focused)
-                rect(p, x + 5, y + 194, tile_w - 10, 2, theme->accent);
+                rect(p, x + 6, y + 145, tile_w - 12, 2, theme->accent);
         }
     }
     if (p->clip) p->clip(p->context, 0, 56, w, fmaxf(1, bottom - 56));
