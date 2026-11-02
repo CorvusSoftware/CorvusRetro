@@ -170,6 +170,10 @@ static void row(cr_ui *u, int i) {
          u->width >= 300 && u->height > u->width)) && !u->quick) {
         u->focus = i;
         cr_ui_confirm(u);
+    } else if (u->page == CR_CORES && u->width >= 320 &&
+               u->height >= 610 && u->height > u->width && i >= 0 && i <= 3) {
+        const float y[] = {376, 282, 188, 558};
+        tap(u, 160, y[i]);
     } else tap(u, 160, 100 + 76 * i);
 }
 static void tab(cr_ui *u, int i) {
