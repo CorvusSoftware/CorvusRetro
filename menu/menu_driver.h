@@ -93,7 +93,9 @@ typedef struct {
     size_t game_count;
     cr_core_catalog core_catalog;
     bool catalog_loading;
-    int page, filter, theme, focus, tab, menu_pointer, feedback_target;
+    int page, filter, library_filter, theme, focus, tab, menu_pointer, feedback_target;
+    bool library_editing;
+    char library_query[96], library_preview[96];
     bool quick, audio, awake, importing, show_input, installing;
     int volume, video_integer, video_smooth, overlay_opacity, overlay_size, overlay_position;
     int notify_cards, notify_progress, backup_count, auto_state, editing_setting;
