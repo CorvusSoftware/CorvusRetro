@@ -1,4 +1,3 @@
-Objectif : espacer les boutons de jeu en portrait, sans agrandir les boutons ni modifier les menus ou le paysage. Même PR21 ouverte.
-Budget STANDARD : input/play_layout.c, tests géométrie/commandes et documentation.
-Stratégie : diagonale A/B plus ouverte selon place disponible ; Select/Start plus écartés sur la rangée inférieure avec le bouton de visibilité ; croix et bouton menu conservés. En réglant la position, déplacer le groupe principal dans la place restant avant cette rangée fixe.
-Validation : géométrie GB/GBC/GBA, petites surfaces, 100..130% et position±15, cibles48dp, diagonales/multitouch, absence chevauchement et paysage inchangé. Tests natifs/ASan, buildAndroid et rendu/interaction sur émulateur avec jeu synthétique. Revue indépendante puis mise à jourPR/CIexactSHA, sans fusion/release.
+Objectif : jouer le MP3 fourni, sans modification, lors du déblocage d'un succès. MêmePR21.
+Budget STANDARD : événementC CR_CHEEVOS_UNLOCKED ->callbackplateforme ->JNI ->SoundPool Android préchargé. Son seulement si cartes/son activés et volume>0 ; lancement/progression/fin de collection restent silencieux. Un seul flux sonore, arrêt pause/destruction, requêtes anciennes invalidées.
+Preuves : test natif événement réel rc_client et RAM, volume/mute/cartes/dédoublonnage ; instrumentation Android chargement/lecture SoundPool du vraiMP3 et lifecycle, parcours succès réel ; compilation2ABI/lint/APKassetidentique. Revue indépendante et CI dernierSHA avant revue. Aucun changement CorvusCore/API/sauvegardes/menus, pas de fusion/release.

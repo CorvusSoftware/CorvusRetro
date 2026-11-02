@@ -2,16 +2,16 @@ CorvusSoftware Quality Gate
 Status: PASS (implémentation locale pour revue)
 Risk: STANDARD
 Criteria:
-- PASS : commandes portrait plus espacées, tailles inchangées, géométrie commune au dessin et au toucher.
-- PASS : petites surfaces/configuration100..130% et positions±15 bornées, cibles téléphones48dp et absence chevauchement.
-- PASS : paysage et menus conservés.
+- PASS : MP3 utilisateur conservé octet pour octet, décodé et préchargé dans Android.
+- PASS : seul le vrai événement de déblocage joue le son, selon cartes/audio/volume ; pas de doublon lancement/progression/collection.
+- PASS : volume courant/mute propagés, pause/destruction arrêtent et libèrent le lecteur ; pas de reprise d'un ancien son.
 Evidence:
--15natives et15ASan/UBSan réussis.
-- Androiddebug2ABI/lint/testAPK ; APKzeroCore/ELF16Ko réussis.
--177contrôles Android overlay portrait répartis surGB/GBC/GBA ; capturesGB/GBA inspectées. La première captureGBC est transitoirement noire, ses interactions et menus passent ; géométrie identiqueGB/GBC dans le code.
+-15suites natives et15ASan/UBSan réussies, test événementRAM/rc_client/volume/cartes ajouté au client natif.
+- Androiddebug2ABI/lint/testAPK ; APKzeroCore/ELF16Ko ; hashassetAPK identique.
+-26contrôlesAndroidSoundPool/décodage/volume/lifecycle et parcours succès natif/popups réussis. Le fixture son impose audio100 pour ne pas dépendre du profil.
 Review:
-- Indépendante sans défaut,127260configurations avec comparaison champ par champ au paysage précédent.
+- Indépendante sans défaut restant, correction du volume pendant lecture validée.
 Open risks:
-- Aucun téléphone physique testé. Pas de nouvelle release signée dans cette PR.
+- Pas d'écoute sur téléphone physique. Aucun changement de moteur ni de compte réel ; protocole synthétique et jeu original de test.
 Decision:
-- PR prête pour revue ; consulter CI du dernier commit avant fusion. Ni fusion ni release dans cette tâche.
+- PR prête pour revue ; consulter CI derniercommit avant fusion. Ni fusion ni release.

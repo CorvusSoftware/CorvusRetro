@@ -934,9 +934,25 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             check(!hasColor(popupArea, 0xffb69aff), stage + " shows no preliminary crow popup");
         } finally { popupArea.recycle(); screen.recycle(); }
     }
+    private int achievementSoundStream(MainActivity activity) throws Exception {
+        java.lang.reflect.Field service=MainActivity.class.getDeclaredField("achievementSound"); service.setAccessible(true);
+        Object sound=service.get(activity);
+        java.lang.reflect.Field field=AchievementSound.class.getDeclaredField("stream"); field.setAccessible(true);
+        java.util.concurrent.atomic.AtomicInteger value=new java.util.concurrent.atomic.AtomicInteger();
+        runOnMainSync(() -> {
+            try { value.set(field.getInt(sound)); } catch (IllegalAccessException error) { throw new AssertionError(error); }
+        });
+        return value.get();
+    }
     private void popups() throws Exception {
         transport(); prepareGame();
         Context context = getTargetContext();
+        SharedPreferences soundPreferences=context.getSharedPreferences("corvus",Context.MODE_PRIVATE);
+        java.util.Map<String,?> originalSound=soundPreferences.getAll();
+        displayPreferences.put("audio",originalSound.get("audio"));
+        displayPreferences.put("audio_volume",originalSound.get("audio_volume"));
+        check(soundPreferences.edit().putBoolean("audio",true).putInt("audio_volume",100).commit(),
+                "unlock sound test uses explicit audio settings");
         File[] cachedImages = new File(context.getCacheDir(), "achievement-images").listFiles();
         if (cachedImages != null) for (File image : cachedImages) check(image.delete(), "cold image cache fixture");
         onlineFlag = new File(context.getExternalFilesDir(null), "ra-network-online");
@@ -969,9 +985,11 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             waitFor(() -> gameImageRequested, "game image requested after identification");
             noLaunchPlaceholder(activity, "waiting-image", gameImageRelease);
             capturePopup("launch", GAME_COLOR);
+            check(achievementSoundStream(activity)==0,"native launch card does not play the unlock sound");
             android.os.SystemClock.sleep(4500);
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BUTTON_A);
             capturePopup("progress", PROGRESS_COLOR);
+            check(achievementSoundStream(activity)==0,"native progress badge stays silent");
             android.os.SystemClock.sleep(2200);
             android.graphics.Bitmap hidden = getUiAutomation().takeScreenshot();
             check(hidden != null && !hasColor(hidden, PROGRESS_COLOR), "progress indicator expires after two seconds");
@@ -985,6 +1003,7 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BUTTON_B);
             capturePopup("unlocked", UNLOCK_COLOR);
             waitFor(() -> awards == 1, "actual core memory unlocked one achievement with decoded images");
+            waitFor(() -> achievementSoundStream(activity)>0,"real native unlock reaches Android SoundPool playback");
             closeContent();
             android.graphics.Bitmap cleared = getUiAutomation().takeScreenshot();
             check(cleared != null && !hasColor(cleared, UNLOCK_COLOR), "closing content keeps the core and removes the old game's popup");

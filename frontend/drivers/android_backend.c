@@ -381,6 +381,7 @@ bool cr_android_init(cr_android *p, struct android_app *app) {
     METHOD(install_pack, "installCorePack", "(Ljava/lang/String;)V");
     METHOD(installed_modules, "installedCoreModules", "()[Ljava/lang/String;");
     METHOD(install_pending, "coreInstallPending", "()Z");
+    METHOD(achievement_sound, "playAchievementSound", "(I)V");
     METHOD(achievement_request, "achievementRequest", "(JLjava/lang/String;Ljava/lang/String;)V");
     METHOD(achievement_credentials, "achievementCredentials", "()[Ljava/lang/String;");
     METHOD(achievement_credentials_set, "achievementCredentialsSet", "(Ljava/lang/String;Ljava/lang/String;)V");
@@ -690,9 +691,14 @@ static bool controller_info(void *context, unsigned port, char *name, size_t cap
     snprintf(name, capacity, "%s", p->controller_names[port]);
     return true;
 }
+static void achievement_sound(void *context, int volume) {
+    cr_android *p = context;
+    (*p->env)->CallVoidMethod(p->env, p->app->activity->clazz, p->achievement_sound, (jint)volume);
+    cr_android_clear_error(p);
+}
 cr_platform cr_android_services(cr_android *p) {
     return (cr_platform){p, pref, set_pref, pick, finish, games, touch, credits,
                          appearance, quit, refresh_catalog, install_pack, install_pending,
                          achievement_request, achievement_credentials, save_achievement_credentials, edit_text,
-                         pick_folder, save_transfer, finish_save_transfer, controller_info};
+                         pick_folder, save_transfer, finish_save_transfer, controller_info, achievement_sound};
 }

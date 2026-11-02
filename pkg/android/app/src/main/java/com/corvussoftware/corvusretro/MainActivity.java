@@ -56,6 +56,7 @@ public final class MainActivity extends NativeActivity {
     private final Object importLock = new Object();
     private GameLibrary library;
     private CoreRepository coreRepository;
+    private AchievementSound achievementSound;
     private SaveTransfers saveTransfers;
     private RetroAchievementsService achievements;
     private RetroAchievementsImages achievementImages;
@@ -140,6 +141,8 @@ public final class MainActivity extends NativeActivity {
                 if (isAlive()) saveTransferResult(request, path, error, cancelled);
             }
         });
+        achievementSound = new AchievementSound(this);
+        updateAchievementSoundVolume();
         achievements = new RetroAchievementsService(this);
         achievementImages = new RetroAchievementsImages(this, MainActivity::achievementImageReady);
         textInput = new NativeTextInput(this);
@@ -203,9 +206,21 @@ public final class MainActivity extends NativeActivity {
     }
     @Override protected void onResume() {
         super.onResume();
+        achievementSound.resume();
         achievements.resumeAwards();
     }
+    @Override protected void onPause() {
+        achievementSound.pause();
+        super.onPause();
+    }
+    public void playAchievementSound(int volumePercent) { achievementSound.play(volumePercent); }
+    private void updateAchievementSoundVolume() {
+        int volume = preference("audio",1) != 0 && preference("notify_cards",1) != 0
+                ? preference("audio_volume",100) : 0;
+        achievementSound.volume(volume);
+    }
     @Override protected void onDestroy() {
+        achievementSound.close();
         if (inputManager != null) inputManager.unregisterInputDeviceListener(controllerListener);
         synchronized (importLock) {
             destroyed = true;
@@ -297,6 +312,8 @@ public final class MainActivity extends NativeActivity {
         }
         else if ("audio".equals(key) || "keep_awake".equals(key)) library.preferences.edit().putBoolean(key, value != 0).apply();
         else library.preferences.edit().putInt(key, value).apply();
+        if ("audio".equals(key) || "audio_volume".equals(key) || "notify_cards".equals(key))
+            updateAchievementSoundVolume();
     }
     public void pickContent(int system) {
         runOnUiThread(() -> {

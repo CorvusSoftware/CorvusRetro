@@ -680,6 +680,8 @@ static void achievement_notification(void *context, const cr_cheevos_notificatio
         break;
     case CR_CHEEVOS_UNLOCKED:
         if (!u->notify_cards) break;
+        if (u->audio && u->volume > 0 && u->platform.achievement_sound)
+            u->platform.achievement_sound(u->platform.context, u->volume);
         snprintf(detail, sizeof(detail), "%s", event->title);
         char title[96];
         snprintf(title, sizeof(title), "Succès débloqué - %u points", event->points);

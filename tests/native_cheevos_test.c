@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #define _POSIX_C_SOURCE 200809L
 #include "cheevos.h"
+#include "menu_driver.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,6 +16,8 @@ typedef struct {
     unsigned calls, awards, notices, credential_saves;
     bool hold, fail, refuse_login, measured;
     unsigned games, unlocks, progresses, hides, clears, completions;
+    unsigned sounds;
+    int sound_volume;
     cr_cheevos_notification game, unlock, progress;
     char user[96], token[128];
 } fixture;
@@ -95,6 +98,47 @@ static cr_cheevos *create(fixture *f) {
 }
 static void pump(cr_cheevos *c) { for (unsigned i = 0; i < 8; ++i) cr_cheevos_idle(c); }
 static cr_cheevos_status status(cr_cheevos *c) { cr_cheevos_status s; cr_cheevos_get_status(c, &s); return s; }
+static void achievement_sound(void *context, int volume) {
+    fixture *f = context; ++f->sounds; f->sound_volume = volume;
+}
+static void frontend_sound(const char *path) {
+    const struct { bool cards, audio, callback; int volume; unsigned sounds; } cases[] = {
+        {true,true,true,100,1}, {true,true,true,30,1}, {true,false,true,100,0},
+        {true,true,true,0,0}, {false,true,true,100,0}, {true,true,false,100,0}
+    };
+    for (unsigned i = 0; i < sizeof(cases)/sizeof(*cases); ++i) {
+        fixture f = {0}; cr_ui ui;
+        cr_ui_init(&ui, (cr_platform){.context=&f,.achievement_request=request,
+            .achievement_sound=cases[i].callback ? achievement_sound : NULL}, "/missing-sound-fixture");
+        f.client = ui.achievements;
+        ui.notify_cards = cases[i].cards; ui.audio = cases[i].audio; ui.volume = cases[i].volume;
+        check(f.client && cr_cheevos_load_game(f.client,path,4,memory,&f) &&
+              cr_cheevos_login(f.client,"CorvusTest","SyntheticPassword"), "native sound fixture loads real achievement definitions");
+        pump(f.client);
+        check(status(f.client).game_loaded && !f.sounds, "game launch stays silent");
+        for (unsigned frame = 0; frame < 8; ++frame) cr_cheevos_frame(f.client);
+        check(!f.sounds, "locked achievements stay silent");
+        f.ram[1] = 7; cr_cheevos_frame(f.client); pump(f.client);
+        check(f.awards == 1 && status(f.client).unlocked == 1 && f.sounds == cases[i].sounds,
+              "real unlock follows card, audio, volume and optional-platform policy");
+        if (f.sounds) check(f.sound_volume == cases[i].volume, "native game volume reaches sound playback");
+        cr_cheevos_frame(f.client); pump(f.client); cr_cheevos_unload_game(f.client);
+        check(f.sounds == cases[i].sounds, "repeat frame, collection completion and unload never replay unlock sound");
+        cr_ui_destroy(&ui);
+    }
+    fixture measured = {.measured=true}; cr_ui ui;
+    cr_ui_init(&ui,(cr_platform){.context=&measured,.achievement_request=request,
+        .achievement_sound=achievement_sound},"/missing-sound-fixture");
+    measured.client=ui.achievements; ui.notify_cards=ui.audio=true; ui.volume=100;
+    check(cr_cheevos_load_game(measured.client,path,4,memory,&measured) &&
+          cr_cheevos_login(measured.client,"CorvusTest","SyntheticPassword"), "measured sound fixture starts");
+    pump(measured.client); cr_cheevos_frame(measured.client);
+    measured.ram[1]=5; cr_cheevos_frame(measured.client); pump(measured.client);
+    check(!measured.sounds && !measured.awards, "measured progress notification stays silent");
+    measured.ram[1]=10; cr_cheevos_frame(measured.client); pump(measured.client);
+    check(measured.sounds==1 && measured.awards==1, "completing measured progress plays one unlock sound");
+    cr_ui_destroy(&ui);
+}
 int main(void) {
     char path[] = "/tmp/corvus-cheevos-XXXXXX";
     int descriptor = mkstemp(path);
@@ -202,6 +246,7 @@ int main(void) {
     cr_cheevos_response(c, late_game, 200, late_definition, strlen(late_definition));
     check(measured.games == games && !status(c).game_loaded, "late old-game response cannot resurrect a popup");
     cr_cheevos_destroy(c);
+    frontend_sound(path);
     check(unlink(path) == 0, "remove original fixture");
     printf("PASS %u native RetroAchievements checks\n", checks);
     return 0;
