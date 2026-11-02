@@ -242,15 +242,14 @@ JNIEXPORT void JNICALL Java_com_corvussoftware_corvusretro_MainActivity_coreModu
     pthread_mutex_unlock(&core_mutex);
     wake_frontend();
 }
-bool cr_android_update_modules(void) {
+bool cr_android_update_modules(int keep) {
     // Only this frontend-thread consumer may negotiate CorvusAPI or mutate the registry.
     pthread_mutex_lock(&core_mutex);
     bool changed = modules_ready;
     if (changed) {
-        for (size_t i = 0; i < pending_module_count; ++i) {
-            const char *path = pending_modules[i];
-            cr_registry_add_installed_modules(&path, 1);
-        }
+        const char *paths[CR_MAX_CORES];
+        for (size_t i = 0; i < pending_module_count; ++i) paths[i] = pending_modules[i];
+        cr_registry_sync_installed_modules(paths,pending_module_count,keep);
         modules_ready = false;
     }
     pthread_mutex_unlock(&core_mutex);
@@ -381,6 +380,8 @@ bool cr_android_init(cr_android *p, struct android_app *app) {
     METHOD(install_pack, "installCorePack", "(Ljava/lang/String;)V");
     METHOD(installed_modules, "installedCoreModules", "()[Ljava/lang/String;");
     METHOD(install_pending, "coreInstallPending", "()Z");
+    METHOD(can_remove_core, "canRemoveCore", "(Ljava/lang/String;)Z");
+    METHOD(remove_core, "removeCore", "(Ljava/lang/String;)V");
     METHOD(achievement_sound, "playAchievementSound", "(I)V");
     METHOD(achievement_request, "achievementRequest", "(JLjava/lang/String;Ljava/lang/String;)V");
     METHOD(achievement_credentials, "achievementCredentials", "()[Ljava/lang/String;");
@@ -696,9 +697,25 @@ static void achievement_sound(void *context, int volume) {
     (*p->env)->CallVoidMethod(p->env, p->app->activity->clazz, p->achievement_sound, (jint)volume);
     cr_android_clear_error(p);
 }
+static bool can_remove_core(void *context, const char *id) {
+    cr_android *p = context;
+    jstring value = (*p->env)->NewStringUTF(p->env,id);
+    if (!value) { cr_android_clear_error(p); return false; }
+    bool allowed = (*p->env)->CallBooleanMethod(p->env,p->app->activity->clazz,p->can_remove_core,value);
+    (*p->env)->DeleteLocalRef(p->env,value);
+    return !cr_android_clear_error(p) && allowed;
+}
+static void remove_core(void *context, const char *id) {
+    cr_android *p = context;
+    jstring value = (*p->env)->NewStringUTF(p->env,id);
+    if (!value) { cr_android_clear_error(p); return; }
+    (*p->env)->CallVoidMethod(p->env,p->app->activity->clazz,p->remove_core,value);
+    (*p->env)->DeleteLocalRef(p->env,value);
+    cr_android_clear_error(p);
+}
 cr_platform cr_android_services(cr_android *p) {
     return (cr_platform){p, pref, set_pref, pick, finish, games, touch, credits,
                          appearance, quit, refresh_catalog, install_pack, install_pending,
                          achievement_request, achievement_credentials, save_achievement_credentials, edit_text,
-                         pick_folder, save_transfer, finish_save_transfer, controller_info, achievement_sound};
+                         pick_folder, save_transfer, finish_save_transfer, controller_info, achievement_sound, can_remove_core, remove_core};
 }

@@ -21,7 +21,12 @@ typedef struct {
     bool controllers_running;
     bool window, resumed, focused, was_running, audio_warning, applied_awake;
     int applied_theme;
-    double deadline, battery_time, last_draw;
+    double deadline, battery_time, last_draw, video_retry;
+#ifndef NDEBUG
+    unsigned long long frames;
+    double playback_log;
+    bool logged_focus, logged_resumed, logged_window;
+#endif
 } application;
 static double now(void) {
     struct timespec t;
@@ -31,6 +36,19 @@ static double now(void) {
 static void save(application *a) {
     if (!cr_engine_save_battery(&a->ui.engine))
         cr_ui_message(&a->ui, a->ui.engine.error);
+}
+static void restore_video(application *a) {
+    if (!a->platform.app->window) return;
+    a->window = cr_gl_init(&a->gl, &a->platform);
+    a->last_draw = now();
+    if (!a->window) {
+        cr_gl_destroy(&a->gl);
+        a->video_retry = now() + .5;
+        __android_log_write(ANDROID_LOG_WARN,"CorvusRetro","Surface EGL indisponible, nouvelle tentative différée");
+    } else {
+        a->video_retry = 0;
+        a->deadline = now();
+    }
 }
 static void controller_devices(application *a) {
     cr_controller_device devices[CR_CONTROLLER_DEVICE_CAP];
@@ -81,14 +99,7 @@ static void command(struct android_app *app, int32_t cmd) {
         if (app->window) {
             if (a->window)
                 cr_gl_destroy(&a->gl);
-            a->window = cr_gl_init(&a->gl, &a->platform);
-            a->last_draw = now();
-            if (!a->window) {
-                cr_gl_destroy(&a->gl);
-                __android_log_write(ANDROID_LOG_ERROR, "CorvusRetro",
-                                    "Initialisation EGL impossible");
-                ANativeActivity_finish(app->activity);
-            }
+            restore_video(a);
         }
         break;
     case APP_CMD_TERM_WINDOW:
@@ -96,6 +107,7 @@ static void command(struct android_app *app, int32_t cmd) {
         if (a->window)
             cr_gl_destroy(&a->gl);
         a->window = false;
+        a->video_retry = 0;
         cr_audio_pause(&a->audio);
         cr_ui_clear_input(&a->ui);
         cr_controller_ports_clear(&a->controllers);
@@ -125,15 +137,13 @@ static void command(struct android_app *app, int32_t cmd) {
         break;
     case APP_CMD_GAINED_FOCUS:
         a->focused = true;
-        a->deadline = now();
         break;
     case APP_CMD_LOST_FOCUS:
         a->ui.controller_capture = -1;
         a->focused = false;
-        cr_audio_pause(&a->audio);
+        /* A visible notification may steal input focus without pausing the activity. */
         cr_ui_clear_input(&a->ui);
         cr_controller_ports_clear(&a->controllers);
-        save(a);
         break;
     case APP_CMD_CONFIG_CHANGED:
         a->ui.controller_capture = -1;
@@ -177,6 +187,7 @@ static int button(int key) {
 static int32_t input(struct android_app *app, AInputEvent *event) {
     application *a = app->userData;
     cr_ui *u = &a->ui;
+    if (!a->window || !a->resumed || !a->focused) return 0;
     controller_devices(a);
     controller_mode(a);
     int source = AInputEvent_getSource(event);
@@ -319,10 +330,11 @@ void android_main(struct android_app *app) {
         last_active = -1, last_show_input = -1, last_installing = -1;
 #endif
     while (!app->destroyRequested) {
-        bool active = a->window && a->resumed && a->focused;
+        bool active = a->window && a->resumed;
         double time = now();
         bool running = active && cr_ui_running(&a->ui);
-        int wait = active ? 0 : -1;
+        bool recover_video = !a->window && a->resumed && app->window;
+        int wait = active ? 0 : recover_video ? (int)fmax(0,fmin(500,(a->video_retry-time)*1000)) : -1;
         if (active && !running)
             wait = 16;
         else if (running && a->deadline > time)
@@ -334,6 +346,8 @@ void android_main(struct android_app *app) {
             source->process(app, source);
         if (app->destroyRequested)
             break;
+        if (!a->window && a->resumed && app->window && now() >= a->video_retry)
+            restore_video(a);
         controller_devices(a);
         controller_mode(a);
         cr_achievement_response response;
@@ -357,13 +371,13 @@ void android_main(struct android_app *app) {
         cr_core_catalog core_catalog;
         if (cr_android_core_catalog(&core_catalog))
             cr_ui_catalog(&a->ui, &core_catalog);
-        if (cr_android_update_modules())
+        if (cr_android_update_modules(a->ui.engine.handle ? a->ui.engine.system : -1))
             cr_ui_reload(&a->ui);
         char install_status[256];
         bool install_finished;
         if (cr_android_core_status(install_status, sizeof(install_status), &install_finished))
             cr_ui_install_status(&a->ui, install_status, install_finished);
-        active = a->window && a->resumed && a->focused;
+        active = a->window && a->resumed;
         running = active && cr_ui_running(&a->ui);
         time = now();
         bool awake = running && a->ui.awake;
@@ -409,12 +423,15 @@ void android_main(struct android_app *app) {
             unsigned masks[2];
             cr_ui_inputs(&a->ui, masks);
             if (cr_engine_step_players(&a->ui.engine, masks)) {
+#ifndef NDEBUG
+                ++a->frames;
+#endif
                 cr_ui_achievement_frame(&a->ui);
                 if (a->ui.audio) {
                     if (cr_audio_start(&a->audio, a->ui.engine.rate)) {
                         cr_audio_set_volume(&a->audio, a->ui.volume);
                         cr_audio_write(&a->audio, a->ui.engine.audio, a->ui.engine.audio_count);
-                        a->audio_warning = false;
+                        if (a->audio.playing) a->audio_warning = false;
                     } else if (!a->audio_warning) {
                         cr_ui_message(&a->ui,
                                       "Sortie audio indisponible. Le jeu continue sans son.");
@@ -430,13 +447,24 @@ void android_main(struct android_app *app) {
                 cr_audio_pause(&a->audio);
             }
             a->deadline += 1.0 / a->ui.engine.fps;
-            if (time - a->deadline > 2.0 / a->ui.engine.fps)
-                a->deadline = time;
+            double completed = now();
+            if (completed - a->deadline > 2.0 / a->ui.engine.fps)
+                a->deadline = completed;
             if (time - a->battery_time > 5) {
                 save(a);
                 a->battery_time = time;
             }
         }
+#ifndef NDEBUG
+        if (a->focused != a->logged_focus || a->resumed != a->logged_resumed ||
+            a->window != a->logged_window || (running && time-a->playback_log >= 1)) {
+            __android_log_print(ANDROID_LOG_DEBUG,"CorvusRetro",
+                "playback resumed=%d focused=%d window=%d frames=%llu audio=%d",
+                a->resumed,a->focused,a->window,a->frames,a->audio.playing);
+            a->logged_focus=a->focused; a->logged_resumed=a->resumed;
+            a->logged_window=a->window; a->playback_log=time;
+        }
+#endif
         if (a->window && a->resumed) {
             cr_gl_set_smoothing(&a->gl, a->ui.video_smooth);
             cr_gl_begin(&a->gl, cr_theme_get(a->ui.theme)->system_bar);
@@ -449,6 +477,9 @@ void android_main(struct android_app *app) {
             if (!cr_gl_end(&a->gl)) {
                 cr_gl_destroy(&a->gl);
                 a->window = false;
+                a->video_retry = now() + .5;
+                cr_ui_clear_input(&a->ui);
+                cr_controller_ports_clear(&a->controllers);
                 cr_audio_pause(&a->audio);
             }
             a->last_draw = time;

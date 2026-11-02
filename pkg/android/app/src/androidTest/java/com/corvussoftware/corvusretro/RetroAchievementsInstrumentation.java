@@ -807,6 +807,141 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             configurationKey(activity, android.view.KeyEvent.KEYCODE_BACK); state(0, -1, 0, 0);
         } finally { runOnMainSync(activity::finish); }
     }
+    private String systemCommand(String command) throws Exception {
+        try (InputStream input = new android.os.ParcelFileDescriptor.AutoCloseInputStream(
+                getUiAutomation().executeShellCommand(command)); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[4096]; int count;
+            while ((count = input.read(buffer)) != -1) {
+                check(output.size() + count < 512 * 1024, "bounded Android system command response");
+                output.write(buffer, 0, count);
+            }
+            return new String(output.toByteArray(), StandardCharsets.UTF_8);
+        }
+    }
+    private long[] playbackState() throws Exception {
+        Process process = Runtime.getRuntime().exec(new String[] {"logcat", "-d", "--pid=" + android.os.Process.myPid(),
+                "-s", "CorvusRetro:D", "*:S"});
+        long[] state = {-1, -1, -1, -1, -1};
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+                "playback resumed=(\\d+) focused=(\\d+) window=(\\d+) frames=(\\d+) audio=(\\d+)");
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                java.util.regex.Matcher match = pattern.matcher(line);
+                if (match.find()) for (int i = 0; i < state.length; ++i) state[i] = Long.parseLong(match.group(i + 1));
+            }
+        }
+        process.waitFor(); return state;
+    }
+    private void playback() throws Exception {
+        prepareOverlayGame(0);
+        Context context = getTargetContext();
+        SharedPreferences preferences = context.getSharedPreferences("corvus", Context.MODE_PRIVATE);
+        displayPreferences.put("audio", preferences.getAll().get("audio"));
+        check(preferences.edit().putInt("achievements_enabled", 0).putString("theme", "corvus")
+                .putInt("show_input", 1).putBoolean("audio", true).commit(), "playback fixture enables real audio output");
+        MainActivity activity = (MainActivity) startActivitySync(new Intent(context, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        try {
+            check(getUiAutomation().setRotation(landscape ? android.app.UiAutomation.ROTATION_FREEZE_90 : android.app.UiAutomation.ROTATION_FREEZE_0),
+                    "playback test rotation");
+            waitFor(() -> { int[] area = activity.safeWindowArea(); return area != null && (area[0] > area[1]) == landscape; }, "playback safe viewport");
+            state(0, -1, 0, 0);
+            waitFor(() -> playbackState()[1] == 1, "native focus is ready before first input");
+            configurationRow(activity, 0); state(3, -1, 0, 0);
+            configurationRow(activity, 0); state(0, 0, 0, 0);
+            tab(activity, 1); tap(activity, 150, 100); state(4, 0, 0, 0);
+            tap(activity, 150, 100); state(8, 0, 1, 0);
+            waitFor(() -> { long[] current = playbackState(); return current[0] == 1 && current[1] == 1 && current[2] == 1 && current[4] == 1; },
+                    "real AAudio stream starts while the original game emulates");
+            screenshot("playback-" + (landscape ? "landscape" : "portrait") + "-controls");
+            systemCommand("cmd statusbar expand-notifications");
+            waitFor(() -> { long[] current = playbackState(); return current[0] == 1 && current[1] == 0 && current[2] == 1 && current[4] == 1; },
+                    "notification shade removes only window focus while keeping audio and video active");
+            long[] covered = playbackState();
+            android.os.SystemClock.sleep(2200);
+            long[] continuing = playbackState();
+            check(continuing[0] == 1 && continuing[1] == 0 && continuing[2] == 1 && continuing[4] == 1 && continuing[3] > covered[3],
+                    "emulated frames and AAudio continue throughout notification shade focus loss");
+            screenshot("playback-notification-shade");
+            systemCommand("cmd statusbar collapse");
+            waitFor(activity::hasWindowFocus, "game regains input focus after shade closes");
+            state(8, 0, 1, 0);
+            quickOpen(activity, 0); configurationKey(activity, android.view.KeyEvent.KEYCODE_BACK); state(8, 0, 1, 0);
+            systemCommand("input keyevent KEYCODE_HOME");
+            waitFor(() -> playbackState()[0] == 0, "real Android HOME lifecycle pauses emulation");
+            long paused = playbackState()[3];
+            android.os.SystemClock.sleep(1500);
+            check(playbackState()[3] == paused, "background lifecycle does not continue emulating");
+            systemCommand("am start -W -n com.corvussoftware.corvusretro/.MainActivity");
+            waitFor(() -> { long[] current = playbackState(); return current[0] == 1 && current[1] == 1 && current[2] == 1 && current[3] > paused && current[4] == 1; },
+                    "returning to Android activity restores EGL, game frames and AAudio");
+            state(8, 0, 1, 0); screenshot("playback-resumed");
+            quickOpen(activity, 0); configurationRow(activity, 2); state(0, 0, 0, 0);
+        } finally {
+            systemCommand("cmd statusbar collapse");
+            runOnMainSync(activity::finish);
+        }
+    }
+    private void coreRemoval() throws Exception {
+        String id = prepareOverlayGame(2);
+        Context context = getTargetContext();
+        check(context.getSharedPreferences("corvus", Context.MODE_PRIVATE).edit()
+                .putInt("achievements_enabled", 0).putString("theme", "corvus").putInt("show_input", 1).commit(),
+                "core-removal fixture preferences");
+        File rom = new File(context.getFilesDir(), "roms/" + id + ".rom");
+        File battery = new File(context.getFilesDir(), "saves/" + id + ".sav");
+        String romHash = CoreStore.hash(rom);
+        MainActivity activity = (MainActivity) startActivitySync(new Intent(context, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        try {
+            check(getUiAutomation().setRotation(landscape ? android.app.UiAutomation.ROTATION_FREEZE_90 : android.app.UiAutomation.ROTATION_FREEZE_0),
+                    "core-removal orientation");
+            waitFor(() -> { int[] area = activity.safeWindowArea(); return area != null && (area[0] > area[1]) == landscape; }, "core-removal safe viewport");
+            state(0, -1, 0, 0);
+            waitFor(() -> playbackState()[1] == 1, "native removal-menu focus is ready before first input");
+            configurationRow(activity, 0); state(3, -1, 0, 0);
+            configurationRow(activity, 2); state(0, 2, 0, 0);
+            tab(activity, 1); tap(activity, 150, 100); state(4, 2, 0, 0);
+            tap(activity, 150, 100); state(8, 2, 1, 0);
+            android.os.SystemClock.sleep(700);
+            quickOpen(activity, 2); configurationRow(activity, 9); state(0, 2, 1, 0);
+            configurationRow(activity, 4); state(14, 2, 1, 0);
+            configurationRow(activity, 3); state(37, 2, 1, 0);
+            screenshot("core-removal-installed");
+            configurationRow(activity, 0); state(38, 2, 1, 0);
+            screenshot("core-removal-confirm");
+            configurationRow(activity, 1); state(37, 2, 1, 0);
+            check(activity.canRemoveCore("corvus.gb") && activity.canRemoveCore("corvus.gba"),
+                    "cancelling removal keeps every installed core");
+            configurationRow(activity, 0); state(38, 2, 1, 0);
+            configurationRow(activity, 0); state(3, 2, 1, 0);
+            waitFor(() -> !activity.canRemoveCore("corvus.gb") && !CoreRepository.downloading(),
+                    "removing another downloaded core finishes without closing current GBA game");
+            check(rom.isFile() && CoreStore.hash(rom).equals(romHash), "removing a different core preserves game bytes");
+            configurationRow(activity, 3); state(37, 2, 1, 0);
+            configurationRow(activity, 1); state(38, 2, 1, 0);
+            configurationRow(activity, 0); state(3, -1, 0, 0);
+            waitFor(() -> !activity.canRemoveCore("corvus.gba") && !CoreRepository.downloading(),
+                    "loaded GBA closes safely and disappears from downloaded list");
+            check(battery.isFile() && battery.length() == 32 * 1024 && CoreStore.hash(rom).equals(romHash),
+                    "deleting loaded core keeps actual battery and original game");
+            String batteryHash = CoreStore.hash(battery);
+            boolean inHistory = false;
+            String[] games = activity.games();
+            for (int i = 0; i < games.length; i += 6) if (id.equals(games[i])) inHistory = true;
+            check(inHistory, "deleted core's game remains in history");
+            screenshot("core-removal-complete");
+            check(id.equals(prepareOverlayGame(2)), "reinstall uses the same stable content identity");
+            MainActivity.coreModulesUpdated(activity.installedCoreModules());
+            waitFor(() -> activity.canRemoveCore("corvus.gba"), "official core can be reinstalled after deletion");
+            android.os.SystemClock.sleep(700);
+            configurationRow(activity, 2); state(0, 2, 0, 0);
+            tab(activity, 1); tap(activity, 150, 100); state(4, 2, 0, 0);
+            tap(activity, 150, 100); state(8, 2, 1, 0);
+            check(batteryHash.equals(CoreStore.hash(battery)), "reinstalled core reuses preserved battery bytes");
+            screenshot("core-removal-reinstalled-playing");
+            quickOpen(activity, 2); configurationRow(activity, 2); state(0, 2, 0, 0);
+        } finally { runOnMainSync(activity::finish); }
+    }
     private void overlays() throws Exception {
         check(overlaySystem >= 0 && overlaySystem < 3, "supported overlay console");
         String id = prepareOverlayGame(overlaySystem);
@@ -1051,8 +1186,8 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
         try {
             if ("savetransfer".equals(phase) || "configuration".equals(phase) || "overlays".equals(phase)
                     || "navigation".equals(phase) || "popups".equals(phase) || "ui".equals(phase)
-                    || "settings_media".equals(phase)) displayDefaults();
-            if ("settings_media".equals(phase)) settingsMedia(); else if ("savetransfer".equals(phase)) saveTransfers(); else if ("configuration".equals(phase)) configuration(); else if ("overlays".equals(phase)) overlays(); else if ("navigation".equals(phase)) navigation(); else if ("popups".equals(phase)) popups(); else if ("ui".equals(phase)) ui(); else if ("outbox".equals(phase)) outbox(); else if ("recover".equals(phase)) recover(); else credentials();
+                    || "settings_media".equals(phase) || "playback".equals(phase) || "core_removal".equals(phase)) displayDefaults();
+            if ("core_removal".equals(phase)) coreRemoval(); else if ("playback".equals(phase)) playback(); else if ("settings_media".equals(phase)) settingsMedia(); else if ("savetransfer".equals(phase)) saveTransfers(); else if ("configuration".equals(phase)) configuration(); else if ("overlays".equals(phase)) overlays(); else if ("navigation".equals(phase)) navigation(); else if ("popups".equals(phase)) popups(); else if ("ui".equals(phase)) ui(); else if ("outbox".equals(phase)) outbox(); else if ("recover".equals(phase)) recover(); else credentials();
             restoreDisplayPreferences();
             result.putString("stream", "PASS " + checks + " Android RetroAchievements checks phase=" + phase + " pid=" + android.os.Process.myPid() + "\n");
             finish(Activity.RESULT_OK, result);

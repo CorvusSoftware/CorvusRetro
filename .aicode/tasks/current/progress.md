@@ -1,5 +1,8 @@
-État : DONE pour livraison0.21.0. Utilisateur a validéPR21 et autorisé la nouvelle version. PR fusionnée, sourceAPK e6f1157dc04736dcbb25f9e462c9f97d0cdc7e5c, tagv0.21.0.
-CI main41443902775, signature41444288324 et publication41445211694 réussies. APKpublic identique aux octets signés qualifiés (SHA256890a3912a4e77959e9892ce4a9732dc3d9179bb26c5d112dab376619fc94f0b1), certpermanentcb431e5abf3ae73ddd5c706a9c485ff6e627be2135bb2557b6191f04ac3a5211, arm64/x86_64/16Ko/zeroCore, MP3inchangé.
-UpgradeémulateurAPI29x86_64 code26->27 accepté, mêmeUID10116/dossier/premièreinstallation ; ASUS/historiqueCorvus-preserved.gba/textes/positions conservés, seules nouvellesicônesdiffèrent ; menu téléchargeur disponiblezeroCore, aucun nouveaucrashobservé. Artefacts /workspace/setup/{signed021-qualification.json,public021-qualification.json,signed021-runtime/upgrade.json}.
-Contrôlesdebug antérieurs :100atlas,646réglages,269commandes/média,75son/succès ; native15+ASan15 et buildsJVM/lint/2ABI. Pasdetéléphone/manettephysique/runtimeARM64 revendiqué. CorvusCore/API/modulesaucunchangement.
-La présente branche actualise seulement README/mémoire/validation aprèspublication ; vérifier sa CI avantfusion, ne pasmodifier v0.21.0 ni sesassets.
+État : VERIFY. Branche feat/playback-and-core-management, base main 7303a32.
+Référence RetroArch documentée dans docs/av-retroarch-reference.md. Tous les changements fonctionnels sont implémentés.
+
+Preuves finales hôtes : 17 suites natives strictes et 17 avec ASan/UBSan passent, dont 284 contrôles AAudio ; frontend sans cœur et 8 tests de workflows passent. 11 nouveaux tests CoreStore passent, ainsi que les tests JVM existants. Base debug et runner compilés pour les deux ABI ; signature, alignement 16 Ko et zéro cœur vérifiés.
+Revue indépendante : entrées effacées après échec EGL et callback d'erreur AAudio tardif sécurisés. Nouvelle revue audio et exécution des 284 contrôles : aucun finding restant.
+Android : agent android_playback_removal_validation utilise exclusivement le profil debug TCP5563, phases playback/core_removal dans RetroAchievementsInstrumentation.java ; build final vert, essais en cours. Lint/JVM et build release finaux dans /workspace/av-android-final.log.
+
+Prochaines actions : terminer et inspecter les parcours/captures Android, consigner les limites de matériel, commit/push PR, vérifier CI exacte. Ne pas modifier les moteurs, l'API, leurs pins ou les fichiers de contenu. Pas de fusion/release dans ce lot. Logs hors dépôt /workspace/av-* et playback-final-runtime.log.

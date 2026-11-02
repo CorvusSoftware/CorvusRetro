@@ -241,6 +241,8 @@ public final class MainActivity extends NativeActivity {
     public void finishSaveTransfer(long request) { saveTransfers.finish(request); }
     public void refreshCoreCatalog() { coreRepository.refresh(); }
     public void installCorePack(String packId) { coreRepository.install(packId); }
+    public boolean canRemoveCore(String id) { return coreRepository.canRemove(id); }
+    public void removeCore(String id) { coreRepository.remove(id); }
     public boolean coreInstallPending() { return CoreRepository.downloading(); }
     public String[] installedCoreModules() {
         ArrayList<String> modules = new ArrayList<>(Arrays.asList(coreRepository.installedModules()));

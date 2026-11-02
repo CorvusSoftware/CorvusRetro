@@ -58,6 +58,16 @@ l'historique seul et les interrupteurs ON/OFF dans les trois thèmes. Utiliser
 fenêtre avant d'injecter une commande après une rotation et lisent les réglages
 via le service Android, qui conserve les types historiques des préférences.
 
+Les phases `playback` et `core_removal` du même runner couvrent la continuité
+avec le volet de notifications, la pause HOME et le retour à la surface EGL,
+puis la confirmation, l'annulation, la suppression avec un jeu chargé et la
+réinstallation. Construire le runner avec
+`-PcorvusTestRunner=com.corvussoftware.corvusretro.RetroAchievementsInstrumentation`
+et fournir `-e phase playback` ou `-e phase core_removal`, ainsi que
+`-e fixture_dir` pointant vers les archives de test officielles déjà vérifiées.
+Le journal de playback debug confirme des trames croissantes et AAudio actif
+pendant la perte de focus. Cela ne constitue pas une écoute physique.
+
 L'instrumentation utilise des programmes de test originaux et un transport
 HTTPS déterministe. Un passage de ces tests ne prouve pas une connexion au
 service public depuis un téléphone. Distinguer explicitement build, tests hôtes,

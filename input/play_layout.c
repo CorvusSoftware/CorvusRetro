@@ -77,6 +77,13 @@ cr_play_layout cr_play_layout_configured(float width, float height, int system, 
         p.dpad.y += shift;
         for (int i = 0; i < 6; ++i) p.controls[i].area.y += shift;
     }
+    if (p.portrait) {
+        /* Lower only the cross, within the remaining gap above the utility row. */
+        float space = p.controls[6].area.y - 8 * s - (p.dpad.y + p.dpad.h);
+        float lower = fminf(12 * s, fmaxf(0, space));
+        p.dpad.y += lower;
+        for (int i = 0; i < 4; ++i) p.controls[i].area.y += lower;
+    }
     if (vw <= 0 || vh <= 0) {
         vw = system == 2 ? 240 : 160;
         vh = system == 2 ? 160 : 144;

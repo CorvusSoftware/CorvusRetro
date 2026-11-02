@@ -1,19 +1,25 @@
 CorvusSoftware Quality Gate
-Status: PASS
-Risk: STANDARD
+Status: PARTIAL
+Risk: DEEP
+
 Criteria:
-- PASS : PR21 approuvée par utilisateur, CI exacte verte puis fusion main.
-- PASS : APK0.21/code27 signé avec identité habituelle et provenance exacte.
-- PASS : deuxABI/alignement16Ko/zeroCore/MP3original et absence provider de test.
-- PASS : upgrade26->27 et conservation UID/données/ASUS/historique vérifiés.
-- PASS : publicationv0.21.0 et retéléchargement public identique aux octets qualifiés.
+- PASS : audio FIFO, amorçage, adaptation bornée, reprise et callbacks tardifs testés.
+- PASS : croix portrait abaissée, bornes et autres géométries préservées.
+- PASS : suppression confirmée, sauvegarde en échec conservant le cœur, identité stable et fichiers protégés.
+- UNVERIFIED : parcours Android réels sur le diff final et CI de la PR, en cours.
+
 Evidence:
-- CI41443902775, signé41444288324 et publication41445211694 réussis sursourcee6f1157.
-- QualificationAPK et upgrade dans /workspace/setup/signed021-qualification.json et signed021-runtime/upgrade.json.
-- PublicAPK SHA256890a3912a4e77959e9892ce4a9732dc3d9179bb26c5d112dab376619fc94f0b1.
+- 17 suites natives strictes et 17 ASan/UBSan passent.
+- 284 contrôles audio et 11 tests JVM de stockage passent.
+- Frontend sans cœur et 8 tests de workflows passent.
+- Build debug/runner deux ABI, signature et alignement APK passent.
+
 Review:
-- Changementsfonctionnels revus indépendamment pendantPR21 ; aucunfinding restant.
+- Revue indépendante effectuée ; les deux défauts concrets sont corrigés et relus.
+
 Open risks:
-- Émulateurx86_64, pas detéléphone/manettephysique/runtimeARM64 testé. Connectivité du catalogue et moteurs distribués séparément, inchangés.
+- Essais Android et lint/build release finaux en cours.
+- Aucun appareil physique ni écoute audio qualifiés.
+
 Decision:
-- Livraison publiée. Documentation dequalification àfusionner après saCI. Conserver tag et assets immuables.
+- Conserver VERIFY jusqu'aux preuves Android et CI ; ne pas présenter une release comme publiée.

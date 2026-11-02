@@ -23,7 +23,7 @@ Aucun fichier d'overlay ni image de RetroArch n'est embarqué.
 
 - Portrait : vidéo en haut, commandes en dessous, espace supplémentaire pour L/R du GBA.
 - Paysage : vidéo centrée entre les commandes, dans des gouttières latérales séparées.
-- Croix continue : quatre directions et quatre diagonales, centre neutre.
+- Croix continue : quatre directions et quatre diagonales, centre neutre. En portrait, elle est légèrement abaissée si la place disponible le permet, en gardant une séparation avec Select/Start.
 - A/B : boutons circulaires avec toucher radial ; L/R uniquement pour GBA.
 - En portrait, A/B utilisent une diagonale plus ouverte si la hauteur disponible le permet.
 - Select et Start sont espacés sur la rangée inférieure, avec la commande de visibilité ; le menu circulaire reste centré au-dessus des commandes.
