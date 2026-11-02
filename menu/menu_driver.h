@@ -47,7 +47,9 @@ enum {
     CR_SAVE_SETTINGS,
     CR_RA_SETTINGS,
     CR_RA_ACCOUNT,
-    CR_GAME_BACKUPS
+    CR_GAME_BACKUPS,
+    CR_REMOVE_CORES,
+    CR_REMOVE_CORE_CONFIRM
 };
 /* Stable quick-menu row IDs; unsupported core operations stay disabled. */
 enum {
@@ -119,6 +121,7 @@ typedef struct {
     cr_pointer pointers[32];
     unsigned keys, pulses, feedback_pulses;
     char title[512], message[512];
+    char remove_core_id[96], remove_core_name[128];
     char *license;
     double message_time, time;
 } cr_ui;

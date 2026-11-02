@@ -55,5 +55,7 @@ typedef struct {
     void (*finish_save_transfer)(void *, uint64_t);
     bool (*controller_info)(void *, unsigned port, char *name, size_t capacity);
     void (*achievement_sound)(void *, int volume_percent);
+    bool (*can_remove_core)(void *, const char *core_id);
+    void (*remove_core)(void *, const char *core_id);
 } cr_platform;
 #endif

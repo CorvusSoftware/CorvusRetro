@@ -156,7 +156,26 @@ int main(int argc, char **argv) {
           "replacement preserves stable index, system identity and core capabilities");
     check(ui.engine.handle == handle && cr_engine_step(&ui.engine, 0),
           "a running game keeps its valid previous module while a replacement is registered");
+    const char *without_gb[] = {replacement, argv[3]};
+    cr_registry_sync_installed_modules(without_gb, 2, ui.engine.system);
+    check(cr_registry_count() == 2 && cr_registry_find("corvus.gb") == -1 &&
+          cr_registry_get(1) == NULL && cr_registry_find("corvus.gbc") == 2 &&
+          cr_registry_index_at(0) == 0 && cr_registry_index_at(1) == 2,
+          "removing an installed core hides its row without renumbering another engine");
+    cr_ui_reload(&ui);
+    check(ui.games[0].system == -1 && ui.games[1].system == 2 && ui.games[2].system == 0 &&
+          ui.engine.handle == handle && cr_engine_step(&ui.engine,0),
+          "removed-core games stay in history unresolved while the other engine continues");
+    check(cr_registry_choose(".gbc",-1) == 2, "content choice skips deleted stable slots");
+    cr_registry_add_installed_modules((const char *const *)&argv[2],1);
+    check(cr_registry_count() == 3 && cr_registry_find("corvus.gb") == 1,
+          "reinstalling the same permanent identity reuses its available slot");
     cr_ui_destroy(&ui);
+    const char *without_gba[] = {argv[2],argv[3]};
+    cr_registry_sync_installed_modules(without_gba,2,-1);
+    check(cr_registry_count() == 2 && !cr_registry_get(0) && cr_registry_index_at(0) == 1 &&
+          cr_registry_choose(".unknown",-1) == 1,
+          "first-live fallback also works after the first registry slot is removed");
     check(unlink(replacement) == 0, "remove replacement module");
     check(unlink(path) == 0 && rmdir(directory) == 0, "remove original test ROM");
     snprintf(path, sizeof(path), "%s/saves/%s.sav", root, id);

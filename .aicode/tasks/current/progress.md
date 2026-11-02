@@ -1,5 +1,8 @@
-État : DONE pour livraison0.21.0. Utilisateur a validéPR21 et autorisé la nouvelle version. PR fusionnée, sourceAPK e6f1157dc04736dcbb25f9e462c9f97d0cdc7e5c, tagv0.21.0.
-CI main41443902775, signature41444288324 et publication41445211694 réussies. APKpublic identique aux octets signés qualifiés (SHA256890a3912a4e77959e9892ce4a9732dc3d9179bb26c5d112dab376619fc94f0b1), certpermanentcb431e5abf3ae73ddd5c706a9c485ff6e627be2135bb2557b6191f04ac3a5211, arm64/x86_64/16Ko/zeroCore, MP3inchangé.
-UpgradeémulateurAPI29x86_64 code26->27 accepté, mêmeUID10116/dossier/premièreinstallation ; ASUS/historiqueCorvus-preserved.gba/textes/positions conservés, seules nouvellesicônesdiffèrent ; menu téléchargeur disponiblezeroCore, aucun nouveaucrashobservé. Artefacts /workspace/setup/{signed021-qualification.json,public021-qualification.json,signed021-runtime/upgrade.json}.
-Contrôlesdebug antérieurs :100atlas,646réglages,269commandes/média,75son/succès ; native15+ASan15 et buildsJVM/lint/2ABI. Pasdetéléphone/manettephysique/runtimeARM64 revendiqué. CorvusCore/API/modulesaucunchangement.
-La présente branche actualise seulement README/mémoire/validation aprèspublication ; vérifier sa CI avantfusion, ne pasmodifier v0.21.0 ni sesassets.
+État : READY_FOR_REVIEW. Implémentation achevée, branche feat/playback-and-core-management, PR #24 ; préparation 0.22.0/code28.
+Référence RetroArch et décisions originales documentées dans docs/av-retroarch-reference.md.
+
+Preuves : 17 suites natives strictes et 17 ASan/UBSan, 284 contrôles AAudio, 19 tests JVM dont 11 nouveaux CoreStore, frontend sans cœur, 8 tests de workflows, lint et builds Android debug/release passent. Base debug deux ABI, signature et alignement 16 Ko vérifiés. Revue indépendante terminée, deux findings corrigés et relus.
+Android 10 API29 x86_64 : playback portrait et paysage 41 contrôles chacun, suppression/réinstallation portrait 91 contrôles ; ROM, batterie et historique conservés. HOME ramène l'écran en portrait ; pas de revendication de retour HOME en paysage. Captures inspectées. Dernière précision de libellé affichant le nom du cœur à supprimer : tests menu/registre/suppression stricts et ASan, build debug/runner/lint passent ; le parcours Android complet repasse ses 91 contrôles, capture nommée inspectée et buffer crash vide.
+CI 41491545182 verte sur 5ccdb7b. Vérifier la CI du nouvel exact head après les derniers commits avant de présenter la PR prête. Aucun merge/release pour ce lot.
+
+Journaux éphémères hors dépôt /workspace/av-* et /workspace/setup/playback-removal-runtime. L'émulateur ne permet pas une écoute physique ; aucune qualification téléphone/Bluetooth/runtime ARM64 revendiquée.

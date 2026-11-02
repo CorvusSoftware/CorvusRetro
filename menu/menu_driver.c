@@ -28,6 +28,9 @@ static const char *system_name(int index) {
 
 enum {
     ACT_NONE,
+    ACT_CORE_REMOVE_CANCEL,
+    ACT_CORE_REMOVE_CONFIRM,
+    ACT_CORE_REMOVE,
     ACT_CORES,
     ACT_UNLOAD,
     ACT_PICK,
@@ -204,6 +207,24 @@ static void press_controls(cr_ui *u, unsigned mask) {
 static float body_bottom(const cr_ui *u) {
     return u->height - 100;
 }
+static int removable_core_at(const cr_ui *u, int row) {
+    if (!u->platform.can_remove_core || !u->platform.remove_core) return -1;
+    for (size_t i = 0; i < cr_registry_count(); ++i) {
+        int index = cr_registry_index_at(i);
+        const cr_core_descriptor *core = cr_registry_get(index);
+        if (core && u->platform.can_remove_core(u->platform.context, core->id) && !row--) return index;
+    }
+    return -1;
+}
+static int removable_cores(const cr_ui *u) {
+    int count = 0;
+    if (!u->platform.can_remove_core || !u->platform.remove_core) return 0;
+    for (size_t i = 0; i < cr_registry_count(); ++i) {
+        const cr_core_descriptor *core = cr_registry_get(cr_registry_index_at(i));
+        if (core && u->platform.can_remove_core(u->platform.context,core->id)) ++count;
+    }
+    return count;
+}
 static int rows(const cr_ui *u) {
     if (u->quick) return CR_QUICK_COUNT - (u->engine.players > 1 ? 0 : 1);
     if (u->page == CR_CORE_OPTIONS) return (int)cr_engine_option_count(&u->engine);
@@ -232,7 +253,9 @@ static int rows(const cr_ui *u) {
     if (u->page == CR_LISTS)
         return 1;
     if (u->page == CR_CORES)
-        return 1 + (int)cr_registry_count();
+        return 1 + (int)cr_registry_count() + (removable_cores(u) > 0);
+    if (u->page == CR_REMOVE_CORES) return removable_cores(u);
+    if (u->page == CR_REMOVE_CORE_CONFIRM) return 2;
     if (u->page == CR_CORE_DOWNLOADS)
         return 1 + (int)u->core_catalog.count;
     if (u->page == CR_SETTINGS) return 6;
@@ -252,7 +275,7 @@ static int rows(const cr_ui *u) {
         return 2 + (int)(count < 4096 ? count : 4096);
     }
     if (u->page == CR_INFORMATION)
-        return 2 + (u->engine.handle ? 1 : 0);
+        return 2 + (u->engine.handle ? 1 : 0) + (removable_cores(u) > 0);
     if (u->page == CR_THEMES)
         return CR_THEME_COUNT;
     if (u->page == CR_GAMES) {
@@ -423,13 +446,25 @@ static row get_row(const cr_ui *u, int index) {
                  "Cœur non installé", CR_ICON_FILE, ACT_GAME, index - 1);
             r.disabled = !u->engine.handle || game->system != u->engine.system;
         }
+    } else if (u->page == CR_REMOVE_CORES) {
+        int slot = removable_core_at(u,index);
+        if (slot >= 0) fill(&r,core_name(slot),"Supprimer ce cœur téléchargé",CR_ICON_CLOSE,ACT_CORE_REMOVE_CONFIRM,slot);
+    } else if (u->page == CR_REMOVE_CORE_CONFIRM) {
+        char label[160];
+        snprintf(label,sizeof(label),"Supprimer %.128s",u->remove_core_name);
+        fill(&r,index ? "Annuler" : label,index ? "Revenir à la liste des cœurs" :
+             "Jeux et sauvegardes conservés",index ? CR_ICON_BACK : CR_ICON_CLOSE,
+             index ? ACT_CORE_REMOVE_CANCEL : ACT_CORE_REMOVE,0);
     } else if (u->page == CR_CORES) {
-        if (index == (int)cr_registry_count()) {
+        if (index > (int)cr_registry_count()) {
+            fill(&r,"Supprimer un cœur téléchargé","Conserver jeux et sauvegardes",CR_ICON_CLOSE,ACT_PAGE,CR_REMOVE_CORES);
+        } else if (index == (int)cr_registry_count()) {
             fill(&r, "Téléchargeur de cœurs", "Catalogue officiel CorvusSoftware",
                  CR_ICON_DOWNLOAD, ACT_OPEN_DOWNLOADER, 0);
         } else {
-            fill(&r, core_name(index), system_name(index), CR_ICON_CORE, ACT_SELECT, index);
-            r.checked = u->engine.handle && u->engine.system == index;
+            int slot = cr_registry_index_at((size_t)index);
+            fill(&r, core_name(slot), system_name(slot), CR_ICON_CORE, ACT_SELECT, slot);
+            r.checked = u->engine.handle && u->engine.system == slot;
         }
     } else if (u->page == CR_CORE_DOWNLOADS) {
         if (index == 0) {
@@ -545,7 +580,9 @@ static row get_row(const cr_ui *u, int index) {
         char value[96]; setting_label(id, setting_get(u, id), value, sizeof(value));
         fill(&r, settings[id].label, value, setting_icon(id), ACT_SETTING_VALUES, id);
     } else if (u->page == CR_INFORMATION) {
-        if (index == 0)
+        if (index == 2 + (u->engine.handle ? 1 : 0))
+            fill(&r,"Supprimer un cœur téléchargé","Conserver jeux et sauvegardes",CR_ICON_CLOSE,ACT_PAGE,CR_REMOVE_CORES);
+        else if (index == 0)
             fill(&r, "À propos de CorvusRetro", "Application native de CorvusSoftware",
                  CR_ICON_INFO, ACT_ABOUT, 0);
         else if (u->engine.handle && index == 1)
@@ -1064,6 +1101,10 @@ static bool import_save_file(cr_ui *u) {
 }
 static void activate(cr_ui *u, row r) {
     if (u->controller_capture >= 0) return;
+    if ((r.action == ACT_CORE_REMOVE || r.action == ACT_CORE_REMOVE_CONFIRM) &&
+        (u->save_request || u->importing || u->installing)) {
+        cr_ui_message(u,"Terminez l’opération en cours avant de supprimer un cœur"); return;
+    }
     if (u->save_request && (r.action == ACT_SELECT || r.action == ACT_UNLOAD ||
         r.action == ACT_GAME || r.action == ACT_PICK || r.action == ACT_FOLDER ||
         r.action == ACT_INSTALL_CORE_PACK || r.action == ACT_OPTION_VALUE ||
@@ -1087,6 +1128,32 @@ static void activate(cr_ui *u, row r) {
         return;
     }
     switch (r.action) {
+    case ACT_CORE_REMOVE_CANCEL:
+        pop_page(u); break;
+    case ACT_CORE_REMOVE_CONFIRM: {
+        const cr_core_descriptor *core = cr_registry_get(r.value);
+        if (!core || !u->platform.can_remove_core || !u->platform.remove_core ||
+            !u->platform.can_remove_core(u->platform.context,core->id)) break;
+        snprintf(u->remove_core_id,sizeof(u->remove_core_id),"%s",core->id);
+        snprintf(u->remove_core_name,sizeof(u->remove_core_name),"%s",core->name);
+        push_page(u,CR_REMOVE_CORE_CONFIRM); break;
+    }
+    case ACT_CORE_REMOVE: {
+        int slot = cr_registry_find(u->remove_core_id);
+        if (slot < 0 || !u->platform.can_remove_core || !u->platform.remove_core ||
+            !u->platform.can_remove_core(u->platform.context,u->remove_core_id)) break;
+        if (u->engine.handle && u->engine.system == slot) {
+            if (!result(u,cr_engine_close(&u->engine))) break;
+            ++u->core_revision; clear_link_selection(u);
+            u->option_key[0]=0; u->input_player=0; u->title[0]=0;
+            cr_cheevos_unload_game(u->achievements); cr_notifications_clear(&u->notifications);
+        }
+        u->installing=true;
+        cr_ui_clear_input(u);
+        page(u,CR_CORES);
+        u->platform.remove_core(u->platform.context,u->remove_core_id);
+        cr_ui_message(u,"Suppression du cœur..."); break;
+    }
     case ACT_SETTING_VALUES: {
         u->editing_setting = r.value;
         push_page(u, CR_SETTING_VALUES);
@@ -1893,6 +1960,12 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         case CR_SETTINGS:
             title = "Réglages";
             break;
+        case CR_REMOVE_CORES:
+            title = "Cœurs téléchargés";
+            break;
+        case CR_REMOVE_CORE_CONFIRM:
+            title = "Supprimer le cœur ?";
+            break;
         case CR_CORES:
             title = "Charger un cœur";
             break;
@@ -2045,7 +2118,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         if (u->page == CR_ABOUT)
             u->text_height = paragraphs(
                 p,
-                "CorvusRetro 0.21.0\n\nFrontend original en C, rendu OpenGL ES et audio "
+                "CorvusRetro 0.22.0\n\nFrontend original en C, rendu OpenGL ES et audio "
                 "AAudio.\n\nCorvusSoftware\nCœurs officiels CorvusCore 0.15.0 : Game Boy, Game "
                 "Boy Color, Game Boy Advance.\n\nNavigation inspirée de "
                 "MaterialUI. Thèmes CorvusRetro, ASUS et NVIDIA Shield.\n\nCopyright (C) 2026 "

@@ -27,6 +27,10 @@ typedef struct {
 } cr_core_descriptor;
 
 size_t cr_registry_count(void);
+/* Live list rows map to stable slots; removing one never renumbers another engine. */
+int cr_registry_index_at(size_t row);
+/* Full verified snapshot. Keep a currently mapped engine usable until owner-thread teardown. */
+void cr_registry_sync_installed_modules(const char *const *paths, size_t count, int keep_index);
 const cr_core_descriptor *cr_registry_get(int index);
 int cr_registry_find(const char *core_id);
 /* Called on the frontend thread with immutable, verified private modules or

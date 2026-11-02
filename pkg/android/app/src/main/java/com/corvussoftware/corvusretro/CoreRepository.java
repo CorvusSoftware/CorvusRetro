@@ -232,6 +232,39 @@ final class CoreRepository {
         });
     }
 
+    boolean canRemove(String coreId) { return store.canRemove(coreId); }
+
+    void remove(String coreId) {
+        if (!activity.isAlive()) return;
+        if (!store.canRemove(coreId)) {
+            MainActivity.coreInstallStatus("Ce cœur n'est pas un téléchargement supprimable", true);
+            return;
+        }
+        if (!DOWNLOADING.compareAndSet(false, true)) return;
+        try { executor.execute(() -> {
+            String message = "Suppression arrêtée";
+            try {
+                if (!activity.isAlive()) return;
+                MainActivity.coreInstallStatus("Suppression du cœur...", false);
+                message = store.remove(coreId) ? "Cœur supprimé" :
+                        "Cœur retiré ; certains anciens fichiers n'ont pas pu être nettoyés";
+            } catch (Exception error) {
+                Log.w("CorvusRetro", "Core removal failed (" + error.getClass().getSimpleName() + ")");
+                message = "Suppression du cœur impossible";
+            } finally {
+                // Metadata may have committed even when file cleanup was interrupted.
+                try { MainActivity.coreModulesUpdated(activity.installedCoreModules()); }
+                finally {
+                    DOWNLOADING.set(false);
+                    MainActivity.coreInstallStatus(message, true);
+                }
+            }
+        }); } catch (java.util.concurrent.RejectedExecutionException error) {
+            DOWNLOADING.set(false);
+            MainActivity.coreInstallStatus("Suppression arrêtée", true);
+        }
+    }
+
     void install(String coreId) {
         if (!activity.isAlive()) return;
         final Core core = cores.get(coreId);
@@ -298,7 +331,7 @@ final class CoreRepository {
                     sum.append(String.format(java.util.Locale.ROOT, "%02x", b & 255));
                 if (!core.sha256.equals(sum.toString())) throw new IOException("Empreinte SHA-256 incorrecte");
                 store.install(core, archive);
-                MainActivity.coreModulesUpdated(store.modules());
+                MainActivity.coreModulesUpdated(activity.installedCoreModules());
                 statusMessage = core.name + " installé";
             } catch (Exception error) {
                 Log.w("CorvusRetro", "Core install failed (" + error.getClass().getSimpleName() + ")");

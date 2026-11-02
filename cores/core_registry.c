@@ -11,6 +11,7 @@
 
 static cr_core_descriptor registry[CR_MAX_CORES];
 static size_t registry_size;
+static bool present[CR_MAX_CORES], installed[CR_MAX_CORES];
 static bool initialized;
 
 static bool copy_string(char *dest, size_t capacity, const char *source) {
@@ -39,8 +40,8 @@ static void set_system_id(cr_core_descriptor *core) {
         snprintf(core->system_id, sizeof(core->system_id), "%s", core->id);
 }
 
-static void register_module(const char *name) {
-    if (!name || registry_size == CR_MAX_CORES) return;
+static void register_module(const char *name, bool downloaded) {
+    if (!name) return;
     char path[4096];
 #if defined(__ANDROID__)
     int n = snprintf(path, sizeof(path), "%s", name);
@@ -84,14 +85,16 @@ static void register_module(const char *name) {
             descriptor.max_players = info.max_players;
             descriptor.state_support = has_state;
             descriptor.battery_support = has_battery;
-            bool unique = true;
+            size_t slot = registry_size;
             for (size_t i = 0; i < registry_size; ++i)
-                if (strcmp(registry[i].id, descriptor.id) == 0) {
-                    registry[i] = descriptor;
-                    unique = false;
-                }
-            if (unique) {
-                registry[registry_size++] = descriptor;
+                if (!strcmp(registry[i].id, descriptor.id)) { slot = i; break; }
+            if (slot == registry_size)
+                for (size_t i = 0; i < registry_size; ++i)
+                    if (!present[i]) { slot = i; break; }
+            if (slot < CR_MAX_CORES) {
+                registry[slot] = descriptor;
+                present[slot] = true; installed[slot] = downloaded;
+                if (slot == registry_size) ++registry_size;
             }
         }
     }
@@ -103,31 +106,51 @@ static void discover(void) {
     initialized = true;
     for (size_t i = 0; i < sizeof(cr_bundled_core_modules) /
                             sizeof(cr_bundled_core_modules[0]); ++i)
-        register_module(cr_bundled_core_modules[i]);
+        register_module(cr_bundled_core_modules[i], false);
 }
 
 size_t cr_registry_count(void) {
     discover();
-    return registry_size;
+    size_t count = 0;
+    for (size_t i = 0; i < registry_size; ++i) count += present[i];
+    return count;
+}
+int cr_registry_index_at(size_t row) {
+    discover();
+    for (size_t i = 0; i < registry_size; ++i)
+        if (present[i] && !row--) return (int)i;
+    return -1;
+}
+void cr_registry_sync_installed_modules(const char *const *paths, size_t count, int keep) {
+    discover();
+    if (count > CR_MAX_CORES || (count && !paths)) return;
+    for (size_t i = 0; i < registry_size; ++i) {
+        if (!present[i] || !installed[i] || (int)i == keep) continue;
+        bool found = false;
+        for (size_t j = 0; j < count; ++j)
+            if (paths[j] && !strcmp(registry[i].module, paths[j])) { found = true; break; }
+        if (!found) present[i] = false;
+    }
+    cr_registry_add_installed_modules(paths, count);
 }
 
 void cr_registry_add_installed_modules(const char *const *paths, size_t count) {
     discover();
     if (!paths || count > CR_MAX_CORES) return;
     for (size_t i = 0; i < count; ++i)
-        if (paths[i] && paths[i][0] == '/') register_module(paths[i]);
+        if (paths[i] && paths[i][0] == '/') register_module(paths[i], true);
 }
 
 const cr_core_descriptor *cr_registry_get(int index) {
     discover();
-    return index >= 0 && (size_t)index < registry_size ? &registry[index] : NULL;
+    return index >= 0 && (size_t)index < registry_size && present[index] ? &registry[index] : NULL;
 }
 
 int cr_registry_find(const char *core_id) {
     if (!core_id || !*core_id) return -1;
     discover();
     for (size_t i = 0; i < registry_size; ++i)
-        if (strcmp(registry[i].id, core_id) == 0) return (int)i;
+        if (present[i] && strcmp(registry[i].id, core_id) == 0) return (int)i;
     return -1;
 }
 
@@ -196,7 +219,9 @@ int cr_registry_choose(const char *extension, int selected) {
     int count = (int)cr_registry_count();
     if (count == 0) return -1;
     if (cr_registry_accepts(selected, extension)) return selected;
-    for (int i = 0; i < count; ++i)
-        if (cr_registry_accepts(i, extension)) return i;
-    return cr_registry_get(selected) ? selected : 0;
+    for (int row = 0; row < count; ++row) {
+        int index = cr_registry_index_at((size_t)row);
+        if (cr_registry_accepts(index, extension)) return index;
+    }
+    return cr_registry_get(selected) ? selected : cr_registry_index_at(0);
 }

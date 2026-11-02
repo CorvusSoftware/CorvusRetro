@@ -12,6 +12,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.nio.file.Files;
+import org.json.JSONArray;
 import java.util.Locale;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -23,10 +30,114 @@ final class CoreStore {
     private static final long MAX_LIBRARY = 64L * 1024 * 1024;
     private final File directory;
     private final SharedPreferences preferences;
+    private static final int MAX_OWNED_FILES = 64;
+    private final ConcurrentHashMap<String, String> removable = new ConcurrentHashMap<>();
 
     CoreStore(Context context) {
-        directory = new File(context.getFilesDir(), "cores");
-        preferences = context.getSharedPreferences("native_cores", Context.MODE_PRIVATE);
+        this(new File(context.getFilesDir(), "cores"),
+                context.getSharedPreferences("native_cores", Context.MODE_PRIVATE));
+    }
+
+    CoreStore(File directory, SharedPreferences preferences) {
+        this.directory = directory;
+        this.preferences = preferences;
+        // Complete the initial preference load before native menu rendering begins.
+        preferences.getAll();
+    }
+
+    private static boolean validId(String id) {
+        return id != null && id.length() <= 95 &&
+                id.matches("[a-z][a-z0-9_-]{0,39}(\\.[a-z0-9_-]{1,39})+");
+    }
+    private static String library(String id, JSONObject record) throws Exception {
+        String library = record.optString("library_name", "");
+        if (library.isEmpty() && id.matches("corvus\\.(gb|gbc|gba)"))
+            library = "libcorvus_" + id.substring("corvus.".length()) + ".so";
+        if (!library.matches("lib[a-z0-9_]{1,60}\\.so")) throw new IOException("Métadonnées de cœur invalides");
+        return library;
+    }
+    private static JSONObject record(String id, String raw) throws Exception {
+        if (!validId(id) || raw == null || raw.length() > 16384)
+            throw new IOException("Cœur téléchargé introuvable");
+        JSONObject record = new JSONObject(raw);
+        String library = library(id, record), digest = record.getString("sha256");
+        if (!digest.matches("[0-9a-f]{64}") || !record.getString("file").equals(
+                library.substring(0, library.length() - 3) + "-" + digest + ".so"))
+            throw new IOException("Métadonnées de cœur invalides");
+        return record;
+    }
+    private static boolean moduleName(String name) {
+        return name != null && name.matches("lib[a-z0-9_]{1,60}-[0-9a-f]{64}\\.so");
+    }
+    private static Set<String> owned(JSONObject record) throws Exception {
+        Set<String> files = new LinkedHashSet<>();
+        files.add(record.getString("file"));
+        JSONArray history = record.optJSONArray("files");
+        if (record.has("files") && history == null) throw new IOException("Historique de cœur invalide");
+        if (history != null) {
+            if (history.length() > MAX_OWNED_FILES) throw new IOException("Historique de cœur trop long");
+            for (int i = 0; i < history.length(); ++i) files.add(history.getString(i));
+        }
+        for (String name : files)
+            if (!moduleName(name)) throw new IOException("Nom de module invalide");
+        return files;
+    }
+    boolean canRemove(String id) {
+        if (!validId(id)) return false;
+        try {
+            String raw = preferences.getString(id, null);
+            if (raw == null) { removable.remove(id); return false; }
+            if (raw.equals(removable.get(id))) return true;
+            owned(record(id, raw));
+            removable.put(id, raw);
+            return true;
+        } catch (Exception invalid) { removable.remove(id); return false; }
+    }
+    @SuppressWarnings("unchecked")
+    private void restoreRecord(String id, Object old) {
+        SharedPreferences.Editor editor = preferences.edit();
+        if (old instanceof String) editor.putString(id, (String) old);
+        else if (old instanceof Integer) editor.putInt(id, (Integer) old);
+        else if (old instanceof Long) editor.putLong(id, (Long) old);
+        else if (old instanceof Float) editor.putFloat(id, (Float) old);
+        else if (old instanceof Boolean) editor.putBoolean(id, (Boolean) old);
+        else if (old instanceof Set) editor.putStringSet(id, (Set<String>) old);
+        else editor.remove(id);
+        editor.commit();
+    }
+    boolean remove(String id) throws Exception {
+        synchronized (LOCK) {
+            String raw = validId(id) ? preferences.getString(id, null) : null;
+            Set<String> files = owned(record(id, raw));
+            if (Files.isSymbolicLink(directory.toPath())) throw new IOException("Dossier des cœurs invalide");
+            Set<String> protectedFiles = new HashSet<>();
+            for (Map.Entry<String, ?> entry : preferences.getAll().entrySet()) {
+                if (entry.getKey().equals(id) || !(entry.getValue() instanceof String)) continue;
+                try {
+                    JSONObject other = new JSONObject((String) entry.getValue());
+                    if (moduleName(other.optString("file", ""))) protectedFiles.add(other.getString("file"));
+                    JSONArray history = other.optJSONArray("files");
+                    if (history != null && history.length() <= MAX_OWNED_FILES)
+                        for (int i = 0; i < history.length(); ++i)
+                            if (moduleName(history.optString(i, ""))) protectedFiles.add(history.getString(i));
+                } catch (Exception invalid) { /* Untrusted metadata is never a path to delete. */ }
+            }
+            if (!preferences.edit().remove(id).commit()) {
+                restoreRecord(id, raw);
+                throw new IOException("Enregistrement de la suppression impossible");
+            }
+            removable.remove(id);
+            boolean complete = true;
+            File parent = directory.getCanonicalFile();
+            for (String name : files) {
+                if (protectedFiles.contains(name)) continue;
+                File file = new File(directory, name);
+                if (Files.isSymbolicLink(file.toPath()) ||
+                        !file.getCanonicalFile().equals(new File(parent, name))) { complete = false; continue; }
+                if (file.exists() && (!file.isFile() || !file.delete())) complete = false;
+            }
+            return complete;
+        }
     }
 
     static String hash(File file) throws Exception {
@@ -113,6 +224,18 @@ final class CoreStore {
                 verifyElf(staged, core.abi);
                 String digest = hash(staged);
                 File destination = new File(directory, core.libraryName().replace(".so", "-" + digest + ".so"));
+                Object previous = preferences.getAll().get(core.id);
+                Set<String> files = new LinkedHashSet<>();
+                if (previous instanceof String) {
+                    try {
+                        JSONObject old = record(core.id, (String) previous);
+                        files.add(old.getString("file"));
+                        files.addAll(owned(old));
+                    } catch (Exception invalid) { /* Never infer ownership from a filename prefix. */ }
+                }
+                files.add(destination.getName());
+                if (files.size() > MAX_OWNED_FILES)
+                    throw new IOException("Supprimez le cœur avant d'installer une nouvelle version");
                 // Different versions have different paths: a running core keeps its original inode.
                 if (destination.exists()) {
                     if (destination.canWrite() || !digest.equals(hash(destination)))
@@ -121,9 +244,13 @@ final class CoreStore {
                     throw new IOException("Enregistrement du cœur impossible");
                 }
                 JSONObject record = new JSONObject().put("file", destination.getName())
-                        .put("sha256", digest).put("library_name", core.libraryName());
-                if (!preferences.edit().putString(core.id, record.toString()).commit())
+                        .put("sha256", digest).put("library_name", core.libraryName())
+                        .put("files", new JSONArray(files));
+                if (!preferences.edit().putString(core.id, record.toString()).commit()) {
+                    restoreRecord(core.id, previous);
                     throw new IOException("Enregistrement du catalogue local impossible");
+                }
+                removable.put(core.id, record.toString());
             } finally {
                 staged.delete();
             }

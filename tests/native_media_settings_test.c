@@ -32,6 +32,13 @@ static void layout_settings(void) {
                           "configured menu, hide and dpad stay inside safe viewport");
                     check(inside(p.video,w,h), "configured video stays inside viewport");
                     check(!overlaps(p.video,p.dpad), "configured cross never covers video");
+                    if (p.portrait) {
+                        float original_y = p.controls[4].area.y - 24*p.scale;
+                        check(p.dpad.y >= original_y - .01f && p.dpad.y <= original_y + 12*p.scale + .01f,
+                              "configured cross lowering is bounded without shifting face buttons");
+                        check(p.dpad.y + p.dpad.h <= p.controls[6].area.y + .01f,
+                              "configured lowered cross stays above the fixed utility row");
+                    }
                     for (int i = 0; i < p.count; ++i) {
                         cr_control b = p.controls[i];
                         check(inside(b.area,w,h), "every configured button remains usable inside viewport");

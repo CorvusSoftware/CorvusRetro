@@ -129,6 +129,22 @@ static void geometry_tests(void) {
     check(fabsf(full_height.video.h - 320) < .01f,
           "landscape uses full video height when native aspect fits between gutters");
 }
+static void lower_portrait_cross(void) {
+    const float phones[][2] = {{320,640},{360,640},{384,696},{384,851},{600,960}};
+    for (int system = 0; system < 3; ++system) {
+        for (size_t i = 0; i < sizeof(phones)/sizeof(*phones); ++i) {
+            cr_play_layout p = cr_play_layout_make(phones[i][0],phones[i][1],system,0,0);
+            float previous_cross_y = p.controls[4].area.y - 24*p.scale;
+            check(fabsf(p.dpad.y - previous_cross_y - 12*p.scale) < .01f,
+                  "portrait cross is lowered by 12 scaled units without moving the face buttons");
+            check(p.dpad.y + p.dpad.h + 8*p.scale <= p.controls[6].area.y + .01f,
+                  "lowered portrait cross keeps a clear gap before Select and Start");
+        }
+        cr_play_layout short_phone = cr_play_layout_make(320,480,system,0,0);
+        check(fabsf(short_phone.dpad.y - (short_phone.controls[4].area.y - 24*short_phone.scale)) < .01f,
+              "short portrait keeps the original cross position when no safe downward space remains");
+    }
+}
 typedef struct {
     cr_area video, menu;
     int menu_icons, games;
@@ -201,6 +217,7 @@ static void tap(cr_ui *u, int id, float x, float y) {
 }
 int main(void) {
     geometry_tests();
+    lower_portrait_cross();
     char root[] = "/tmp/corvus-controls-XXXXXX";
     check(mkdtemp(root) != NULL, "temporary storage");
     cr_ui u;

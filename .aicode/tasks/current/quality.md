@@ -1,19 +1,28 @@
 CorvusSoftware Quality Gate
 Status: PASS
-Risk: STANDARD
+Risk: DEEP
+
 Criteria:
-- PASS : PR21 approuvée par utilisateur, CI exacte verte puis fusion main.
-- PASS : APK0.21/code27 signé avec identité habituelle et provenance exacte.
-- PASS : deuxABI/alignement16Ko/zeroCore/MP3original et absence provider de test.
-- PASS : upgrade26->27 et conservation UID/données/ASUS/historique vérifiés.
-- PASS : publicationv0.21.0 et retéléchargement public identique aux octets qualifiés.
+- PASS : continuité pendant perte de focus, vraie pause HOME et reprise EGL/audio observées sur Android.
+- PASS : FIFO audio, amorçage, adaptation bornée, reprise et callbacks tardifs testés.
+- PASS : croix portrait abaissée, bornes et autres géométries préservées.
+- PASS : suppression confirmée, autre moteur préservé, échec batterie conservant le moteur, ROM/batterie/historique conservés et réinstallation.
+
 Evidence:
-- CI41443902775, signé41444288324 et publication41445211694 réussis sursourcee6f1157.
-- QualificationAPK et upgrade dans /workspace/setup/signed021-qualification.json et signed021-runtime/upgrade.json.
-- PublicAPK SHA256890a3912a4e77959e9892ce4a9732dc3d9179bb26c5d112dab376619fc94f0b1.
+- 17 suites natives strictes et 17 ASan/UBSan passent, dont 284 contrôles audio.
+- 19 tests JVM, frontend sans cœur et 8 tests de workflows passent.
+- Lint, builds debug/release et contrôle du paquet debug deux ABI/16 Ko passent.
+- Android 10 API29 x86_64 : 41 contrôles playback portrait, 41 paysage et 91 suppression portrait passent.
+- Après précision du nom dans la confirmation, les trois suites menu/registre/suppression strictes et ASan passent, ainsi que le rebuild debug/runner et lint ; les 91 contrôles Android repassent, capture finale inspectée et buffer crash vide.
+- CI 41491545182 réussie sur la source 5ccdb7b ; tout nouvel exact head doit être contrôlé avant livraison/fusion.
+
 Review:
-- Changementsfonctionnels revus indépendamment pendantPR21 ; aucunfinding restant.
+- Revue indépendante effectuée ; les entrées maintenues après perte EGL et le callback d'erreur tardif ont été corrigés et relus. Aucun finding concret restant.
+
 Open risks:
-- Émulateurx86_64, pas detéléphone/manettephysique/runtimeARM64 testé. Connectivité du catalogue et moteurs distribués séparément, inchangés.
+- Pas d'écoute physique ni de téléphone/Bluetooth/runtime ARM64 qualifiés.
+- Le lanceur revient en portrait après HOME ; pas de preuve de retour HOME en paysage.
+- Les politiques audio Android, notamment les appels, restent applicables.
+
 Decision:
-- Livraison publiée. Documentation dequalification àfusionner après saCI. Conserver tag et assets immuables.
+- Implémentation prête à la revue. Publication de release et fusion séparées. Le statut distant exact de la PR doit encore être observé après le dernier push.
