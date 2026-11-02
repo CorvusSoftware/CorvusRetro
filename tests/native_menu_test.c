@@ -380,6 +380,9 @@ int main(void) {
               strstr(c.text, "Accès rapide") && strstr(c.text, "Bibliothèque"),
           "dashboard renders its primary panels and navigation");
     check(c.header_crows == 1, "home header uses the CorvusRetro crow");
+    cr_ui_move(&u, 1);
+    cr_ui_move(&u, 1);
+    check(u.focus == 2 && u.scroll > 0, "controller focus scrolls to the dashboard information shortcut");
     tab(&u, 2);
     check(u.page == CR_SAVE_HUB && u.tab == 2, "saves tab opens a dedicated hub");
     capture saves = draw(&u);
