@@ -61,6 +61,7 @@ int main(void) {
     cr_ui_back(&ui);
     cr_ui_back(&ui);
     check(ui.page == CR_MAIN, "library back navigation restores main menu");
+    cr_ui_move(&ui, -1);
     cr_ui_confirm(&ui);
     check(ui.page == CR_CORES, "core manager is accessible without bundled engines");
     cr_ui_touch(&ui, 0, CR_TOUCH_DOWN, 180, 190);
