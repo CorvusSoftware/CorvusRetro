@@ -453,6 +453,9 @@ int main(void) {
               library.row_icons <= 10,
           "library renders original two-column cover tiles for imported games");
     tap(&u, 315, 99);
+    if (u.library_filter != 2 || u.scroll != 0)
+        fprintf(stderr, "library filter diagnostic: filter=%d scroll=%.1f page=%d quick=%d pointer=%d\\n",
+                u.library_filter, u.scroll, u.page, u.quick, u.menu_pointer);
     check(u.library_filter == 2 && u.scroll == 0, "GBA chip filters imported games without rewriting index");
     library = draw(&u);
     check(strstr(library.text, "Scroll item 2") && !strstr(library.text, "Scroll item 0"),
