@@ -12,8 +12,8 @@ Evidence:
 - 17 suites natives strictes et 17 ASan/UBSan passent, dont 284 contrôles audio.
 - 19 tests JVM, frontend sans cœur et 8 tests de workflows passent.
 - Lint, builds debug/release et contrôle du paquet debug deux ABI/16 Ko passent.
-- Android : 41 contrôles playback portrait, 41 paysage et 91 suppression portrait passent.
-- Après précision du nom dans la confirmation, les trois suites menu/registre/suppression strictes et ASan passent, ainsi que le rebuild debug/runner et lint.
+- Android 10 API29 x86_64 : 41 contrôles playback portrait, 41 paysage et 91 suppression portrait passent.
+- Après précision du nom dans la confirmation, les trois suites menu/registre/suppression strictes et ASan passent, ainsi que le rebuild debug/runner et lint ; les 91 contrôles Android repassent, capture finale inspectée et buffer crash vide.
 - CI 41491545182 réussie sur la source 5ccdb7b ; tout nouvel exact head doit être contrôlé avant livraison/fusion.
 
 Review:

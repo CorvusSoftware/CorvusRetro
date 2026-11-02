@@ -7,6 +7,6 @@ P0 : native_registry : zéro cœur, slots stables après suppression/réinstalla
 P0 : CoreStoreTest : fichiers propriétaires seulement, versions/historique bornés, fichiers partagés, traversal/symlink, échec commit, absence de blocage du menu.
 P0 : native_controls/media : croix portrait abaissée avec bornes et séparation, autres boutons/vidéo/paysage conservés.
 P1 : 17 suites host strictes et ASan/UBSan, frontend sans cœur, Gradle JVM/lint/build deux ABI, signature/alignement APK zéro cœur.
-P1 : émulateur Android15 x86_64 : volet notifications (focus perdu mais activité reprise, frames/AAudio continuent), HOME pause et retour EGL/audio, suppression via menus puis réinstallation avec ROM/history/batterie conservés, captures portrait/paysage.
+P1 : émulateur Android 10 API29 x86_64 : volet notifications (focus perdu mais activité reprise, frames/AAudio continuent), HOME pause et retour EGL/audio, suppression via menus puis réinstallation avec ROM/history/batterie conservés, captures portrait/paysage.
 P1 : revue indépendante, correction de chaque finding avéré, CI sur commit exact de PR.
 Limites : pas de téléphone physique ni d'écoute sur émulateur sans sortie audio ; politiques audio Android/appel restent gérées par l'OS. La réinitialisation après erreur AAudio est injectée dans le test pilote host ; HOME/rotation exercent la surface Android réelle.

@@ -402,7 +402,7 @@ runtime ARM64 n'est revendiqué.
 
 ## Continuité audio et suppression des cœurs, préparation 0.22
 
-Sur l'émulateur x86_64, les phases `playback` portrait et paysage passent
+Sur l'émulateur Android 10 API29 x86_64, les phases `playback` portrait et paysage passent
 chacune 41 contrôles. Le volet de notifications retire le focus sans interrompre
 les trames ni l'état AAudio actif. HOME suspend effectivement les trames et le
 retour reconstruit la surface avec reprise audio. Le lanceur ramène le retour
