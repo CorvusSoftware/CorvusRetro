@@ -36,9 +36,24 @@ static void geometry_tests(void) {
             check(p.count == (system == 2 ? 10 : 8), "only native console buttons are present");
             check(inside(p.menu, w, h) && inside(p.hide, w, h) && inside(p.dpad, w, h),
                   "menu, overlay toggle and cross fit viewport");
+            if (p.toolbar.w > 0) {
+                check(p.portrait && p.toolbar.h >= 48 && p.toolbar.w >= 240 &&
+                      p.toolbar.y + p.toolbar.h <= p.dpad.y,
+                      "tall portrait bar fits between video and directional pad");
+                for (int slot = 0; slot < 3; ++slot) {
+                    float x = p.toolbar.x + (slot + .5f) * p.toolbar.w / 4;
+                    float y = p.toolbar.y + p.toolbar.h / 2;
+                    check(cr_play_hit(&p, x, y) == 0,
+                          "toolbar does not generate emulated game input");
+                }
+            }
             if (p.portrait) {
-                check(fabsf(p.menu.x + p.menu.w / 2 - w / 2) < .01f && p.menu.y >= p.panel.y,
-                      "portrait menu centered between lower controls");
+                check((p.toolbar.w > 0 ?
+                       fabsf(p.menu.x - (p.toolbar.x + p.toolbar.w * .75f)) < .01f &&
+                       p.menu.y >= p.panel.y && p.toolbar.y >= p.video.y + p.video.h - .01f :
+                       fabsf(p.menu.x + p.menu.w / 2 - w / 2) < .01f &&
+                       p.menu.y >= p.panel.y),
+                      "portrait settings target follows the toolbar or compact menu");
                 check(p.hide.x > w / 2 && p.hide.y > h / 2,
                       "portrait overlay toggle in lower right corner");
                 check(p.panel.y <= h / 2 + .01f && inside(p.panel, w, h),
@@ -181,7 +196,7 @@ static float measure(void *ctx, const char *text, float size) {
 static void icon(void *ctx, int kind, float x, float y, float size, uint32_t color) {
     (void)color;
     capture *c = ctx;
-    if (kind == CR_ICON_MENU) {
+    if (kind == CR_ICON_MENU || kind == CR_ICON_SETTINGS) {
         c->menu_icons++;
         c->menu = (cr_area){x, y, size, size};
     }
@@ -226,6 +241,24 @@ int main(void) {
               "rendered video aspect preserved");
         tap(&u, 0, u.width - 28, 28);
         check(!u.quick && cr_ui_input(&u) == 0, "former title button no longer opens menu");
+        if (p.toolbar.w > 0) {
+            float tx = p.toolbar.x + p.toolbar.w / 8;
+            float ty = p.toolbar.y + p.toolbar.h / 2;
+            tap(&u, 0, tx, ty);
+            check(!u.quick && !u.fast_forward && cr_ui_input(&u) == 0,
+                  "restart toolbar target does not generate input without engine API");
+            tx = p.toolbar.x + p.toolbar.w * 3 / 8;
+            tap(&u, 0, tx, ty);
+            check(!u.quick && cr_ui_input(&u) == 0 &&
+                  strstr(u.message, "Sauvegarde") != NULL,
+                  "save toolbar reports unsupported state without crashing");
+            tx = p.toolbar.x + p.toolbar.w * 5 / 8;
+            tap(&u, 0, tx, ty);
+            check(u.fast_forward && cr_ui_input(&u) == 0,
+                  "fast-forward toggles x2 without sending game buttons");
+            tap(&u, 0, tx, ty);
+            check(!u.fast_forward, "second toolbar press restores normal speed");
+        }
         cr_area a = p.controls[4].area;
         cr_ui_touch(&u, 0, CR_TOUCH_DOWN, a.x + a.w / 2, a.y + a.h / 2);
         check(cr_ui_input(&u) == 16, "A held before opening menu");
