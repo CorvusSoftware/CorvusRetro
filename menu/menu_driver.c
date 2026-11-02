@@ -236,6 +236,9 @@ enum {
 static bool library_grid(const cr_ui *u) {
     return !u->quick && u->page == CR_LIBRARY && u->width >= 300 && u->height > u->width;
 }
+static float library_top(const cr_ui *u) {
+    return u->library_query[0] ? 207 : 184;
+}
 static int library_system(const cr_game *game) {
     if (!strcmp(game->system_id, "nintendo.game_boy") ||
         !strcmp(game->core_id, "corvus.gb")) return 0;
@@ -667,7 +670,7 @@ static void clamp_scroll(cr_ui *u) {
                     (float)rows(u) * 76;
     if (library_grid(u)) {
         float total = ((library_count(u) + 1) / 2) * 208.f;
-        u->scroll = fmaxf(0, fminf(u->scroll, total - fmaxf(1, body_bottom(u) - 184)));
+        u->scroll = fmaxf(0, fminf(u->scroll, total - fmaxf(1, body_bottom(u) - library_top(u))));
         return;
     }
     if (u->page == CR_ABOUT || u->page == CR_LICENSE || u->page == CR_CORE_INFO ||
@@ -1725,7 +1728,7 @@ void cr_ui_move(cr_ui *u, int direction) {
         if (library_grid(u)) {
             top = u->focus ? ((u->focus - 1) / 2) * 208.f : 0;
             size = u->focus ? 198 : 0;
-            view = fmaxf(1, body_bottom(u) - 184);
+            view = fmaxf(1, body_bottom(u) - library_top(u));
         }
         if (top < u->scroll)
             u->scroll = top;
@@ -1803,11 +1806,12 @@ static int library_target(const cr_ui *u, float x, float y) {
             return LIBRARY_ALL - category;
     }
     if (y >= 127 && y < 169 && x >= 16 && x < w - 16) return LIBRARY_IMPORT;
-    if (y < 184 || y >= body_bottom(u) || x < 16 || x >= w - 16) return -1;
+    float top = library_top(u);
+    if (y < top || y >= body_bottom(u) || x < 16 || x >= w - 16) return -1;
     float tile_width = (w - 44) / 2, column_x = x - 16;
     int column = column_x < tile_width ? 0 : column_x >= tile_width + 12 ? 1 : -1;
     if (column < 0) return -1;
-    float offset = y - 184 + u->scroll;
+    float offset = y - top + u->scroll;
     int grid_row = (int)floorf(offset / 208);
     if (grid_row < 0 || fmodf(offset, 208) >= 196) return -1;
     int position = grid_row * 2 + column;
@@ -2207,7 +2211,8 @@ static void draw_library(cr_ui *u, const cr_painter *p, const cr_theme *theme) {
         center(p, filters[i], x + cell / 2, 102, 13,
                selected ? 0xff160f30 : theme->text);
     }
-    rounded(p, 16, 128, w - 32, 40, 11, 0xff202640);
+    rounded(p, 16, 128, w - 32, 40, 11,
+            u->focus == 0 ? 0xff3b3265 : 0xff202640);
     p->icon(p->context, CR_ICON_FOLDER, 28, 138, 20, theme->accent);
     text(p, "Importer un dossier", 58, 152, 13, theme->text, w - 102);
     if (u->library_query[0]) {
@@ -2215,7 +2220,7 @@ static void draw_library(cr_ui *u, const cr_painter *p, const cr_theme *theme) {
         text(p, u->library_editing ? u->library_preview : u->library_query,
              26, 189, 11, 0xffe4d7ff, w - 56);
     }
-    float grid_top = u->library_query[0] ? 207 : 184;
+    float grid_top = library_top(u);
     float tile_w = (w - 44) / 2;
     int total = library_count(u);
     if (!total) {
@@ -2522,7 +2527,12 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
             p->icon(p->context, CR_ICON_BACK, 12, 16, 24, theme->header_text);
         if (library_grid(u)) {
             text(p, title, has_back(u) ? 56 : 20, 35, 19, theme->header_text, w - 120);
-            p->icon(p->context, CR_ICON_INFO, w - 91, 17, 22, accent);
+            for (int i = 0; i < 16; ++i) {
+                float a = i * .3926991f, b = (i + 1) * .3926991f;
+                p->line(p->context, w - 80 + cosf(a) * 7, 26 + sinf(a) * 7,
+                        w - 80 + cosf(b) * 7, 26 + sinf(b) * 7, 2, accent);
+            }
+            p->line(p->context, w - 75, 31, w - 69, 37, 2, accent);
             p->icon(p->context, CR_ICON_FOLDER, w - 41, 17, 22, accent);
         } else if (home_cards(u)) {
             p->icon(p->context, CR_ICON_CROW, 16, 16, 25, accent);
