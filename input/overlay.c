@@ -40,6 +40,41 @@ static void rectangle(const cr_painter *p, cr_area a, float inset, float width, 
                       a.x + a.w - inset, a.y + a.h - inset, a.x + inset, a.y + a.h - inset};
     path(p, points, 4, width, value);
 }
+static void pill(const cr_painter *p, cr_area a, uint32_t fill, uint32_t border) {
+    float r = a.h / 2;
+    if (p->rect) {
+        p->rect(p->context, a.x + r, a.y, a.w - 2*r, a.h, fill);
+        if (p->circle) {
+            p->circle(p->context, a.x + r, a.y + r, r, fill);
+            p->circle(p->context, a.x + a.w - r, a.y + r, r, fill);
+        }
+    }
+    for (int i = 0; i < 16; ++i) {
+        float angle = (float)i * 3.14159265f / 15;
+        float next = (float)(i + 1) * 3.14159265f / 15;
+        segment(p, a.x + r - cosf(angle)*r, a.y + r - sinf(angle)*r,
+                a.x + r - cosf(next)*r, a.y + r - sinf(next)*r, 1.5f, border);
+        segment(p, a.x + a.w - r + cosf(angle)*r, a.y + r + sinf(angle)*r,
+                a.x + a.w - r + cosf(next)*r, a.y + r + sinf(next)*r, 1.5f, border);
+    }
+    segment(p, a.x + r, a.y, a.x + a.w - r, a.y, 1.5f, border);
+    segment(p, a.x + r, a.y + a.h, a.x + a.w - r, a.y + a.h, 1.5f, border);
+}
+static void art_cross(const cr_painter *p, cr_area a, float s) {
+    float cell = a.w / 3, x = a.x, y = a.y;
+    uint32_t fill = 0xff303351, edge = 0xff9f98e1;
+    if (p->rect) {
+        p->rect(p->context, x+cell, y, cell, cell*3, fill);
+        p->rect(p->context, x, y+cell, cell*3, cell, fill);
+    }
+    float outline[] = {
+        x+cell,y, x+2*cell,y, x+2*cell,y+cell,
+        x+3*cell,y+cell, x+3*cell,y+2*cell, x+2*cell,y+2*cell,
+        x+2*cell,y+3*cell, x+cell,y+3*cell, x+cell,y+2*cell,
+        x,y+2*cell, x,y+cell, x+cell,y+cell
+    };
+    path(p, outline, 12, 1.8f*s, edge);
+}
 static void dpad(const cr_painter *p, cr_area a, int direction, float scale, uint32_t value) {
     const float shape[] = {-.40f, -.40f, .40f, -.40f, .40f, .35f, 0, .85f, -.40f, .35f};
     const float arrow[] = {0, -.12f, -.10f, .08f, .10f, .08f};
@@ -91,16 +126,22 @@ void cr_overlay_draw_configured(const cr_play_layout *layout, const cr_painter *
             }
         }
     }
+    if (visible && artwork) art_cross(p, layout->dpad, scale);
     if (visible) for (int i = 0; i < layout->count; ++i) {
         const cr_control *button = &layout->controls[i];
         cr_area a = button->area;
         float level = held & button->mask ? 1 : feedback[i];
         uint32_t edge = color(level, 128 * opacity / 100), text = color(level, 160 * opacity / 100);
         if (i < 4) {
-            if (artwork && p->rect)
-                p->rect(p->context, a.x, a.y, a.w, a.h,
-                        color(level * .25f, 26 * opacity / 100) & 0xff8582be);
-            dpad(p, a, i, scale, edge);
+            if (artwork) {
+                float cx = a.x + a.w/2, cy = a.y + a.h/2, z = 5*scale;
+                float arrow[6];
+                if (i == 0) { float v[] = {cx,cy-z,cx-z,cy+z,cx+z,cy+z}; memcpy(arrow,v,sizeof v); }
+                else if (i == 1) { float v[] = {cx,cy+z,cx-z,cy-z,cx+z,cy-z}; memcpy(arrow,v,sizeof v); }
+                else if (i == 2) { float v[] = {cx-z,cy,cx+z,cy-z,cx+z,cy+z}; memcpy(arrow,v,sizeof v); }
+                else { float v[] = {cx+z,cy,cx-z,cy-z,cx-z,cy+z}; memcpy(arrow,v,sizeof v); }
+                path(p, arrow, 3, 1.7f*scale, 0xffb5a9f3);
+            } else dpad(p, a, i, scale, edge);
         }
         else if (i < 6) {
             float radius = a.w / 2 - stroke;
@@ -113,27 +154,29 @@ void cr_overlay_draw_configured(const cr_play_layout *layout, const cr_painter *
             ring(p, a.x + a.w / 2, a.y + a.h / 2, radius, stroke, edge);
             caption(p, button->label, a.x + a.w / 2, a.y + a.h / 2 + 8 * scale,
                     26 * scale, text, a.w);
-        } else if (i == 6) {
-            if (artwork && p->rect)
-                p->rect(p->context, a.x + 2 * scale, a.y + 4 * scale,
-                        a.w - 4 * scale, a.h - 8 * scale, 0xff222a41);
-            float cx = a.x + a.w / 2, cy = a.y + a.h * .40f;
-            float points[] = {cx - 14 * scale, cy - 10 * scale, cx + 16 * scale, cy,
-                              cx - 14 * scale, cy + 10 * scale};
-            path(p, points, 3, stroke, edge);
-            caption(p, button->label, cx, a.y + a.h - 2 * scale, 8 * scale, text, a.w);
-        } else if (i == 7) {
-            if (artwork && p->rect)
-                p->rect(p->context, a.x + 2 * scale, a.y + 4 * scale,
-                        a.w - 4 * scale, a.h - 8 * scale, 0xff222a41);
-            cr_area mark = {a.x + a.w / 2 - 14 * scale, a.y + a.h * .40f - 9 * scale,
-                            28 * scale, 18 * scale};
-            rectangle(p, mark, 0, stroke, edge);
-            caption(p, button->label, a.x + a.w / 2, a.y + a.h - 2 * scale, 8 * scale, text, a.w);
+        } else if (i == 6 || i == 7) {
+            if (artwork) {
+                cr_area button_area = {a.x, a.y + 8*scale, a.w, a.h - 16*scale};
+                pill(p, button_area, 0xff30324e, 0xffa59bdf);
+                caption(p, button->label, a.x + a.w / 2, a.y + a.h/2 + 4*scale,
+                        10*scale, 0xffebecff, a.w);
+            } else if (i == 6) {
+                float cx = a.x + a.w / 2, cy = a.y + a.h * .40f;
+                float points[] = {cx - 14 * scale, cy - 10 * scale, cx + 16 * scale, cy,
+                                  cx - 14 * scale, cy + 10 * scale};
+                path(p, points, 3, stroke, edge);
+                caption(p, button->label, cx, a.y + a.h - 2 * scale, 8 * scale, text, a.w);
+            } else {
+                cr_area mark = {a.x + a.w / 2 - 14 * scale, a.y + a.h * .40f - 9 * scale,
+                                28 * scale, 18 * scale};
+                rectangle(p, mark, 0, stroke, edge);
+                caption(p, button->label, a.x + a.w / 2, a.y + a.h - 2 * scale, 8 * scale, text, a.w);
+            }
+        } else if (artwork) {
+            pill(p, a, 0xff30324e, 0xffa59bdf);
+            caption(p, button->label, a.x + a.w/2, a.y + a.h/2 + 6*scale,
+                    18*scale, 0xffe7e4fa, a.w);
         } else {
-            if (artwork && p->rect)
-                p->rect(p->context, a.x + 5 * scale, a.y + 5 * scale,
-                        a.w - 10 * scale, a.h - 10 * scale, 0xff222a41);
             rectangle(p, a, 5 * scale, stroke, edge);
             caption(p, button->label, a.x + a.w / 2, a.y + a.h / 2 + 6 * scale,
                     20 * scale, text, a.w);
