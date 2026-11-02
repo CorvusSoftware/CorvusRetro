@@ -1796,7 +1796,7 @@ static void quick_clamp(cr_ui *u) {
 static int home_target(const cr_ui *u, float x, float y) {
     float s = home_scale(u), top = y + u->scroll;
     float left = 16 * s, available = u->width - 32 * s;
-    if (top >= 256 * s && top < 332 * s && x >= left && x < u->width - left)
+    if (top >= 256 * s && top < 351 * s && x >= left && x < u->width - left)
         return HOME_PRIMARY;
     if (top >= 370 * s && top < 458 * s && x >= left && x < u->width - left) {
         int tile = (int)((x - left) / (available / 3));
@@ -2167,6 +2167,8 @@ static void rounded(const cr_painter *p, float x, float y, float w, float h,
     p->circle(p->context, x + r, y + h - r, r, color);
     p->circle(p->context, x + w - r, y + h - r, r, color);
 }
+static void art_pine(const cr_painter *, float, float, float, uint32_t);
+static void art_mountains(const cr_painter *, float, float, float, float, uint32_t, int);
 static void draw_home(cr_ui *u, const cr_painter *p, const cr_theme *theme) {
     float s = home_scale(u), w = u->width, x = 16 * s, gap = 9 * s;
     float card_w = (w - 2 * x - 2 * gap) / 3, scroll = u->scroll;
@@ -2176,24 +2178,33 @@ static void draw_home(cr_ui *u, const cr_painter *p, const cr_theme *theme) {
     if (p->clip)
         p->clip(p->context, x, fmaxf(hero, 56), w - 2 * x,
                 fmaxf(1, fminf(hero + hero_h, body_bottom(u)) - fmaxf(hero, 56)));
-    for (int i = 0; i < 24; ++i) {
-        float y = hero + i * hero_h / 24;
-        uint32_t c = i < 8 ? 0xff332c6c : i < 17 ? 0xff503275 : 0xff242650;
-        rect(p, x, y, w - 2 * x, hero_h / 24 + 1, c);
+    static const uint32_t horizon[] = {
+        0xff241d55, 0xff332568, 0xff503080, 0xff824399, 0xffb75da8, 0xff50377c
+    };
+    for (int i = 0; i < 42; ++i) {
+        float yy = hero + i * hero_h / 42;
+        int band = i * 6 / 42;
+        rect(p, x, yy, w - 2 * x, hero_h / 42 + 1, horizon[band]);
     }
-    p->circle(p->context, w - 110 * s, hero + 47 * s, 24 * s, 0xffaa8be9);
-    for (int i = 0; i < 8; ++i)
-        p->circle(p->context, x + (33 + i * 39) * s, hero + (19 + (i * 11) % 42) * s,
-                  1.6f * s, 0xffe3d1ff);
-    for (int i = 0; i < 55; ++i) {
-        float xx = x + i * (w - 2 * x) / 55;
-        float ridge = hero + (96 + 19 * sinf(i * .18f) - 13 * sinf(i * .37f)) * s;
-        rect(p, xx, ridge, (w - 2 * x) / 55 + 1, hero + hero_h - ridge, 0xff30275f);
-        float near = hero + (129 + 10 * sinf(i * .29f) - 9 * sinf(i * .17f)) * s;
-        rect(p, xx, near, (w - 2 * x) / 55 + 1, hero + hero_h - near, 0xff171b3b);
+    p->circle(p->context, x + (w - 2*x)*.59f, hero + 76*s, 26*s, 0xffc67fc5);
+    p->circle(p->context, x + (w - 2*x)*.59f, hero + 76*s, 19*s, 0xffe8a2d2);
+    for (int i = 0; i < 22; ++i) {
+        float xx = x + (12 + (i * 47) % 332) * s;
+        float yy = hero + (12 + (i * 17) % 85) * s;
+        rect(p, xx, yy, (i % 3 ? 2 : 3) * s, 2*s, 0xffe9c9ef);
     }
+    art_mountains(p, x, hero + 155*s, w - 2*x, 72*s, 0xff503178, 2);
+    art_mountains(p, x, hero + 168*s, w - 2*x, 58*s, 0xff34205f, 5);
+    art_pine(p, x + 20*s, hero + 155*s, 65*s, 0xff12143f);
+    art_pine(p, x + 49*s, hero + 165*s, 48*s, 0xff13143c);
+    art_pine(p, x + 85*s, hero + 171*s, 41*s, 0xff15143d);
+    art_pine(p, w - 35*s, hero + 168*s, 57*s, 0xff11143b);
+    for (int i = 0; i < 15; ++i)
+        rect(p, x, hero + (128 + i * 3) * s,
+             w - 2*x, 3*s, i < 7 ? 0x58101234 : 0x92101234);
     float console_x = w - 95 * s, console_y = hero + 51 * s;
-    rounded(p, console_x, console_y, 60 * s, 95 * s, 9 * s, 0xff9290d2);
+    rounded(p, console_x, console_y, 60 * s, 95 * s, 9 * s, 0xff9376d7);
+    rounded(p, console_x + 5*s, console_y + 5*s, 50*s, 85*s, 7*s, 0xff6e5db2);
     rounded(p, console_x + 9*s, console_y + 9*s, 42*s, 39*s, 4*s, 0xff292650);
     rect(p, console_x + 15*s, console_y + 15*s, 30*s, 27*s, 0xff7d98c2);
     rect(p, console_x + 14*s, console_y + 64*s, 24*s, 5*s, 0xff292650);
@@ -2202,24 +2213,28 @@ static void draw_home(cr_ui *u, const cr_painter *p, const cr_theme *theme) {
     p->circle(p->context, console_x + 53*s, console_y + 61*s, 5*s, 0xffa251e9);
     if (p->clip) p->clip(p->context, 0, 56, w, fmaxf(1, body_bottom(u) - 56));
     text(p, "Bienvenue !", x + 14*s, hero + 127*s, 23*s, 0xffffffff, w - 140*s);
-    text(p, "Retrouvez vos jeux rétro", x + 14*s, hero + 147*s, 12*s,
-         0xffe2d9ff, w - 140*s);
+    text(p, "Reprenez votre dernière partie", x + 14*s, hero + 148*s, 12*s,
+         0xfff2eaff, w - 115*s);
+    text(p, "ou explorez votre bibliothèque.", x + 14*s, hero + 163*s, 12*s,
+         0xffe9d9ff, w - 105*s);
 
     float resume = 256*s - scroll;
     bool resume_focused = u->focus == (u->engine.loaded ? 0 : 1);
-    rounded(p, x, resume, w - 2*x, 76*s, 13*s,
+    rounded(p, x, resume, w - 2*x, 95*s, 13*s,
             resume_focused ? 0xff514186 : 0xff282450);
-    rounded(p, x + 9*s, resume + 10*s, 55*s, 55*s, 9*s, 0xff4a3e90);
-    p->icon(p->context, CR_ICON_CONTENT, x + 23*s, resume + 24*s, 27*s, 0xffd5c6ff);
+    rounded(p, x + 9*s, resume + 10*s, 64*s, 74*s, 9*s, 0xff503a96);
+    art_mountains(p, x + 13*s, resume + 75*s, 56*s, 42*s, 0xff6c9ccc, 4);
+    p->circle(p->context, x + 45*s, resume + 34*s, 12*s, 0xffdeebff);
+    art_pine(p, x + 23*s, resume + 80*s, 27*s, 0xff327f74);
     text(p, u->engine.loaded ? "Continuer" : "Charger un jeu",
-         x + 75*s, resume + 28*s, 15*s, fg, w - 159*s);
+         x + 84*s, resume + 36*s, 15*s, fg, w - 159*s);
     text(p, u->engine.loaded ? u->title : u->engine.handle ?
-         "Ouvrir un contenu" : "Choisir d'abord un cœur", x + 75*s,
-         resume + 48*s, 11*s, 0xffc3b8dc, w - 162*s);
-    p->circle(p->context, w - 46*s, resume + 38*s, 21*s, accent);
-    p->icon(p->context, CR_ICON_PLAY, w - 57*s, resume + 27*s, 22*s, 0xff17122c);
+         "Ouvrir un contenu" : "Choisir d'abord un cœur", x + 84*s,
+         resume + 58*s, 11*s, 0xffc3b8dc, w - 162*s);
+    p->circle(p->context, w - 46*s, resume + 47*s, 21*s, accent);
+    p->icon(p->context, CR_ICON_PLAY, w - 57*s, resume + 36*s, 22*s, 0xff17122c);
 
-    text(p, "Accès rapide", x, 357*s - scroll, 15*s, fg, w - 2*x);
+    /* The reference keeps this gap clean: shortcuts sit directly below resume. */
     const int icons[] = {CR_ICON_LIST, CR_ICON_CORE, CR_ICON_SAVES};
     const char *titles[] = {"Bibliothèque", "Cœurs", "Saves"};
     for (int i = 0; i < 3; ++i) {
