@@ -58,17 +58,55 @@ static void dpad(const cr_painter *p, cr_area a, int direction, float scale, uin
 }
 void cr_overlay_draw_configured(const cr_play_layout *layout, const cr_painter *p, unsigned held,
                                 const float feedback[10], bool visible, bool menu_down,
-                                bool hide_down, int opacity_percent) {
+                                bool hide_down, bool fast_forward, int opacity_percent) {
     float scale = layout->scale, stroke = 2 * scale;
     unsigned opacity = opacity_percent < 0 ? 0 : opacity_percent > 100 ? 100 : (unsigned)opacity_percent;
+    bool artwork = layout->toolbar.w > 0;
+    if (artwork && p->rect) {
+        cr_area bar = layout->toolbar;
+        p->rect(p->context, layout->panel.x, layout->panel.y,
+                layout->panel.w, layout->panel.h, 0xff0c1424);
+        p->rect(p->context, bar.x, bar.y, bar.w, bar.h, 0xff202941);
+        for (int slot = 0; slot < 4; ++slot) {
+            float x = bar.x + (slot + .5f) * bar.w / 4;
+            if (slot == 2 && fast_forward)
+                p->rect(p->context, bar.x + 2 * bar.w / 4, bar.y,
+                        bar.w / 4, bar.h, 0xff493f80);
+            if (slot && p->line)
+                segment(p, bar.x + slot * bar.w / 4, bar.y + 9 * scale,
+                        bar.x + slot * bar.w / 4, bar.y + bar.h - 9 * scale,
+                        scale, 0x88ffffff);
+            if (slot == 2) {
+                if (p->icon) {
+                    p->icon(p->context, CR_ICON_NEXT, x - 17 * scale,
+                            bar.y + 12 * scale, 23 * scale, 0xffe0dcfa);
+                    p->icon(p->context, CR_ICON_NEXT, x - 5 * scale,
+                            bar.y + 12 * scale, 23 * scale, 0xffe0dcfa);
+                }
+            } else if (p->icon) {
+                int kind = slot == 0 ? CR_ICON_RESTART :
+                           slot == 1 ? CR_ICON_SAVES : CR_ICON_SETTINGS;
+                p->icon(p->context, kind, x - 12 * scale,
+                        bar.y + 12 * scale, 24 * scale, 0xffe0dcfa);
+            }
+        }
+    }
     if (visible) for (int i = 0; i < layout->count; ++i) {
         const cr_control *button = &layout->controls[i];
         cr_area a = button->area;
         float level = held & button->mask ? 1 : feedback[i];
         uint32_t edge = color(level, 128 * opacity / 100), text = color(level, 160 * opacity / 100);
-        if (i < 4) dpad(p, a, i, scale, edge);
+        if (i < 4) {
+            if (artwork && p->rect)
+                p->rect(p->context, a.x, a.y, a.w, a.h,
+                        color(level * .25f, 26 * opacity / 100) & 0xff8582be);
+            dpad(p, a, i, scale, edge);
+        }
         else if (i < 6) {
             float radius = a.w / 2 - stroke;
+            if (artwork && p->circle)
+                p->circle(p->context, a.x + a.w / 2, a.y + a.h / 2,
+                          radius, 0xff242c42);
             if (level > 0 && p->circle)
                 p->circle(p->context, a.x + a.w / 2, a.y + a.h / 2, radius - stroke,
                           color(level * .18f, 0));
@@ -76,17 +114,26 @@ void cr_overlay_draw_configured(const cr_play_layout *layout, const cr_painter *
             caption(p, button->label, a.x + a.w / 2, a.y + a.h / 2 + 8 * scale,
                     26 * scale, text, a.w);
         } else if (i == 6) {
+            if (artwork && p->rect)
+                p->rect(p->context, a.x + 2 * scale, a.y + 4 * scale,
+                        a.w - 4 * scale, a.h - 8 * scale, 0xff222a41);
             float cx = a.x + a.w / 2, cy = a.y + a.h * .40f;
             float points[] = {cx - 14 * scale, cy - 10 * scale, cx + 16 * scale, cy,
                               cx - 14 * scale, cy + 10 * scale};
             path(p, points, 3, stroke, edge);
             caption(p, button->label, cx, a.y + a.h - 2 * scale, 8 * scale, text, a.w);
         } else if (i == 7) {
+            if (artwork && p->rect)
+                p->rect(p->context, a.x + 2 * scale, a.y + 4 * scale,
+                        a.w - 4 * scale, a.h - 8 * scale, 0xff222a41);
             cr_area mark = {a.x + a.w / 2 - 14 * scale, a.y + a.h * .40f - 9 * scale,
                             28 * scale, 18 * scale};
             rectangle(p, mark, 0, stroke, edge);
             caption(p, button->label, a.x + a.w / 2, a.y + a.h - 2 * scale, 8 * scale, text, a.w);
         } else {
+            if (artwork && p->rect)
+                p->rect(p->context, a.x + 5 * scale, a.y + 5 * scale,
+                        a.w - 10 * scale, a.h - 10 * scale, 0xff222a41);
             rectangle(p, a, 5 * scale, stroke, edge);
             caption(p, button->label, a.x + a.w / 2, a.y + a.h / 2 + 6 * scale,
                     20 * scale, text, a.w);
@@ -94,10 +141,12 @@ void cr_overlay_draw_configured(const cr_play_layout *layout, const cr_painter *
     }
     cr_area menu = layout->menu, hide = layout->hide;
     float radius = 15 * scale;
-    ring(p, menu.x + menu.w / 2, menu.y + menu.h / 2, radius, stroke, color(menu_down, 128));
-    if (p->icon)
-        p->icon(p->context, CR_ICON_MENU, menu.x + menu.w / 2 - 10 * scale,
-                menu.y + menu.h / 2 - 10 * scale, 20 * scale, color(menu_down, 160));
+    if (!artwork) {
+        ring(p, menu.x + menu.w / 2, menu.y + menu.h / 2, radius, stroke, color(menu_down, 128));
+        if (p->icon)
+            p->icon(p->context, CR_ICON_MENU, menu.x + menu.w / 2 - 10 * scale,
+                    menu.y + menu.h / 2 - 10 * scale, 20 * scale, color(menu_down, 160));
+    }
     float cx = hide.x + hide.w / 2, cy = hide.y + hide.h / 2;
     ring(p, cx, cy, radius, stroke, color(hide_down, 128));
     float sign = visible ? 1 : -1;
@@ -109,5 +158,5 @@ void cr_overlay_draw_configured(const cr_play_layout *layout, const cr_painter *
 
 void cr_overlay_draw(const cr_play_layout *layout, const cr_painter *p, unsigned held,
                      const float feedback[10], bool visible, bool menu_down, bool hide_down) {
-    cr_overlay_draw_configured(layout, p, held, feedback, visible, menu_down, hide_down, 100);
+    cr_overlay_draw_configured(layout, p, held, feedback, visible, menu_down, hide_down, false, 100);
 }
