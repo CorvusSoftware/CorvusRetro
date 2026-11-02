@@ -229,6 +229,48 @@ enum {
     HOME_PRIMARY = -201, HOME_LIBRARY, HOME_CORES, HOME_SAVES, HOME_CORE,
     HOME_HISTORY, HOME_INFO, HOME_PICK, HOME_SUBSYSTEM, HOME_UNLOAD, HOME_SETTINGS
 };
+enum {
+    LIBRARY_SEARCH = -300, LIBRARY_IMPORT, LIBRARY_ALL, LIBRARY_GB,
+    LIBRARY_GBC, LIBRARY_GBA, LIBRARY_GAME_BASE = -400
+};
+static bool library_grid(const cr_ui *u) {
+    return !u->quick && u->page == CR_LIBRARY && u->width >= 300 && u->height > u->width;
+}
+static int library_system(const cr_game *game) {
+    if (!strcmp(game->system_id, "nintendo.game_boy") ||
+        !strcmp(game->core_id, "corvus.gb")) return 0;
+    if (!strcmp(game->system_id, "nintendo.game_boy_color") ||
+        !strcmp(game->core_id, "corvus.gbc")) return 1;
+    if (!strcmp(game->system_id, "nintendo.game_boy_advance") ||
+        !strcmp(game->core_id, "corvus.gba")) return 2;
+    return cr_registry_legacy_system(game->system);
+}
+static bool library_contains(const char *title, const char *query) {
+    if (!query[0]) return true;
+    for (const char *start = title; *start; ++start) {
+        const char *a = start, *b = query;
+        while (*a && *b && tolower((unsigned char)*a) == tolower((unsigned char)*b)) {
+            ++a; ++b;
+        }
+        if (!*b) return true;
+    }
+    return false;
+}
+static bool library_matches(const cr_ui *u, const cr_game *game) {
+    return (u->library_filter < 0 || library_system(game) == u->library_filter) &&
+           library_contains(game->title, u->library_query);
+}
+static int library_count(const cr_ui *u) {
+    int count = 0;
+    for (size_t i = 0; i < u->game_count; ++i)
+        if (library_matches(u, &u->games[i]) && count < 100000) ++count;
+    return count;
+}
+static int library_index(const cr_ui *u, int position) {
+    for (size_t i = 0; i < u->game_count; ++i)
+        if (library_matches(u, &u->games[i]) && position-- == 0) return (int)i;
+    return -1;
+}
 static int rows(const cr_ui *u) {
     if (u->quick) return CR_QUICK_COUNT - (u->engine.players > 1 ? 0 : 1);
     if (u->page == CR_CORE_OPTIONS) return (int)cr_engine_option_count(&u->engine);
@@ -252,7 +294,7 @@ static int rows(const cr_ui *u) {
     if (u->page == CR_SAVESTATES) return 3;
     if (u->page == CR_SAVE_HUB) return 2;
     if (u->page == CR_CONTENT) return 2;
-    if (u->page == CR_LIBRARY) return 1 + (int)u->game_count;
+    if (u->page == CR_LIBRARY) return 1 + library_count(u);
     if (u->page == CR_MAIN)
         return 3 + (u->engine.loaded ? 1 : 0) + (u->engine.handle ? 1 : 0);
     if (u->page == CR_LISTS)
@@ -457,11 +499,14 @@ static row get_row(const cr_ui *u, int index) {
                                     "Chargez un cœur pour importer un dossier"),
                  CR_ICON_FOLDER, ACT_FOLDER, 0);
             r.disabled = !u->engine.handle || u->importing;
-        } else if ((size_t)(index - 1) < u->game_count) {
-            const cr_game *game = &u->games[index - 1];
-            fill(&r, game->title, game->system >= 0 ? core_name(game->system) :
-                 "Cœur non installé", CR_ICON_FILE, ACT_GAME, index - 1);
-            r.disabled = !u->engine.handle || game->system != u->engine.system;
+        } else {
+            int game_index = library_index(u, index - 1);
+            if (game_index >= 0) {
+                const cr_game *game = &u->games[game_index];
+                fill(&r, game->title, game->system >= 0 ? core_name(game->system) :
+                     "Cœur non installé", CR_ICON_FILE, ACT_GAME, game_index);
+                r.disabled = !u->engine.handle || game->system != u->engine.system;
+            }
         }
     } else if (u->page == CR_CORES) {
         if (index == (int)cr_registry_count()) {
@@ -620,6 +665,11 @@ static row get_row(const cr_ui *u, int index) {
 static void clamp_scroll(cr_ui *u) {
     float content = home_cards(u) ? (u->engine.handle ? 695.f : 631.f) * home_scale(u) :
                     (float)rows(u) * 76;
+    if (library_grid(u)) {
+        float total = ((library_count(u) + 1) / 2) * 208.f;
+        u->scroll = fmaxf(0, fminf(u->scroll, total - fmaxf(1, body_bottom(u) - 184)));
+        return;
+    }
     if (u->page == CR_ABOUT || u->page == CR_LICENSE || u->page == CR_CORE_INFO ||
         ((u->page == CR_SUBSYSTEMS || u->page == CR_CORE_OPTIONS) && !rows(u)))
         content = fmaxf(400, u->text_height);
@@ -788,6 +838,20 @@ void cr_ui_achievement_frame(cr_ui *u) {
     if (u->ra_enabled && u->engine.players <= 1) cr_cheevos_frame(u->achievements);
 }
 void cr_ui_text_result(cr_ui *u, int field, const char *text, bool accepted) {
+    if (u->library_editing && field == -3) {
+        snprintf(u->library_preview, sizeof(u->library_preview), "%.64s", text ? text : "");
+        return;
+    }
+    if (u->library_editing && field == 3) {
+        u->library_editing = false;
+        if (accepted) {
+            snprintf(u->library_query, sizeof(u->library_query), "%.64s", text ? text : "");
+            u->scroll = 0;
+            u->focus = 0;
+        }
+        u->library_preview[0] = 0;
+        return;
+    }
     if (field < 0 && -field == u->ra_editing) {
         snprintf(u->ra_preview, sizeof(u->ra_preview), "%s", text);
         return;
@@ -805,6 +869,7 @@ void cr_ui_init(cr_ui *u, cr_platform p, const char *root) {
     u->width = 384;
     u->height = 700;
     u->filter = -1;
+    u->library_filter = -1;
     u->theme = CR_THEME_CORVUS;
     u->menu_pointer = u->feedback_target = -1;
     u->show_input = true;
@@ -1657,6 +1722,11 @@ void cr_ui_move(cr_ui *u, int direction) {
         float top = home_cards(u) ? home_focus_top(u) : u->focus * 76;
         float size = home_cards(u) ? 70 * home_scale(u) : 76;
         float view = fmaxf(1, body_bottom(u) - 64);
+        if (library_grid(u)) {
+            top = u->focus ? ((u->focus - 1) / 2) * 208.f : 0;
+            size = u->focus ? 198 : 0;
+            view = fmaxf(1, body_bottom(u) - 184);
+        }
         if (top < u->scroll)
             u->scroll = top;
         if (top + size > u->scroll + view)
