@@ -24,7 +24,7 @@ cr_play_layout cr_play_layout_configured(float width, float height, int system, 
     p.menu = p.portrait ? (cr_area){(w - cell) / 2, p.panel.y + 12 * s, cell, cell}
                         : (cr_area){104 * s, 12 * s, cell, cell};
     /* Full artwork bar on tall portrait phones; compact surfaces keep the old controls. */
-    bool artwork = p.portrait && w >= 360 && h >= 780 && panel >= 365 * s;
+    bool artwork = p.portrait && w >= 360 && h >= 820 && panel >= 365 * s;
     if (artwork) {
         p.toolbar = (cr_area){margin, p.panel.y + 8 * s, w - 2 * margin, 48 * s};
         p.menu = (cr_area){p.toolbar.x + p.toolbar.w * .75f, p.toolbar.y,
