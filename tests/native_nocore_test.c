@@ -61,6 +61,18 @@ int main(void) {
     cr_ui_back(&ui);
     cr_ui_back(&ui);
     check(ui.page == CR_MAIN, "library back navigation restores main menu");
+    cr_ui_confirm(&ui);
+    check(ui.page == CR_CORES, "core manager is accessible without bundled engines");
+    cr_ui_touch(&ui, 0, CR_TOUCH_DOWN, 180, 190);
+    cr_ui_touch(&ui, 0, CR_TOUCH_UP, 180, 190);
+    check(ui.page == CR_CORE_DOWNLOADS && reloads == 2 && !ui.engine.handle,
+          "uninstalled CorvusGBA card opens verified downloader without loading a core");
+    cr_ui_back(&ui);
+    check(ui.page == CR_CORES, "downloader back restores cards");
+    cr_ui_touch(&ui, 0, CR_TOUCH_DOWN, 180, 563);
+    cr_ui_touch(&ui, 0, CR_TOUCH_UP, 180, 563);
+    check(ui.page == CR_CORE_DOWNLOADS && reloads == 3 && !ui.engine.handle,
+          "core install button uses the existing downloader service");
 
     cr_ui_destroy(&ui);
     puts("PASS core-free CorvusRetro");
