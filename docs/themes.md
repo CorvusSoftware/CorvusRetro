@@ -6,14 +6,14 @@ la couleur ARGB transmise par le frontend natif.
 
 ## CorvusRetro par défaut
 
-Palette inspirée visuellement du logo de corbeau fourni par l'utilisateur.
+Palette basée sur la référence mobile CorvusRetro retenue : fonds bleu nuit,\ncartes indigo, accents violets et illustrations originales rendues en C11.
 Les tons ont été adaptés au contraste des petites icônes et du texte :
 
 | Rôle | Couleur |
 | --- | --- |
-| Fond bleu presque noir | `#090D14` |
-| En-tête bleu nuit | `#111827` |
-| Navigation ardoise | `#141E30` |
+| Fond bleu presque noir | `#0B1029` |
+| En-tête bleu nuit | `#0B1028` |
+| Navigation ardoise | `#111631` |
 | Accent lavande/violet | `#B69AFF` |
 | Icônes indigo | `#9A9DFF` |
 | Texte | `#EFF1FA` |
