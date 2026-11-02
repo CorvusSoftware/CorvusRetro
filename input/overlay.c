@@ -50,12 +50,14 @@ static void pill(const cr_painter *p, cr_area a, uint32_t fill, uint32_t border)
         }
     }
     for (int i = 0; i < 16; ++i) {
-        float angle = (float)i * 3.14159265f / 15;
-        float next = (float)(i + 1) * 3.14159265f / 15;
-        segment(p, a.x + r - cosf(angle)*r, a.y + r - sinf(angle)*r,
-                a.x + r - cosf(next)*r, a.y + r - sinf(next)*r, 1.5f, border);
-        segment(p, a.x + a.w - r + cosf(angle)*r, a.y + r + sinf(angle)*r,
-                a.x + a.w - r + cosf(next)*r, a.y + r + sinf(next)*r, 1.5f, border);
+        float a1 = 1.5707963f + i * 3.14159265f / 16;
+        float a2 = 1.5707963f + (i + 1) * 3.14159265f / 16;
+        float b1 = -1.5707963f + i * 3.14159265f / 16;
+        float b2 = -1.5707963f + (i + 1) * 3.14159265f / 16;
+        segment(p, a.x+r+cosf(a1)*r, a.y+r+sinf(a1)*r,
+                a.x+r+cosf(a2)*r, a.y+r+sinf(a2)*r, 1.5f, border);
+        segment(p, a.x+a.w-r+cosf(b1)*r, a.y+r+sinf(b1)*r,
+                a.x+a.w-r+cosf(b2)*r, a.y+r+sinf(b2)*r, 1.5f, border);
     }
     segment(p, a.x + r, a.y, a.x + a.w - r, a.y, 1.5f, border);
     segment(p, a.x + r, a.y + a.h, a.x + a.w - r, a.y + a.h, 1.5f, border);
