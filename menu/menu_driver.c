@@ -234,6 +234,15 @@ enum {
     LIBRARY_GB = -303, LIBRARY_GBC = -304, LIBRARY_GBA = -305,
     LIBRARY_GAME_BASE = -400
 };
+static bool core_cards(const cr_ui *u) {
+    return !u->quick && u->page == CR_CORES && u->width >= 320 &&
+           u->height >= 610 && u->height > u->width && cr_registry_count() <= 3;
+}
+static const char *const featured_core_ids[] = {"corvus.gba", "corvus.gbc", "corvus.gb"};
+static const char *const featured_core_titles[] = {"CorvusGBA", "CorvusGBC", "CorvusGB"};
+static const char *const featured_core_systems[] = {"Game Boy Advance", "Game Boy Color", "Game Boy"};
+enum { CORE_CARD_GBA = -701, CORE_CARD_GBC = -702, CORE_CARD_GB = -703,
+       CORE_CARD_INSTALL = -704 };
 static bool library_grid(const cr_ui *u) {
     return !u->quick && u->page == CR_LIBRARY && u->width >= 300 && u->height > u->width;
 }
@@ -1799,6 +1808,14 @@ static void navigate_tab(cr_ui *u, int tab_index) {
     if (tab_index < 0 || tab_index >= 5) return;
     page(u, pages[tab_index]);
 }
+static int core_target(const cr_ui *u, float x, float y) {
+    if (x < 18 || x >= u->width - 18) return -1;
+    for (int i = 0; i < 3; ++i) {
+        float top = 150 + i * 94;
+        if (y >= top && y < top + 78) return CORE_CARD_GBA - i;
+    }
+    return y >= u->height - 165 && y < u->height - 113 ? CORE_CARD_INSTALL : -1;
+}
 static int library_target(const cr_ui *u, float x, float y) {
     float w = u->width;
     if (y >= 78 && y < 121) {
@@ -1838,6 +1855,8 @@ static int target(const cr_ui *u, float x, float y) {
         return -1;
     if (home_cards(u))
         return home_target(u, x, y);
+    if (core_cards(u))
+        return core_target(u, x, y);
     if (library_grid(u))
         return library_target(u, x, y);
     int i = (int)((y - 64 + (u->quick ? u->quick_scroll : u->scroll)) / 76);
@@ -1959,6 +1978,19 @@ void cr_ui_touch_at(cr_ui *u, int id, int phase, float x, float y, double event_
         }
         if (t == -2) {
             cr_ui_back(u);
+            return;
+        }
+        if (core_cards(u) && t >= CORE_CARD_INSTALL && t <= CORE_CARD_GBA) {
+            if (t == CORE_CARD_INSTALL) {
+                show_core_downloader(u);
+            } else {
+                int slot = CORE_CARD_GBA - t;
+                if (slot >= 0 && slot < 3) {
+                    int index = cr_registry_find(featured_core_ids[slot]);
+                    if (index >= 0) activate(u, get_row(u, index));
+                    else show_core_downloader(u);
+                }
+            }
             return;
         }
         if (library_grid(u) && t <= LIBRARY_GAME_BASE) {
@@ -2201,6 +2233,39 @@ static uint32_t library_art_hash(const char *id) {
         h = (h ^ *c) * 16777619u;
     return h;
 }
+static void draw_cores(cr_ui *u, const cr_painter *p, const cr_theme *theme) {
+    float w = u->width, h = u->height;
+    text(p, "Gérez les cœurs (émulateurs) disponibles.", 20, 99, 13,
+         theme->muted, w - 36);
+    for (int i = 0; i < 3; ++i) {
+        int index = cr_registry_find(featured_core_ids[i]);
+        bool installed = index >= 0;
+        bool selected = installed && u->engine.handle && u->engine.system == index;
+        float y = 150 + i * 94;
+        if (selected)
+            rounded(p, 17, y - 2, w - 34, 82, 17, theme->accent);
+        rounded(p, 19, y, w - 38, 78, 15,
+                selected ? 0xff2a254f : 0xff1a2139);
+        rounded(p, 32, y + 17, 46, 45, 9, 0xff383260);
+        p->icon(p->context, CR_ICON_CORE, 41, y + 25, 28,
+                installed ? theme->accent : 0xff8e94b5);
+        text(p, featured_core_titles[i], 91, y + 32, 17,
+             theme->text, w - 157);
+        text(p, featured_core_systems[i], 91, y + 53, 12,
+             theme->muted, w - 157);
+        if (selected) {
+            p->circle(p->context, w - 47, y + 38, 15, theme->accent);
+            text(p, "✓", w - 54, y + 45, 18, 0xff160e2e, 19);
+        } else if (installed)
+            p->icon(p->context, CR_ICON_NEXT, w - 56, y + 29, 20, theme->muted);
+        else
+            p->icon(p->context, CR_ICON_DOWNLOAD, w - 57, y + 29, 22, theme->accent);
+    }
+    float top = h - 165;
+    rounded(p, 20, top, w - 40, 52, 17, theme->accent);
+    p->icon(p->context, CR_ICON_DOWNLOAD, w/2 - 89, top + 15, 23, 0xff1a1237);
+    center(p, "Installer un cœur", w/2 + 15, top + 32, 14, 0xff1a1237);
+}
 static void draw_library(cr_ui *u, const cr_painter *p, const cr_theme *theme) {
     float w = u->width, bottom = body_bottom(u);
     static const char *filters[] = {"Tous", "GB", "GBC", "GBA"};
@@ -2437,6 +2502,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         int first = (int)fmaxf(0, floorf((scroll - 84) / 76));
         int end = (int)fminf(count, floorf((scroll + body_bottom(u) - 64) / 76) + 1);
         if (home_cards(u)) draw_home(u, p, theme);
+        else if (core_cards(u)) draw_cores(u, p, theme);
         else if (library_grid(u)) draw_library(u, p, theme);
         else for (int i = first; i < end; i++) {
             float y = 64 + i * 76 - scroll;
