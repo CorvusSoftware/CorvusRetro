@@ -113,7 +113,7 @@ int main(void) {
     check(cr_engine_close(&u.engine), "release incompatible core");
     u.page = CR_MAIN;
     u.scroll = 0;
-    tap(&u, 100, 500); tap(&u, 100, 100);
+    tap(&u, 100, 500); tap(&u, 100, 280);
     tap(&u, 330, 568);
     check(u.page == CR_CONTENT, "dashboard content shortcut retains the loaded core");
     tap(&u, 100, 100);
