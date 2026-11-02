@@ -131,6 +131,13 @@ static int saved_show = -1, saved_audio = -1, writes;
 static int core_refreshes, core_installs, folder_calls, folder_system;
 static char folder_extensions[128];
 static char selected_pack[96];
+static int text_field;
+static char text_initial[96];
+static void edit_text(void *ctx, int field, const char *initial, bool secret) {
+    (void)ctx; (void)secret;
+    text_field = field;
+    snprintf(text_initial, sizeof(text_initial), "%s", initial);
+}
 static void pick_folder(void *ctx, int system, const char *extensions) {
     (void)ctx;
     folder_calls++;
@@ -159,7 +166,8 @@ static void tap(cr_ui *u, float x, float y) {
     cr_ui_touch(u, 0, CR_TOUCH_UP, x, y);
 }
 static void row(cr_ui *u, int i) {
-    if (u->page == CR_MAIN && !u->quick) {
+    if ((u->page == CR_MAIN || (u->page == CR_LIBRARY &&
+         u->width >= 300 && u->height > u->width)) && !u->quick) {
         u->focus = i;
         cr_ui_confirm(u);
     } else tap(u, 160, 100 + 76 * i);
@@ -373,7 +381,8 @@ int main(void) {
     cr_ui_init(&u, (cr_platform){.set_preference = set,
                                 .refresh_core_catalog = refresh_core_catalog,
                                 .install_core_pack = install_core_pack,
-                                .pick_folder = pick_folder}, root);
+                                .pick_folder = pick_folder,
+                                .edit_text = edit_text}, root);
     cr_ui_size(&u, 384, 700);
     capture c = draw(&u);
     check(c.home_tab && c.settings_tab && strstr(c.text, "Bienvenue !") &&
@@ -410,7 +419,11 @@ int main(void) {
     check(long_history != NULL, "allocate long history fixture");
     for (size_t i = 0; i < 1200; ++i) {
         long_history[i].played = 1;
+        long_history[i].system = (int)(i % 3);
         snprintf(long_history[i].title, sizeof(long_history[i].title), "Scroll item %zu", i);
+        snprintf(long_history[i].system_id, sizeof(long_history[i].system_id), "%s",
+                 i % 3 == 0 ? "nintendo.game_boy" :
+                 i % 3 == 1 ? "nintendo.game_boy_color" : "nintendo.game_boy_advance");
     }
     u.games = long_history;
     u.game_count = 1200;
@@ -436,8 +449,33 @@ int main(void) {
     u.page = CR_LIBRARY;
     u.scroll = 0;
     capture library = draw(&u);
-    check(strstr(library.text, "Scroll item 0") && library.row_icons <= 10,
-          "library shows imported games even when they were never played");
+    check(strstr(library.text, "Scroll item 0") && strstr(library.text, "GBC") &&
+              library.row_icons <= 10,
+          "library renders original two-column cover tiles for imported games");
+    tap(&u, 315, 99);
+    check(u.library_filter == 2 && u.scroll == 0, "GBA chip filters imported games without rewriting index");
+    library = draw(&u);
+    check(strstr(library.text, "Scroll item 2") && !strstr(library.text, "Scroll item 0"),
+          "GBA filter only presents compatible games");
+    tap(&u, 303, 28);
+    check(u.library_editing && text_field == 3 && !strcmp(text_initial, ""),
+          "library search opens the existing Android text input");
+    cr_ui_text_result(&u, -3, "Scroll item 1199", true);
+    check(!strcmp(u.library_preview, "Scroll item 1199"), "search preview is bounded in native UI");
+    cr_ui_text_result(&u, 3, "Scroll item 1199", true);
+    library = draw(&u);
+    check(!u.library_editing && strstr(library.text, "Scroll item 1199") &&
+              !strstr(library.text, "Scroll item 2"), "search intersects the active system filter");
+    tap(&u, 303, 28);
+    check(text_field == 3 && !strcmp(text_initial, "Scroll item 1199"),
+          "search can be edited without losing its previous query");
+    cr_ui_text_result(&u, 3, "", true);
+    tap(&u, 55, 100);
+    check(u.library_filter == -1 && !u.library_query[0], "all-games chip clears only filter");
+    tap(&u, 46, 231);
+    check(u.page == CR_LIBRARY && strstr(u.message, "Chargez un cœur"),
+          "cover tap cannot launch a game without a selected core");
+    u.scroll = 0;
     u.games = NULL;
     u.game_count = 0;
     u.page = CR_MAIN;
