@@ -409,11 +409,15 @@ int main(void) {
     tab(&u, 0);
     u.page = CR_CORES;
     capture cores = draw(&u);
+    check(strstr(cores.text, "CorvusGBA") && strstr(cores.text, "CorvusGBC") &&
+              strstr(cores.text, "CorvusGB") && strstr(cores.text, "Installer un cœur"),
+          "portrait core manager renders three official cards and install button");
+    cr_ui_size(&u, 700, 384);
+    cores = draw(&u);
     check(cores.row_icons && cores.label_fonts == cores.row_icons &&
               cores.hint_fonts == cores.row_icons,
-          "existing list icon and font sizing remain stable");
-    check(strstr(cores.text, "Game Boy Advance") && !strstr(cores.text, "Expérimental"),
-          "GBA remains available without the experimental label");
+          "landscape core list retains existing row typography and icons");
+    cr_ui_size(&u, 384, 700);
     u.page = CR_MAIN;
     cr_game *long_history = calloc(1200, sizeof(*long_history));
     check(long_history != NULL, "allocate long history fixture");
@@ -501,8 +505,8 @@ int main(void) {
     row(&u, 0);
     check(u.page == CR_CORES, "core menu opens before downloader");
     c = draw(&u);
-    check(strstr(c.text, "Téléchargeur de cœurs"), "core menu exposes online updater");
-    row(&u, 3);
+    check(strstr(c.text, "Installer un cœur"), "core screen exposes the official downloader");
+    tap(&u, 160, 558);
     check(u.page == CR_CORE_DOWNLOADS && core_refreshes == 1 &&
           u.catalog_loading, "downloader starts catalog request on entry");
     cr_core_catalog catalog = {0};
