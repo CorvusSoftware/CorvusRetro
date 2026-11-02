@@ -96,7 +96,7 @@ typedef struct {
     int page, filter, library_filter, theme, focus, tab, menu_pointer, feedback_target;
     bool library_editing;
     char library_query[96], library_preview[96];
-    bool quick, audio, awake, importing, show_input, installing;
+    bool quick, audio, awake, importing, show_input, installing, fast_forward;
     int volume, video_integer, video_smooth, overlay_opacity, overlay_size, overlay_position;
     int notify_cards, notify_progress, backup_count, auto_state, editing_setting;
     int controller_bindings[10], controller_capture;
