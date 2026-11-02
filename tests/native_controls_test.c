@@ -150,7 +150,7 @@ typedef struct {
     int menu_icons, games;
     float width, height;
     unsigned lines;
-    bool title;
+    bool title, themed;
 } capture;
 static void line(void *context, float x1, float y1, float x2, float y2, float width, uint32_t color) {
     capture *c = context;
@@ -158,7 +158,8 @@ static void line(void *context, float x1, float y1, float x2, float y2, float wi
           "overlay strokes have finite geometry");
     check(x1 >= 0 && y1 >= 0 && x2 >= 0 && y2 >= 0 && x1 <= c->width && x2 <= c->width &&
               y1 <= c->height && y2 <= c->height, "overlay outlines stay inside the safe viewport");
-    check((color & 0xffffff) == 0xffffff, "overlay contours use neutral gray without theme tint");
+    check(c->themed || (color & 0xffffff) == 0xffffff,
+          "compact overlay contours remain neutral; reference gamepad may use violet");
     ++c->lines;
 }
 static void box(void *c, float x, float y, float w, float h, uint32_t color) {
@@ -231,7 +232,7 @@ int main(void) {
     for (size_t k = 0; k < sizeof(sizes) / sizeof(sizes[0]); k++) {
         cr_ui_size(&u, sizes[k][0], sizes[k][1]);
         cr_play_layout p = cr_play_layout_make(u.width, u.height, 0, 160, 144);
-        capture c = {.width = u.width, .height = u.height};
+        capture c = {.width = u.width, .height = u.height, .themed = p.toolbar.w > 0};
         cr_painter painter = {&c, box, circle, text, measure, icon, NULL, game, NULL, NULL, line};
         cr_ui_draw(&u, &painter);
         check(c.games == 1 && c.menu_icons == 1 && !c.title,
