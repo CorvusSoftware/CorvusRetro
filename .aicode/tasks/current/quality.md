@@ -1,21 +1,25 @@
 CorvusSoftware Quality Gate
 Status: PASS
-Risk: DEEP
+Risk: STANDARD
 
 Criteria:
-- PASS : répétition reproduite avant correction, expiration et vrais changements/reset/reload préservés.
-- PASS : défaut audio nominal GBA/60Hz reproduit avant correction puis supprimé, PCM et gain exacts.
-- PASS : 17 suites strictes/ASan, 321 contrôles client, 18372 contrôles audio, JVM19, builds Android/lint/paquet/corefree.
-- PASS : Android68, captures fraîches inspectées et buffercrash vide.
+- PASS : fusion autorisée et CI exacte PR/main verte.
+- PASS : buildsigné, provenance, certificatdurable, version0.22.1/code29 et paquetdeuxABI/16Ko/zérocoeur/MP3original.
+- PASS : upgrade28->29 avec UID/dossier/premièreinstallation/ASUS/historique conservés.
+- PASS : publication et octets publics identiques à l'artefact qualifié.
+
+Evidence:
+- CI41543067388, signé41543475863, publication41544028480 sur sourceea05c867eddc6258999724435023212a0390e2d9.
+- PublicSHA256c7ca0e7e00646d37ba6a743ce460c942d181033d5d94de90fda1fd994ec93c0e.
+- Reçus signés, update et comparaison publique dans /workspace/setup/.
 
 Review:
-- Revue indépendante des deux changements production, aucun finding concret restant.
-- Assertions et durées des widgets inchangées ; calendrier de captures corrigé pour tenir compte du coût d'encodagePNG.
+- Changementsfonctionnels revus indépendamment dans PR #26 ; aucun finding restant.
+- Documentation relue contre les reçus et résultats distants.
 
 Open risks:
-- ROM Pokémon non disponible ; pas d'écoute physique/téléphone/Bluetooth/runtimeARM64.
-- L'amorce traite le calendrier nominal et n'asservit pas une dérive d'horloge prolongée.
-- Les captures négatives ne remplacent pas la preuve native déterministe.
+- ÉmulateurAPI29x86_64 uniquement ; aucune écoutephysique/ROMPokémon/Bluetooth/runtimeARM64.
+- L'amorce corrigée ne constitue pas un asservissement deshorloges longuesdurées.
 
 Decision:
-- Correctif local prêt pour revue. Vérifier la CI du commit exact de PR avant livraison ; la version0.22.1 n'est pas publiée.
+- Livraison publiée et vérifiée. Fusionner la documentation après sa CI exacte ; conserver tag/assets immuables.

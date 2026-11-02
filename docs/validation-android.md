@@ -502,3 +502,34 @@ La ROM Pokémon Émeraude n'était pas disponible. Ces essais ne remplacent pas
 une écoute sur téléphone ; une dérive prolongée entre horloges ou un frontend
 trop lent reste un cas distinct de l'amorce corrigée. Aucune qualification
 Bluetooth ou runtime ARM64 n'est revendiquée.
+
+### Publication signée 0.22.1
+
+La [release v0.22.1](https://github.com/CorvusSoftware/CorvusRetro/releases/tag/v0.22.1)
+provient du commit de fusion de PR #26 `ea05c867eddc6258999724435023212a0390e2d9`, versionCode29.
+Son arbre est identique à la tête de PR `0b03d92`, déjà revue et qualifiée.
+La [CI main 41543067388](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41543067388),
+le [build signé 41543475863](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41543475863)
+et la [publication 41544028480](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41544028480)
+sont réussis sur ce commit exact.
+
+Certificat durable inchangé : `cb431e5abf3ae73ddd5c706a9c485ff6e627be2135bb2557b6191f04ac3a5211`.
+L'APK public a été retéléchargé et comparé octet pour octet à l'artefact signé
+testé. SHA-256 : `c7ca0e7e00646d37ba6a743ce460c942d181033d5d94de90fda1fd994ec93c0e`.
+Version0.22.1/code29, frontends arm64-v8a/x86_64, alignement16 Ko, absence de
+cœur et de provider de tests, provenance des trois sous-modules et MP3 original
+ont été vérifiés. Aucune révision de moteur ou d'API n'a changé.
+
+Sur le profil signé Android10/API29 x86_64, la mise à jour0.22.0/code28 vers
+0.22.1/code29 est acceptée sans désinstallation. UID10116, dossier de données
+et première date d'installation sont identiques. Le thème ASUS et l'historique
+`Corvus-preserved.gba` sont conservés ; la ligne d'historique est identique en
+pixels. Les captures ont été inspectées et le menu sans cœur propose toujours
+le téléchargeur. Aucun nouveau crash de l'application n'a été observé.
+
+Les régressions progression et amorce audio, 17 suites natives strictes et
+ASan/UBSan, 19 tests JVM et 68 contrôles Android sont décrits ci-dessus.
+Le test PCM ne remplace pas une écoute sur téléphone ; aucune ROM Pokémon,
+écoute physique, qualification Bluetooth ou exécution ARM64 n'est revendiquée.
+Le tag et les octets de v0.22.1 restent immuables ; cette documentation ne
+modifie pas le binaire publié.
