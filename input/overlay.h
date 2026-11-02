@@ -10,5 +10,5 @@ void cr_overlay_draw(const cr_play_layout *, const cr_painter *, unsigned held,
                      const float feedback[10], bool visible, bool menu_down, bool hide_down);
 void cr_overlay_draw_configured(const cr_play_layout *, const cr_painter *, unsigned held,
                                 const float feedback[10], bool visible, bool menu_down,
-                                bool hide_down, int opacity_percent);
+                                bool hide_down, bool fast_forward, int opacity_percent);
 #endif
