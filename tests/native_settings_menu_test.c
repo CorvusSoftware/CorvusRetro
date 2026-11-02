@@ -80,11 +80,11 @@ static void settings_root(cr_ui *u) {
     float x = u->width * 5 / 6, y = u->height - 30;
     cr_ui_touch_at(u, 0, CR_TOUCH_DOWN, x, y, 100);
     cr_ui_touch_at(u, 0, CR_TOUCH_UP, x, y, 100.05);
-    check(u->page == CR_SETTINGS && u->tab == 2 && !u->quick, "settings tab opens the global root");
+    check(u->page == CR_SETTINGS && u->tab == 4 && !u->quick, "settings tab opens the global root");
 }
 static void category(cr_ui *u, int row, int page) {
     settings_root(u); choose(u, row);
-    check(u->page == page && u->tab == 2 && u->depth == 1, "category opens from global settings");
+    check(u->page == page && u->tab == 4 && u->depth == 1, "category opens from global settings");
 }
 static void choose_value(cr_ui *u, int row, int value_index, int return_page) {
     choose(u, row);
