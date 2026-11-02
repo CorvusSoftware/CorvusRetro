@@ -1849,7 +1849,7 @@ void cr_ui_touch_at(cr_ui *u, int id, int phase, float x, float y, double event_
             cr_ui_back(u);
             return;
         }
-        if (t <= -201) {
+        if (t >= HOME_PRIMARY && t <= HOME_SETTINGS) {
             switch (t) {
             case HOME_PRIMARY:
                 if (u->engine.loaded) page(u, CR_PLAY);
@@ -1954,6 +1954,102 @@ static float paragraphs(const cr_painter *p, const char *s, float x, float top, 
         text(p, buffer, x, y, 14, color, w);
     return y + scroll - top + line;
 }
+static void rounded(const cr_painter *p, float x, float y, float w, float h,
+                    float radius, uint32_t color) {
+    float r = fminf(radius, fminf(w, h) / 2);
+    if (r <= 0) { rect(p, x, y, w, h, color); return; }
+    rect(p, x + r, y, w - 2 * r, h, color);
+    rect(p, x, y + r, r, h - 2 * r, color);
+    rect(p, x + w - r, y + r, r, h - 2 * r, color);
+    p->circle(p->context, x + r, y + r, r, color);
+    p->circle(p->context, x + w - r, y + r, r, color);
+    p->circle(p->context, x + r, y + h - r, r, color);
+    p->circle(p->context, x + w - r, y + h - r, r, color);
+}
+static void draw_home(cr_ui *u, const cr_painter *p, const cr_theme *theme) {
+    float s = home_scale(u), w = u->width, x = 16 * s, gap = 9 * s;
+    float card_w = (w - 2 * x - 2 * gap) / 3, scroll = u->scroll;
+    uint32_t fg = theme->text, muted = theme->muted, accent = theme->accent;
+    float hero = 72 * s - scroll, hero_h = 172 * s;
+    rounded(p, x, hero, w - 2 * x, hero_h, 16 * s, 0xff1b1d4c);
+    if (p->clip)
+        p->clip(p->context, x, fmaxf(hero, 56), w - 2 * x,
+                fmaxf(1, fminf(hero + hero_h, body_bottom(u)) - fmaxf(hero, 56)));
+    for (int i = 0; i < 24; ++i) {
+        float y = hero + i * hero_h / 24;
+        uint32_t c = i < 8 ? 0xff332c6c : i < 17 ? 0xff503275 : 0xff242650;
+        rect(p, x, y, w - 2 * x, hero_h / 24 + 1, c);
+    }
+    p->circle(p->context, w - 110 * s, hero + 47 * s, 24 * s, 0xffaa8be9);
+    for (int i = 0; i < 8; ++i)
+        p->circle(p->context, x + (33 + i * 39) * s, hero + (19 + (i * 11) % 42) * s,
+                  1.6f * s, 0xffe3d1ff);
+    for (int i = 0; i < 55; ++i) {
+        float xx = x + i * (w - 2 * x) / 55;
+        float ridge = hero + (96 + 19 * sinf(i * .18f) - 13 * sinf(i * .37f)) * s;
+        rect(p, xx, ridge, (w - 2 * x) / 55 + 1, hero + hero_h - ridge, 0xff30275f);
+        float near = hero + (129 + 10 * sinf(i * .29f) - 9 * sinf(i * .17f)) * s;
+        rect(p, xx, near, (w - 2 * x) / 55 + 1, hero + hero_h - near, 0xff171b3b);
+    }
+    float console_x = w - 95 * s, console_y = hero + 51 * s;
+    rounded(p, console_x, console_y, 60 * s, 95 * s, 9 * s, 0xff9290d2);
+    rounded(p, console_x + 9*s, console_y + 9*s, 42*s, 39*s, 4*s, 0xff292650);
+    rect(p, console_x + 15*s, console_y + 15*s, 30*s, 27*s, 0xff7d98c2);
+    rect(p, console_x + 14*s, console_y + 64*s, 24*s, 5*s, 0xff292650);
+    rect(p, console_x + 23*s, console_y + 55*s, 5*s, 23*s, 0xff292650);
+    p->circle(p->context, console_x + 43*s, console_y + 68*s, 5*s, 0xffa251e9);
+    p->circle(p->context, console_x + 53*s, console_y + 61*s, 5*s, 0xffa251e9);
+    if (p->clip) p->clip(p->context, 0, 56, w, fmaxf(1, body_bottom(u) - 56));
+    text(p, "Bienvenue !", x + 14*s, hero + 127*s, 23*s, 0xffffffff, w - 140*s);
+    text(p, "Retrouvez vos jeux rétro", x + 14*s, hero + 147*s, 12*s,
+         0xffe2d9ff, w - 140*s);
+
+    float resume = 256*s - scroll;
+    rounded(p, x, resume, w - 2*x, 76*s, 13*s, 0xff282450);
+    rounded(p, x + 9*s, resume + 10*s, 55*s, 55*s, 9*s, 0xff4a3e90);
+    p->icon(p->context, CR_ICON_CONTENT, x + 23*s, resume + 24*s, 27*s, 0xffd5c6ff);
+    text(p, u->engine.loaded ? "Continuer" : "Charger un jeu",
+         x + 75*s, resume + 28*s, 15*s, fg, w - 159*s);
+    text(p, u->engine.loaded ? u->title : u->engine.handle ?
+         "Ouvrir un contenu" : "Choisir d'abord un cœur", x + 75*s,
+         resume + 48*s, 11*s, 0xffc3b8dc, w - 162*s);
+    p->circle(p->context, w - 46*s, resume + 38*s, 21*s, accent);
+    p->icon(p->context, CR_ICON_PLAY, w - 57*s, resume + 27*s, 22*s, 0xff17122c);
+
+    text(p, "Accès rapide", x, 357*s - scroll, 15*s, fg, w - 2*x);
+    const int icons[] = {CR_ICON_LIST, CR_ICON_CORE, CR_ICON_SAVES};
+    const char *titles[] = {"Bibliothèque", "Cœurs", "Saves"};
+    for (int i = 0; i < 3; ++i) {
+        float tile_x = x + i * (card_w + gap), tile_y = 370*s - scroll;
+        rounded(p, tile_x, tile_y, card_w, 88*s, 12*s,
+                i == 2 ? 0xff192d51 : 0xff28234d);
+        p->icon(p->context, icons[i], tile_x + (card_w - 28*s)/2, tile_y + 15*s,
+                28*s, i == 2 ? 0xff85c8ff : accent);
+        center(p, titles[i], tile_x + card_w / 2, tile_y + 71*s, 11*s, fg);
+    }
+    float core_y = 474*s - scroll;
+    rounded(p, x, core_y, w - 2*x, 70*s, 12*s, 0xff1b243c);
+    text(p, "Cœur actif", x + 14*s, core_y + 23*s, 12*s, muted, w - 2*x);
+    p->icon(p->context, CR_ICON_CORE, x + 14*s, core_y + 36*s, 24*s, accent);
+    text(p, u->engine.handle ? core_name(u->engine.system) : "Aucun cœur chargé",
+         x + 46*s, core_y + 53*s, 14*s, fg, w - 105*s);
+    p->icon(p->context, CR_ICON_NEXT, w - 37*s, core_y + 29*s, 18*s, muted);
+
+    const char *extras[] = {"Historique", "Informations", "Charger un jeu"};
+    for (int i = 0; i < 3; ++i) {
+        float tile_x = x + i * (card_w + gap), y = 556*s - scroll;
+        rounded(p, tile_x, y, card_w, 48*s, 9*s, 0xff172039);
+        center(p, extras[i], tile_x + card_w / 2, y + 29*s, 10*s, muted);
+    }
+    if (u->engine.handle) {
+        float y = 616*s - scroll;
+        rounded(p, x, y, (w - 2*x - gap)/2, 49*s, 9*s, 0xff202640);
+        rounded(p, x + (w - 2*x + gap)/2, y,
+                (w - 2*x - gap)/2, 49*s, 9*s, 0xff202640);
+        center(p, "Sous-système", x + (w - 2*x - gap)/4, y + 29*s, 11*s, fg);
+        center(p, "Décharger le cœur", x + 3*(w - 2*x)/4, y + 29*s, 11*s, muted);
+    }
+}
 void cr_ui_draw(cr_ui *u, const cr_painter *p) {
     const cr_theme *theme = cr_theme_get(u->theme);
     uint32_t bg = theme->background, header = theme->header, nav = theme->navigation;
@@ -1977,7 +2073,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
             }
         cr_overlay_draw_configured(&layout, p, input, u->control_feedback, u->show_input, menu_down, hide_down, u->overlay_opacity);
     } else {
-        const char *title = u->quick ? "Menu rapide" : "Menu principal";
+        const char *title = u->quick ? "Menu rapide" : u->page == CR_MAIN ? "CorvusRetro" : "Menu principal";
         switch (u->page) {
         case CR_LISTS:
             title = "Listes de lecture";
@@ -1986,7 +2082,10 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
             title = "Réglages";
             break;
         case CR_CORES:
-            title = "Charger un cœur";
+            title = "Cœurs";
+            break;
+        case CR_SAVE_HUB:
+            title = "Sauvegardes";
             break;
         case CR_GAME_SAVES:
             title = "Sauvegardes du jeu";
@@ -2097,7 +2196,8 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         float scroll = u->quick ? u->quick_scroll : u->scroll;
         int first = (int)fmaxf(0, floorf((scroll - 84) / 76));
         int end = (int)fminf(count, floorf((scroll + body_bottom(u) - 64) / 76) + 1);
-        for (int i = first; i < end; i++) {
+        if (home_cards(u)) draw_home(u, p, theme);
+        else for (int i = first; i < end; i++) {
             float y = 64 + i * 76 - scroll;
             if (y + 76 < 56 || y > body_bottom(u))
                 continue;
@@ -2185,7 +2285,13 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
             p->circle(p->context, 28, 28, 22, alpha_color(focus, u->feedback_alpha));
         if (has_back(u))
             p->icon(p->context, CR_ICON_BACK, 12, 16, 24, theme->header_text);
-        text(p, title, has_back(u) ? 56 : 20, 35, 19, theme->header_text, w - 100);
+        if (home_cards(u)) {
+            p->icon(p->context, CR_ICON_CROW, 16, 16, 25, accent);
+            text(p, title, 51, 35, 19, theme->header_text, w - 105);
+            p->icon(p->context, CR_ICON_SETTINGS, w - 39, 17, 22, accent);
+        } else {
+            text(p, title, has_back(u) ? 56 : 20, 35, 19, theme->header_text, w - 100);
+        }
         rect(p, 0, body_bottom(u), w, 100, bg);
         char footer[256];
         if (u->engine.handle) {
@@ -2198,15 +2304,18 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         text(p, footer, 20, h - 84, 11, muted, w - 40);
         rect(p, 0, h - 72, w, 72, nav);
         rect(p, 0, h - 72, w, 1, line);
-        const char *labels[] = {"Menu principal", "Listes de lecture", "Réglages"};
-        int icons[] = {CR_ICON_HOME, CR_ICON_LIST, CR_ICON_SETTINGS};
+        const char *labels[] = {"Accueil", "Jeux", "Saves", "Cœurs", "Réglages"};
+        const int icons[] = {CR_ICON_HOME, CR_ICON_LIST, CR_ICON_SAVES,
+                             CR_ICON_CORE, CR_ICON_SETTINGS};
         int selected = u->tab;
-        for (int i = 0; i < 3; i++) {
-            float x = w * (i + .5f) / 3;
+        for (int i = 0; i < 5; i++) {
+            float x = w * (i + .5f) / 5;
             uint32_t c = i == selected ? theme->navigation_active : theme->navigation_passive;
+            if (i == selected)
+                rounded(p, i * w / 5 + 8, h - 70, w / 5 - 16, 60, 14, focus);
             if (u->feedback_target == -100 - i && u->feedback_alpha > 0)
-                rect(p, i * w / 3, h - 72, w / 3, 72, alpha_color(focus, u->feedback_alpha));
-            p->icon(p->context, icons[i], x - 12, h - 61, 24, c);
+                rect(p, i * w / 5, h - 72, w / 5, 72, alpha_color(focus, u->feedback_alpha));
+            p->icon(p->context, icons[i], x - 12, h - 59, 24, c);
             center(p, labels[i], x, h - 17, 10, c);
         }
     }
