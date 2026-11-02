@@ -354,3 +354,38 @@ APK confirme la base sans cœur et l'alignement 16 Ko. Sur émulateur x86_64,
 réglages et de leurs sous-menus. La revue indépendante ne relève aucun défaut.
 Le dessin, les zones tactiles et le défilement ont aussi été comparés aux sources
 de 0.20.0. Aucun test sur téléphone physique n'est revendiqué.
+
+### Publication signée 0.21.0
+
+La PR21 est fusionnée dans `main`. L'APK public provient exactement de
+`e6f1157dc04736dcbb25f9e462c9f97d0cdc7e5c`, avec versionCode27. La CI de main
+[41443902775](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41443902775),
+la construction signée
+[41444288324](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41444288324)
+et la publication
+[41445211694](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41445211694)
+sont réussies. Le tag immuable `v0.21.0` désigne ce commit qualifié.
+
+Le certificat conserve l'empreinte
+`cb431e5abf3ae73ddd5c706a9c485ff6e627be2135bb2557b6191f04ac3a5211`.
+L'APK téléchargé depuis la release publique est identique octet pour octet à
+l'artefact signé testé ; SHA-256 :
+`890a3912a4e77959e9892ce4a9732dc3d9179bb26c5d112dab376619fc94f0b1`.
+Les deux frontends arm64-v8a/x86_64, l'alignement16Ko, l'absence de cœur et
+l'absence du provider de tests ont été vérifiés. Le MP3 du succès conserve son
+hash d'origine malgré le nom de ressource optimisé par AAPT dans l'APK release.
+
+Sur émulateur Android29x86_64, la mise à jour signée0.20.0/code26 vers0.21.0/code27
+est acceptée sans désinstallation. UID10116, répertoire de données et première
+date d'installation restent identiques. Le thème ASUS, l'entrée d'historique
+`Corvus-preserved.gba`, ses textes et leurs positions sont conservés. Les images
+d'icônes changent comme prévu. Le menu sans cœur propose toujours le téléchargeur.
+Aucun nouveau crash de l'application n'apparaît dans le buffer observé.
+
+Les fonctionnalités de la PR ont aussi été contrôlées sur l'APK debug :
+100 contrôles de rasterisation d'icônes,646 de réglages portrait/paysage,
+269 des commandes et réglages média avec jeux synthétiques, puis75 du son et
+du déblocage réel d'un succès. Les étapes correspondantes et leurs sources sont
+décrites dans la mémoire de tâche. La CI finale exécute15 suites natives et
+15 sous ASan/UBSan. Aucun test sur téléphone physique, manette physique ou
+runtime ARM64 n'est revendiqué.

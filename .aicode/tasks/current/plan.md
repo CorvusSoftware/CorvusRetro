@@ -1,3 +1,6 @@
-Objectif : jouer le MP3 fourni, sans modification, lors du déblocage d'un succès. MêmePR21.
-Budget STANDARD : événementC CR_CHEEVOS_UNLOCKED ->callbackplateforme ->JNI ->SoundPool Android préchargé. Son seulement si cartes/son activés et volume>0 ; lancement/progression/fin de collection restent silencieux. Un seul flux sonore, arrêt pause/destruction, requêtes anciennes invalidées.
-Preuves : test natif événement réel rc_client et RAM, volume/mute/cartes/dédoublonnage ; instrumentation Android chargement/lecture SoundPool du vraiMP3 et lifecycle, parcours succès réel ; compilation2ABI/lint/APKassetidentique. Revue indépendante et CI dernierSHA avant revue. Aucun changement CorvusCore/API/sauvegardes/menus, pas de fusion/release.
+Objectif : valider/fusionnerPR21 et publier la nouvelle version0.21.0/code27.
+1. CI têtePRd9ad8f4 verte, fusion autorisée par utilisateur versmaine6f1157.
+2. CI main41443902775 et buildsigné41444288324 réussis ; provenance3sousmodules/signature/ABI16Ko/zeroCore/MP3 vérifiés.
+3. Miseàjoursignée26->27 sansdésinstallation ; UID/données/ASUS/historique et lancementzeroCore vérifiés surémulateurAPI29x86_64.
+4. Tagv0.21.0 sure6f1157, publication41445211694 réussie ; APKpublic retéléchargé et comparé aux octets qualifiés.
+5. README et mémoire/documentation actualisés ; cette documentation se fusionne aprèsCI exacte, sans modifier le tag ni l'APK publié.

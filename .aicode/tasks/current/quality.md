@@ -1,17 +1,19 @@
 CorvusSoftware Quality Gate
-Status: PASS (implémentation locale pour revue)
+Status: PASS
 Risk: STANDARD
 Criteria:
-- PASS : MP3 utilisateur conservé octet pour octet, décodé et préchargé dans Android.
-- PASS : seul le vrai événement de déblocage joue le son, selon cartes/audio/volume ; pas de doublon lancement/progression/collection.
-- PASS : volume courant/mute propagés, pause/destruction arrêtent et libèrent le lecteur ; pas de reprise d'un ancien son.
+- PASS : PR21 approuvée par utilisateur, CI exacte verte puis fusion main.
+- PASS : APK0.21/code27 signé avec identité habituelle et provenance exacte.
+- PASS : deuxABI/alignement16Ko/zeroCore/MP3original et absence provider de test.
+- PASS : upgrade26->27 et conservation UID/données/ASUS/historique vérifiés.
+- PASS : publicationv0.21.0 et retéléchargement public identique aux octets qualifiés.
 Evidence:
--15suites natives et15ASan/UBSan réussies, test événementRAM/rc_client/volume/cartes ajouté au client natif.
-- Androiddebug2ABI/lint/testAPK ; APKzeroCore/ELF16Ko ; hashassetAPK identique.
--26contrôlesAndroidSoundPool/décodage/volume/lifecycle et parcours succès natif/popups réussis. Le fixture son impose audio100 pour ne pas dépendre du profil.
+- CI41443902775, signé41444288324 et publication41445211694 réussis sursourcee6f1157.
+- QualificationAPK et upgrade dans /workspace/setup/signed021-qualification.json et signed021-runtime/upgrade.json.
+- PublicAPK SHA256890a3912a4e77959e9892ce4a9732dc3d9179bb26c5d112dab376619fc94f0b1.
 Review:
-- Indépendante sans défaut restant, correction du volume pendant lecture validée.
+- Changementsfonctionnels revus indépendamment pendantPR21 ; aucunfinding restant.
 Open risks:
-- Pas d'écoute sur téléphone physique. Aucun changement de moteur ni de compte réel ; protocole synthétique et jeu original de test.
+- Émulateurx86_64, pas detéléphone/manettephysique/runtimeARM64 testé. Connectivité du catalogue et moteurs distribués séparément, inchangés.
 Decision:
-- PR prête pour revue ; consulter CI derniercommit avant fusion. Ni fusion ni release.
+- Livraison publiée. Documentation dequalification àfusionner après saCI. Conserver tag et assets immuables.
