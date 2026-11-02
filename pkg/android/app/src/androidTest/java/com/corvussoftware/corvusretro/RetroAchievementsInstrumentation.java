@@ -169,7 +169,9 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
                         responseStarted = true;
                         if (RetroAchievementsImages.allowed(address.toString())) {
                             if ("popups".equals(phase) && address.getPath().contains("/Images/")) {
+                                android.util.Log.i("CorvusRetroTest", "POPUP_IMAGE_REQUEST " + android.os.SystemClock.uptimeMillis());
                                 gameImageRequested = true; awaitFixture(gameImageRelease);
+                                android.util.Log.i("CorvusRetroTest", "POPUP_IMAGE_RELEASED " + android.os.SystemClock.uptimeMillis());
                             }
                             image = fixtureImage(address.toString()); imageRequests++; status = 200; return;
                         }
@@ -261,9 +263,12 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
         rom[0x100] = (byte) 0xc3; rom[0x101] = 0x50; rom[0x102] = 1;
         byte[] program = {(byte)0x3e,0x10,(byte)0xe0,0,(byte)0xf0,0,(byte)0xe6,1,0x20,(byte)0xfa,0x3e,0x42,(byte)0xea,0,(byte)0xc0,0x18,(byte)0xfe};
         if ("popups".equals(phase)) program = new byte[] {
-            (byte)0x3e,0x10,(byte)0xe0,0,(byte)0xf0,0,(byte)0xe6,1,0x20,(byte)0xfa,
-            0x3e,0x21,(byte)0xea,0,(byte)0xc0,(byte)0xf0,0,(byte)0xe6,1,0x28,(byte)0xfa,
-            (byte)0xf0,0,(byte)0xe6,2,0x20,(byte)0xfa,0x3e,0x42,(byte)0xea,0,(byte)0xc0,0x18,(byte)0xfe};
+            // Poll A=33, Select=49 and B=66; release restores zero before the next attempt.
+            0x3e,0x10,(byte)0xe0,0x00,(byte)0xf0,0x00,(byte)0xe6,0x02,0x28,0x20,(byte)0xf0,0x00,
+            (byte)0xe6,0x04,0x28,0x0d,(byte)0xf0,0x00,(byte)0xe6,0x01,0x20,0x0e,0x3e,0x21,
+            (byte)0xea,0x00,(byte)0xc0,0x18,(byte)0xe7,0x3e,0x31,(byte)0xea,0x00,(byte)0xc0,0x18,(byte)0xe0,
+            (byte)0xaf,(byte)0xea,0x00,(byte)0xc0,0x18,(byte)0xda,0x3e,0x42,(byte)0xea,0x00,(byte)0xc0,0x18,
+            (byte)0xfe};
         System.arraycopy(program, 0, rom, 0x150, program.length);
         System.arraycopy("CORVUS RA TEST".getBytes(StandardCharsets.US_ASCII), 0, rom, 0x134, 14);
         int checksum = 0;
@@ -308,17 +313,25 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
         do {
             if (bitmap != null) bitmap.recycle();
             android.os.SystemClock.sleep(100);
+            long captureStarted = android.os.SystemClock.uptimeMillis();
             bitmap = getUiAutomation().takeScreenshot();
+            android.util.Log.i("CorvusRetroTest", "POPUP_CAPTURE " + name + " at=" + android.os.SystemClock.uptimeMillis() +
+                    " duration=" + (android.os.SystemClock.uptimeMillis() - captureStarted) +
+                    " visible=" + (bitmap != null && hasColor(bitmap, color)));
         } while ((bitmap == null || !hasColor(bitmap, color)) && android.os.SystemClock.uptimeMillis() < deadline);
+        android.graphics.Bitmap entry = null;
         if (("launch".equals(name) || "unlocked".equals(name)) && bitmap != null && hasColor(bitmap, color)) {
-            try (FileOutputStream out = new FileOutputStream(new File(getTargetContext().getFilesDir(), "test-popup-" + name + "-entry.png"))) {
-                bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out);
-            }
-            bitmap.recycle();
+            entry = bitmap;
             android.os.SystemClock.sleep(750);
             bitmap = getUiAutomation().takeScreenshot();
         }
         boolean visible = bitmap != null && hasColor(bitmap, color);
+        // Capture both animation stages before PNG encoding consumes their display time.
+        if (entry != null) {
+            try (FileOutputStream out = new FileOutputStream(new File(getTargetContext().getFilesDir(), "test-popup-" + name + "-entry.png"))) {
+                entry.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out);
+            } finally { entry.recycle(); }
+        }
         if (bitmap != null) {
             try (FileOutputStream out = new FileOutputStream(new File(getTargetContext().getFilesDir(), "test-popup-" + name + ".png"))) {
                 bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out);
@@ -1053,7 +1066,10 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
         do {
             if (screen != null) screen.recycle();
             android.os.SystemClock.sleep(100);
+            long captureStarted = android.os.SystemClock.uptimeMillis();
             screen = getUiAutomation().takeScreenshot();
+            android.util.Log.i("CorvusRetroTest", "POPUP_PENDING_CAPTURE " + stage + " at=" + android.os.SystemClock.uptimeMillis() +
+                    " duration=" + (android.os.SystemClock.uptimeMillis() - captureStarted));
         } while ((screen == null || !hasColor(screen, 0xffe0f8d0)) && android.os.SystemClock.uptimeMillis() < deadline);
         // The screenshot is immutable; image delivery need not wait for PNG encoding.
         if (screen != null && captured != null) captured.countDown();
@@ -1078,6 +1094,30 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             try { value.set(field.getInt(sound)); } catch (IllegalAccessException error) { throw new AssertionError(error); }
         });
         return value.get();
+    }
+    private void gameKey(int key, boolean pressed) {
+        sendKeySync(new android.view.KeyEvent(pressed ? android.view.KeyEvent.ACTION_DOWN :
+                android.view.KeyEvent.ACTION_UP, key));
+        android.util.Log.i("CorvusRetroTest", "POPUP_KEY key=" + key + " pressed=" + pressed +
+                " at=" + android.os.SystemClock.uptimeMillis());
+    }
+    private void heldGameKey(int key, boolean pressed) throws Exception {
+        gameKey(key, pressed);
+        long before = playbackState()[3];
+        waitFor(() -> playbackState()[3] > before, "emulated frame consumes the held game input");
+        android.util.Log.i("CorvusRetroTest", "POPUP_KEY_FRAME key=" + key + " at=" + android.os.SystemClock.uptimeMillis());
+    }
+    private void noProgressPopup(String name) throws Exception {
+        android.graphics.Bitmap screen = getUiAutomation().takeScreenshot();
+        check(screen != null, "progress replay screenshot is available");
+        try {
+            boolean visible = hasColor(screen, PROGRESS_COLOR);
+            try (FileOutputStream out = new FileOutputStream(new File(getTargetContext().getFilesDir(),
+                    "test-popup-" + name + ".png"))) {
+                screen.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out);
+            }
+            check(!visible, "identical progress stays hidden: " + name);
+        } finally { screen.recycle(); }
     }
     private void popups() throws Exception {
         transport(); prepareGame();
@@ -1110,33 +1150,47 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
                 waitFor(() -> activity.achievementImage("https://media.retroachievements.org/" + image) != null,
                         "fixture image ready before timed popup capture");
             android.os.SystemClock.sleep(800);
+            waitFor(() -> playbackState()[1] == 1, "native popup input focus is ready");
             selectFixtureCore(activity);
             tab(activity, 1); tap(activity, 150, 100); state(4, 0, 0, 0);
             tap(activity, 150, 100);
             state(8, 0, 1, 0);
             waitFor(() -> metadataRequested, "game identification is pending");
             noLaunchPlaceholder(activity, "waiting-metadata", null);
+            android.util.Log.i("CorvusRetroTest", "POPUP_METADATA_RELEASED " + android.os.SystemClock.uptimeMillis());
             metadataRelease.countDown();
             waitFor(() -> gameImageRequested, "game image requested after identification");
             noLaunchPlaceholder(activity, "waiting-image", gameImageRelease);
             capturePopup("launch", GAME_COLOR);
             check(achievementSoundStream(activity)==0,"native launch card does not play the unlock sound");
             android.os.SystemClock.sleep(4500);
-            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BUTTON_A);
+            gameKey(android.view.KeyEvent.KEYCODE_BUTTON_A, true);
             capturePopup("progress", PROGRESS_COLOR);
+            heldGameKey(android.view.KeyEvent.KEYCODE_BUTTON_A, false);
             check(achievementSoundStream(activity)==0,"native progress badge stays silent");
             android.os.SystemClock.sleep(2200);
             android.graphics.Bitmap hidden = getUiAutomation().takeScreenshot();
             check(hidden != null && !hasColor(hidden, PROGRESS_COLOR), "progress indicator expires after two seconds");
             if (hidden != null) hidden.recycle();
+            for (int attempt = 0; attempt < 3; ++attempt) {
+                heldGameKey(android.view.KeyEvent.KEYCODE_BUTTON_A, true);
+                try { noProgressPopup("progress-repeat-" + attempt); }
+                finally { heldGameKey(android.view.KeyEvent.KEYCODE_BUTTON_A, false); }
+            }
+            check(achievementSoundStream(activity)==0,"repeated progress never plays the unlock sound");
+            gameKey(android.view.KeyEvent.KEYCODE_BUTTON_SELECT, true);
+            try { capturePopup("progress-advanced", PROGRESS_COLOR); }
+            finally { heldGameKey(android.view.KeyEvent.KEYCODE_BUTTON_SELECT, false); }
+            check(achievementSoundStream(activity)==0,"genuine progress changes remain silent");
             check(getUiAutomation().performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME),
                     "pause to exercise native window lifecycle");
             android.os.SystemClock.sleep(500);
             context.startActivity(new Intent(context, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
             waitFor(activity::hasWindowFocus, "game window focused after resume");
             state(8, 0, 1, 0);
-            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BUTTON_B);
+            gameKey(android.view.KeyEvent.KEYCODE_BUTTON_B, true);
             capturePopup("unlocked", UNLOCK_COLOR);
+            heldGameKey(android.view.KeyEvent.KEYCODE_BUTTON_B, false);
             waitFor(() -> awards == 1, "actual core memory unlocked one achievement with decoded images");
             waitFor(() -> achievementSoundStream(activity)>0,"real native unlock reaches Android SoundPool playback");
             closeContent();

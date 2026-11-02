@@ -462,3 +462,43 @@ Les contrôles fonctionnels précédents restent ceux de l'émulateur API29 et d
 tests hôtes. Aucune écoute physique, connexion Bluetooth ou exécution sur
 appareil ARM64 n'est revendiquée. Le tag `v0.22.0` et son APK restent immuables ;
 la présente documentation ne modifie pas la source du binaire publié.
+
+## Progression répétée et amorce audio, préparation 0.22.1
+
+Une régression native avec rcheevos réel reproduit le retour temporaire d'un
+compteur à zéro puis à sa valeur précédente. Avant correction, la même
+progression est réémise et le popup peut revenir après expiration. Le test
+vérifie maintenant 240 frames sans réapparition, les historiques indépendants
+de deux succès, les véritables augmentations et diminutions, puis les resets,
+chargements d'état et rechargements de jeu. Les 321 contrôles du client passent.
+
+Le pilote AAudio est testé avec un calendrier GBA exact de 59,727 Hz présenté
+à 60 Hz. La nouvelle régression échoue contre le pilote de v0.22.0, puis passe
+avec l'amorce de deux lots PCM. Cinq simulations de 60 s vérifient l'absence de
+silence ajouté et l'ordre exact de la stéréo sur toute la plage 16 bits. Les
+18 372 contrôles incluent les gains 0/1/37/50/99/100 %, les tailles 548/549 dans
+les deux ordres, les limites de file et les reprises. Les compilations API26
+ARM64/x86_64, les modes strict et ASan/UBSan passent. Voir
+[la référence audio et vidéo](av-retroarch-reference.md).
+
+Sur émulateur Android 10/API29 x86_64, 68 contrôles de la phase `popups` passent
+avec un programme GB original : A donne 33/66, trois nouvelles tentatives A
+restent sans badge aux captures, Select donne une nouvelle valeur 49/66, puis
+B débloque un seul succès avec un seul son. La progression reste silencieuse.
+Les captures fraîches ont été inspectées ; le buffer crash est vide avant et
+après. Les captures négatives après une attente de heartbeat lente ne suffisent
+pas seules à exclure un flash déjà expiré : la preuve de non-répétition vient
+du test natif déterministe, complété par la frontière Android.
+
+Le runner collecte ses deux snapshots d'animation avant d'encoder les PNG.
+L'encodage mesuré pouvait durer plus de 2 s et laisser expirer une carte pourtant
+vue au premier snapshot. Les captures positives suivent directement l'appui ;
+les contrôles négatifs et les relâchements attendent une frame supplémentaire.
+Les durées et assertions des widgets restent identiques.
+
+Les 17 suites natives strictes et ASan/UBSan, les 19 tests JVM, le frontend sans
+cœur, le lint, les builds debug/release et le paquet debug deux ABI/16 Ko passent.
+La ROM Pokémon Émeraude n'était pas disponible. Ces essais ne remplacent pas
+une écoute sur téléphone ; une dérive prolongée entre horloges ou un frontend
+trop lent reste un cas distinct de l'amorce corrigée. Aucune qualification
+Bluetooth ou runtime ARM64 n'est revendiquée.

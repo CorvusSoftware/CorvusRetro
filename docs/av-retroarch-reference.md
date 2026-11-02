@@ -15,8 +15,12 @@ file avec un producteur et un consommateur, complète les manques par du silence
 et vise un tampon matériel de deux blocs (`framesPerBurst`, ligne 769).
 
 CorvusRetro utilise une file stéréo bornée avec compteurs atomiques 32 bits,
-sans verrou ni allocation dans le callback. Le démarrage attend deux blocs
-préremplis. Les dépassements jettent des nouvelles trames complètes, sans
+sans verrou ni allocation dans le callback. Le tampon matériel vise deux blocs. Avant le démarrage, la file logicielle
+attend aussi deux lots PCM livrés par le cœur (budget de deux fois le plus grand
+lot reçu moins une trame, borné par la capacité de la file). Cela accepte les
+lots GBA alternant 548 et 549 trames stéréo sans attendre un troisième lot.
+Cette amorce absorbe l'intervalle d'affichage plus long quand la cadence GBA
+59,727 Hz est présentée sur un écran 60 Hz. Les dépassements jettent des nouvelles trames complètes, sans
 modifier le curseur du consommateur. Une sous-alimentation détectée par AAudio
 peut agrandir progressivement le tampon matériel, dans sa capacité et au plus
 jusqu'à huit blocs. Une erreur déclenche la fermeture et une nouvelle tentative
@@ -65,3 +69,25 @@ installés par split APK ne sont pas supprimés par cette action.
 Le registre conserve les indices des autres cœurs et réassocie la bibliothèque
 par identifiant permanent après la réception du nouvel instantané. Réinstaller
 un cœur permet de retrouver les contenus déjà importés.
+
+## Contrôle numérique du son, préparation 0.22.1
+
+Le pilote précédent pouvait commencer dès le premier lot GBA : 548 trames PCM
+pour un seuil matériel de 384 trames (deux blocs de 192). La simulation exacte
+GBA/écran 60 Hz produit alors 10 callbacks partiellement vides et 733 trames de
+silence sur 60 s, sans augmentation du compteur de sous-alimentation matériel.
+Un callback AAudio peut donc fonctionner normalement tout en lisant une file
+logicielle vide.
+
+L'amorce attend maintenant le deuxième lot PCM. Sur les cinq simulations de
+60 s avec blocs matériels de 64, 128, 192, 256 et 512 trames, aucune trame de
+silence n'est ajoutée. Un motif stéréo non identique couvre toute la plage
+16 bits et vérifie l'ordre exact à travers les tours de la file. Le gain est
+comparé à une référence 64 bits pour plusieurs volumes, sans saturation.
+Le tampon matériel conserve sa taille initiale de deux blocs ; le démarrage
+attend un lot supplémentaire dans les cas qui commençaient trop tôt.
+
+Ce contrôle ne prouve pas la qualité perçue sur le téléphone du mainteneur.
+La ROM Pokémon Émeraude n'était pas disponible et aucune écoute physique ou
+campagne Bluetooth n'a été réalisée. Il prouve la suppression d'une cause
+mesurée de silences parasites dans le frontend, avec un PCM inchangé.

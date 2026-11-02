@@ -47,9 +47,13 @@ créée après identification, sans carte générique préalable. Un jeu non rec
 un compte déconnecté ou un cœur sans support des succès ne produit pas cette carte.
 
 La progression mesurée est un indicateur séparé : badge verrouillé, compteur
-fourni par rcheevos et barre mesurée. Chaque changement renouvelle son affichage
-pendant 2 s ; un événement HIDE, une réinitialisation ou la fermeture du contenu
-le retire.
+fourni par rcheevos et barre mesurée. Une nouvelle valeur renouvelle son affichage
+pendant 2 s ; le retour d'une valeur identique après une fluctuation temporaire
+ne réaffiche pas le même badge et ne prolonge pas sa durée. Le suivi est séparé
+pour les 128 succès mesurés les plus récents. Les changements réels, y compris
+une diminution du compteur, restent affichés. Un événement HIDE retire le badge
+sans oublier la dernière valeur. Une réinitialisation explicite, le chargement
+d'un état ou d'un autre jeu recommence ce suivi. La progression reste silencieuse.
 
 Les images publiques sont téléchargées et décodées en arrière-plan, avec caches
 mémoire et disque bornés. Une carte attend que sa texture soit disponible avant

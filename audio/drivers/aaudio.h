@@ -21,7 +21,7 @@ typedef struct {
     int64_t retry_after_ns;
 } cr_audio;
 void cr_audio_init(cr_audio *);
-/* Prepares the stream. PCM is primed before cr_audio_write starts playback. */
+/* Prepares the stream. cr_audio_write primes device bursts and submitted PCM batches. */
 bool cr_audio_start(cr_audio *, int);
 void cr_audio_pause(cr_audio *);
 void cr_audio_set_volume(cr_audio *, int percent);
