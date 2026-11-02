@@ -1,9 +1,9 @@
 CorvusSoftware Test Matrix
-Risk: DEEP
+Risk: STANDARD (release d'un code déjà revu)
 
-P0 : native_cheevos avec rcheevos réel et mémoire synthétique : cycle5->0->5 pendant240frames sans réapparition après expiration, entrelacement de deux succès, vrais changements, reset/restore/reload et son uniquement au déblocage. Régression constatée sur base avant correction.
-P0 : native_audio avec pilote réel/fauxAAudio : calendrier GBA59.727/écran60Hz, comparaison nombre de silences avant/après sur60s, fréquences/volumes/stéréo/pleineéchelle/amorce et cycle de vie. Aucun traitement PCM inventé.
-P1 : suites strictes et ASan/UBSan, cœur absent, Gradle debug/lint/JVM/testAPK pour les deux ABI et contrôle de paquet.
-P1 : Android API29 debug sur programme original : 3 réactivationsA identiques après expiration sanspopup, nouvellevaleurSelect visible, B débloque avecunseulson ; contrôles depause/reprise existants.
-P1 : revue indépendante, CI exacte de PR et qualification documentée.
-Limites : pas de ROM Pokémon disponible, ni écoute physique/Bluetooth/runtimeARM64. Le test de calendrier et l'intégrité numérique PCM ne prouvent pas à eux seuls la qualité perçue sur le téléphone du mainteneur.
+P0 : CI exacte PR puis main et build signé réussis, arbre identique au code de PR #26 qualifié.
+P0 : contrôle provenance, version, certificat durable, deux ABI/16 Ko, zéro cœur, absence provider test et MP3 original.
+P0 : mise à jour signée28->29 conservant UID/dossier/première installation/ASUS/historique.
+P1 : publication réussie puis APK public retéléchargé identique aux octets qualifiés.
+P1 : documentation cohérente avec reçus, CI exacte de documentation avant fusion.
+Limites : émulateur API29 x86_64, aucune écoute physique/ROM Pokémon/Bluetooth/runtimeARM64 ; dérive d'horloge distincte de l'amorce corrigée.

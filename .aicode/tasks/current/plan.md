@@ -1,9 +1,6 @@
-Objectif : corriger les popups de progression répétés et examiner le grésillement GBA signalé sur Pokémon Émeraude, après la version 0.22.0.
-Budget : DEEP. Base main dcf5542. Branche fix/progress-popup-and-audio.
-
-1. Reproduire les réapparitions identiques et les variations RAM temporaires avec rcheevos réel et un programme de test original ; distinguer progression et déblocage/son.
-2. Ignorer les répétitions de la même valeur par succès sans prolonger le popup, y compris après expiration/masquage et entre plusieurs succès ; conserver les vrais changements et effacer l'historique à la sortie du jeu.
-3. Auditer la chaîne PCM GBA, fréquence, gain et cadence AAudio. Reproduire la sous-alimentation logicielle sur un calendrier GBA/écran60Hz, corriger minimalement si avérée et comparer les échantillons avant/après.
-4. Tests stricts et ASan ciblés puis frontières Android, revue indépendante et PR avec CI exacte. Aucun moteur, API, pin, sauvegarde ou asset publié modifié.
-
-Limites : aucune ROM de Pokémon fournie ; utiliser uniquement du PCM et des programmes synthétiques originaux. Ne pas prétendre à une écoute sur téléphone/Bluetooth depuis un émulateur sans sortie physique.
+Objectif : fusionner PR #26 et sortir0.22.1/code29, demande utilisateur explicite. Budget STANDARD.
+1. PR #26 fusionnée aprèsCIexacte verte ; sourceea05c867eddc6258999724435023212a0390e2d9.
+2. CI main41543067388 et buildsigné41543475863 réussis ; provenance/signature durable/paquet vérifiés.
+3. Upgrade28->29 sans désinstallation ; UID/données/ASUS/historique conservés et captures inspectées.
+4. Tagv0.22.1 et publication41544028480 réussis ; APK public retéléchargé identique aux octets qualifiés.
+5. README/mémoire/validation actualisés en documentation séparée, à fusionner après sa CI exacte sans modifier le tag ou le binaire.
