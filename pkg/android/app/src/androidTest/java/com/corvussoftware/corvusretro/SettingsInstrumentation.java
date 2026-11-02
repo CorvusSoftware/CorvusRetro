@@ -13,6 +13,7 @@ import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -86,7 +87,14 @@ public final class SettingsInstrumentation extends Instrumentation {
         page = previous[0]; focus = previous[1]; rows = previous[2];
     }
     private void settingsRoot() throws Exception {
-        MenuTestNavigation.tapTab(this, activity, 2);
+        await(activity::hasWindowFocus, "settings tab input ready");
+        int[] safe = activity.safeWindowArea();
+        float density = activity.getResources().getDisplayMetrics().density;
+        float x = safe[2] + (safe[0] - safe[2] - safe[4]) * 5f / 6;
+        float y = safe[1] - safe[5] - 32 * density;
+        long now = SystemClock.uptimeMillis();
+        sendPointerSync(MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, x, y, 0));
+        sendPointerSync(MotionEvent.obtain(now, now + 16, MotionEvent.ACTION_UP, x, y, 0));
         state(ROOT); parents.clear(); page = ROOT; focus = 0; rows = 6;
     }
     private void preference(String key, int wanted) throws Exception {

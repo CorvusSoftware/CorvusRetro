@@ -68,7 +68,7 @@ Cette icône est un bloc plein avec un symbole découpé. `load_content.png`,
 CorvusRetro dessine ses propres vecteurs : module avec tête de corbeau en réserve,
 profil de corbeau pour l'identité, classeur pour le contenu, lignes pour les listes,
 roue dentée pour les réglages, historique et éjection pour le déchargement.
-Depuis0.21, la famille compte32icônes aux contours arrondis cohérents, dont les
+Depuis 0.21, la famille compte 32 icônes aux contours arrondis cohérents, dont les
 catégories vidéo/audio/commandes, succès, sous-systèmes et sauvegardes. Les formes
 restent lisibles à petite taille. Aucun fichier graphique de RetroArch n'est embarqué.
 
@@ -203,8 +203,8 @@ et
   demande précédente de l'utilisateur ; cette demande prévaut sur les
   favoris et autres listes optionnelles de RetroArch.
 
-CorvusRetro conserve ses propres icônes vectorielles et sa police Android.
-Le cache GL expose les avances exactes par caractère au calcul des indications ;
-le même découpage sert à la hauteur, au toucher et au dessin, y compris les
-capitales larges et les ligatures françaises. Les petites flèches d'action sont
-une décoration propre à CorvusRetro ; elles ne définissent pas la zone tactile.
+Ces mesures décrivent la référence étudiée. La proposition de les appliquer
+à CorvusRetro dans la PR21 a été retirée après retour de l'utilisateur : la
+présentation de 0.20.0 est conservée, avec ses tailles fixes, sa barre inférieure
+et ses libellés d'onglets. Aucun calcul DPI ni menu latéral n'est ajouté.
+Les icônes restent des créations vectorielles originales de CorvusRetro.

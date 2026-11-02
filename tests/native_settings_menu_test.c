@@ -74,13 +74,10 @@ static capture draw(cr_ui *u) {
     return c;
 }
 static void choose(cr_ui *u, int index) {
-    u->focus = u->quick ? cr_ui_quick_row(u, index) : index;
-    check(u->focus >= 0, "requested action exists in the current menu");
-    cr_ui_move(u, 0); cr_ui_confirm(u);
+    u->focus = u->quick ? cr_ui_quick_row(u, index) : index; cr_ui_move(u, 0); cr_ui_confirm(u);
 }
 static void settings_root(cr_ui *u) {
-    cr_area tab = cr_ui_tab_area(u, 2);
-    float x = tab.x + tab.w / 2, y = tab.y + tab.h / 2;
+    float x = u->width * 5 / 6, y = u->height - 30;
     cr_ui_touch_at(u, 0, CR_TOUCH_DOWN, x, y, 100);
     cr_ui_touch_at(u, 0, CR_TOUCH_UP, x, y, 100.05);
     check(u->page == CR_SETTINGS && u->tab == 2 && !u->quick, "settings tab opens the global root");

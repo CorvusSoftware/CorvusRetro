@@ -334,24 +334,23 @@ avec le SHA-256 ci-dessus.
 
 ### Interface 0.21.0
 
-La référence de dimensions et d'ordre est RetroArch `b28b8a4`, consultée dans
-ses sources Android, son calcul DPI et son pilote tactile. L'implémentation
-CorvusRetro reste originale. Le thème MaterialUI n'est pas réintroduit.
+La PR21 conserve les dimensions et la disposition de 0.20.0. Les icônes de ligne
+restent à 32 dp, celles des onglets à 24 dp ; les tailles de texte restent
+16/13/19 dp. L'en-tête de 56 dp, les lignes de 76 dp, les onglets de 72 dp en bas
+avec leurs libellés et le pied de page conservent leur présentation précédente
+dans les deux orientations. Aucun calcul DPI automatique, ligne extensible ou
+menu latéral n'est ajouté.
 
-- 32 icônes originales partagent les mêmes indices C/Java dans l'atlas réservé.
-  L'icône APK fournie par l'utilisateur est conservée.
-- Les menus utilisent les proportions Android de référence, les métriques de
-  la police Android et les avances réelles du cache GL pour replier les textes.
-  Une ligne peut grandir ; dessin, toucher et défilement utilisent sa même hauteur.
-- Navigation à trois onglets, en bas en portrait et à droite en paysage ; les
-  marges Android restent appliquées. Le pied de page permanent est supprimé.
-- Le menu rapide regroupe états et batteries, puis options du cœur, commandes,
-  succès et informations. Les identifiants internes d'actions restent stables.
-- Les libellés GBA ne portent plus la mention expérimentale. Cela ne modifie
-  ni les moteurs distribués séparément ni le statut de l'ABI CorvusAPI.
+Les 32 icônes originales, le classement des menus et le retrait du libellé
+expérimental du GBA restent dans la PR. Le logo APK est conservé. CorvusCore,
+CorvusAPI, jeux, sauvegardes et préférences ne changent pas. Les tests antérieurs
+de navigation à coordonnées connues sont conservés ; les positions des nouvelles
+actions rapides utilisent leur correspondance explicite.
 
-Preuves locales : 16 suites natives, 16 suites ASan/UBSan, démarrage sans cœur,
-compilation Android deux ABI, lint, tests JVM, base APK sans module et alignement
-16 Ko. Le test d'atlas a exécuté 100 contrôles de rasterisation, unicité et
-isolation sur l'émulateur Android. Les captures sont des artefacts de travail,
-pas des fichiers source. Aucun test sur téléphone physique n'est revendiqué.
+Validation locale de la correction : 15 suites natives et 15 sous ASan/UBSan,
+compilation Android debug pour les deux ABI, lint et tests JVM réussis. Le contrôle
+APK confirme la base sans cœur et l'alignement 16 Ko. Sur émulateur x86_64,
+323 contrôles Android passent en portrait et 323 en paysage, avec captures des
+réglages et de leurs sous-menus. La revue indépendante ne relève aucun défaut.
+Le dessin, les zones tactiles et le défilement ont aussi été comparés aux sources
+de 0.20.0. Aucun test sur téléphone physique n'est revendiqué.

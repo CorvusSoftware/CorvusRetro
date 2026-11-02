@@ -487,13 +487,6 @@ public final class MainActivity extends NativeActivity {
         paint.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
         return paint;
     }
-    public float[] menuMetrics() {
-        Paint paint = font();
-        Paint.FontMetrics metrics = paint.getFontMetrics();
-        int dpi = getResources().getDisplayMetrics().densityDpi;
-        return new float[] {dpi > 0 ? dpi : 90, (metrics.descent - metrics.ascent) / 40,
-                -metrics.ascent / 40, paint.measureText("a") / 40};
-    }
     private static String character(int codepoint) {
         return new String(Character.toChars(Character.isValidCodePoint(codepoint) ? codepoint : 0xfffd));
     }

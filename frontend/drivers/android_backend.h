@@ -14,7 +14,7 @@ typedef struct {
     bool attached;
     bool controller_connected[CR_CONTROLLER_PORT_COUNT];
     char controller_names[CR_CONTROLLER_PORT_COUNT][128];
-    jmethodID density, menu_metrics, safe_area, atlas, advances, glyph, advance, games, root, credits, preference,
+    jmethodID density, safe_area, atlas, advances, glyph, advance, games, root, credits, preference,
         set_preference, pick, finish, touch, appearance, quit, refresh_catalog, install_pack,
         installed_modules, install_pending, achievement_request, achievement_credentials,
         achievement_credentials_set, edit_text, achievement_image, pick_folder, save_transfer, finish_save_transfer;
@@ -23,7 +23,6 @@ bool cr_android_init(cr_android *, struct android_app *);
 void cr_android_destroy(cr_android *);
 cr_platform cr_android_services(cr_android *);
 float cr_android_density(cr_android *);
-void cr_android_menu_metrics(cr_android *, float values[4]);
 void cr_android_root(cr_android *, char *, size_t);
 bool cr_android_import(cr_import *);
 bool cr_android_save_transfer_result(cr_save_transfer_result *);

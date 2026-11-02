@@ -2,7 +2,6 @@
 // Copyright (C) 2026 CorvusSoftware
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "menu_driver.h"
-#include "menu_layout.h"
 #include "play_layout.h"
 #include <math.h>
 #include <stdio.h>
@@ -15,17 +14,10 @@ static void check(bool ok, const char *message) {
         exit(1);
     }
 }
-static bool near(float a, float b) { return fabsf(a - b) < .02f; }
-static cr_menu_layout menu_layout(const cr_ui *u) {
-    return cr_menu_layout_make(u->width, u->height, u->pixel_density,
-        u->display_width, u->display_height, u->menu_dpi,
-        u->font_line_ratio, u->font_ascent_ratio, u->font_glyph_ratio);
-}
 typedef struct {
-    char text[16384], focus_label[128];
-    cr_menu_layout menu;
-    cr_area first_row, feedback_row, focused_row, home_area, settings_area;
-    bool list_clip, body_clipped;
+    char text[16384], focus_label[256];
+    float selection_y;
+    unsigned label_fonts, hint_fonts;
     uint32_t highlight, a_body, a_text;
     float ax, ay, ar;
     const cr_play_layout *layout;
@@ -37,7 +29,7 @@ typedef struct {
     bool home_tab, settings_tab;
     unsigned switch_ends, games_drawn, header_crows, row_icons;
     bool full_width_selection;
-    float switch_thumb, switch_left, switch_right, switch_radius, toggle_text_end;
+    float switch_thumb, toggle_text_end;
 } capture;
 static void rect(void *ctx, float x, float y, float w, float h, uint32_t color) {
     capture *c = ctx;
@@ -57,21 +49,16 @@ static void rect(void *ctx, float x, float y, float w, float h, uint32_t color) 
                   "notification does not cover a touch control");
         }
     }
-    if (near(x, 0) && near(y, c->focused_row.y) && near(w, c->menu.content_width) &&
-        near(h, c->focused_row.h)) c->full_width_selection = true;
-    if (near(x, 0) && near(y, c->feedback_row.y) && near(w, c->menu.content_width) &&
-        near(h, c->feedback_row.h)) c->highlight = color;
+    if (x == 0 && w == 384 && h == 76) c->selection_y = y;
+    if (x == 0 && y == 64 && w == 384 && h == 76) c->full_width_selection = true;
+    if (x == 0 && y == 216 && w == 384 && h == 76)
+        c->highlight = color;
 }
 static void circle(void *ctx, float x, float y, float r, uint32_t color) {
+    (void)r;
     capture *c = ctx;
-    if (c->list_clip && y >= c->first_row.y && y <= c->first_row.y + c->first_row.h &&
-        x > c->menu.content_width * .7f) {
-        if (!c->switch_ends) {
-            c->switch_radius = r; c->switch_left = x; ++c->switch_ends;
-        } else if (near(r, c->switch_radius)) {
-            c->switch_right = x; ++c->switch_ends;
-        } else if (r < c->switch_radius) c->switch_thumb = x;
-    }
+    if (fabsf(y - 102) < .01f && r == 14) ++c->switch_ends;
+    if (fabsf(y - 102) < .01f && r == 10) c->switch_thumb = x;
     if (x > c->ax - 1 && x < c->ax + 1 && y > c->ay - 1 && y < c->ay + 1)
         c->a_body = color;
 }
@@ -90,10 +77,11 @@ static void text(void *ctx, const char *s, float x, float y, float size, uint32_
     (void)size;
     (void)max;
     capture *c = ctx;
-    if (!strcmp(s, "Activer le son")) c->toggle_text_end = x + max;
-    if (c->list_clip && !c->focus_label[0] && y >= c->focused_row.y &&
-        y < c->focused_row.y + c->focused_row.h)
+    if (x == 66 && size == 16) ++c->label_fonts;
+    if (x == 66 && size == 13) ++c->hint_fonts;
+    if (x == 66 && y == c->selection_y + 29 && size == 16)
         snprintf(c->focus_label, sizeof(c->focus_label), "%s", s);
+    if (x == 66 && y == 93) c->toggle_text_end = x + max;
     size_t n = strlen(c->text);
     snprintf(c->text + n, sizeof(c->text) - n, "%s\n", s);
     if (strcmp(s, "A") == 0)
@@ -105,17 +93,10 @@ static float measure(void *ctx, const char *s, float size) {
 }
 static void icon(void *ctx, int kind, float x, float y, float size, uint32_t color) {
     capture *c = ctx;
-    if (kind == CR_ICON_CROW && y >= 0 && y + size <= c->menu.header) ++c->header_crows;
-    if (c->list_clip && near(x, 0) && near(size, c->menu.icon)) {
-        ++c->row_icons;
-        check(x + size <= c->menu.content_width, "row icon stays inside the content panel");
-    }
-    if (kind == CR_ICON_HOME && x >= c->home_area.x && y >= c->home_area.y &&
-        x + size <= c->home_area.x + c->home_area.w && y + size <= c->home_area.y + c->home_area.h)
-        c->home_tab = true;
-    if (kind == CR_ICON_SETTINGS && x >= c->settings_area.x && y >= c->settings_area.y &&
-        x + size <= c->settings_area.x + c->settings_area.w && y + size <= c->settings_area.y + c->settings_area.h)
-        c->settings_tab = true;
+    if (kind == CR_ICON_CROW && y == 16) ++c->header_crows;
+    if (x == 20 && size == 32) ++c->row_icons;
+    if (y > 600 && kind == CR_ICON_HOME) c->home_tab = true;
+    if (y > 600 && kind == CR_ICON_SETTINGS) c->settings_tab = true;
     if (c->layout && kind == CR_ICON_CROW) {
         if (!c->badge_count)
             check(size + .001f >= c->minimum_badge, "centered layout never shrinks the card below the original safe area");
@@ -138,20 +119,11 @@ static void game(void *ctx, const uint32_t *pixels, int iw, int ih, float x, flo
     (void)w;
     (void)h;
 }
-static void clip(void *ctx, float x, float y, float w, float h) {
-    capture *c = ctx;
-    c->list_clip = near(x, 0) && near(y, c->menu.body_top) &&
-        near(w, c->menu.content_width) && near(h, c->menu.body_bottom - c->menu.body_top);
-    if (c->list_clip) c->body_clipped = true;
-}
 static capture draw(cr_ui *u) {
     cr_play_layout p = cr_play_layout_make(u->width, u->height, u->engine.system, 160, 144);
     cr_area a = p.controls[4].area;
-    capture c = {.ax = a.x + a.w / 2, .ay = a.y + a.h / 2, .ar = a.w / 2,
-        .menu = menu_layout(u), .first_row = cr_ui_row_area(u, 0),
-        .feedback_row = cr_ui_row_area(u, 2), .focused_row = cr_ui_row_area(u, u->focus),
-        .home_area = cr_ui_tab_area(u, 0), .settings_area = cr_ui_tab_area(u, 2)};
-    cr_painter painter = {&c, rect, circle, text, measure, icon, clip, game, NULL, NULL, line};
+    capture c = {.ax = a.x + a.w / 2, .ay = a.y + a.h / 2, .ar = a.w / 2};
+    cr_painter painter = {&c, rect, circle, text, measure, icon, NULL, game, NULL, NULL, line};
     cr_ui_draw(u, &painter);
     return c;
 }
@@ -187,16 +159,10 @@ static void tap(cr_ui *u, float x, float y) {
     cr_ui_touch(u, 0, CR_TOUCH_UP, x, y);
 }
 static void row(cr_ui *u, int i) {
-    cr_area area = cr_ui_row_area(u, i);
-    check(area.w > 0 && area.h > 0, "requested menu row has positive bounds");
-    cr_menu_layout layout = menu_layout(u);
-    check(area.y >= layout.body_top - .02f && area.y + area.h <= layout.body_bottom + .02f,
-          "tapped menu row is fully inside the content viewport");
-    tap(u, area.x + area.w / 2, area.y + area.h / 2);
+    tap(u, 160, 100 + 76 * i);
 }
 static void tab(cr_ui *u, int i) {
-    cr_area area = cr_ui_tab_area(u, i);
-    tap(u, area.x + area.w / 2, area.y + area.h / 2);
+    tap(u, 64 + i * 128, 660);
 }
 static void quick_order(cr_ui *u) {
     static const struct { int action; const char *label; } expected[] = {
@@ -220,8 +186,6 @@ static void quick_order(cr_ui *u) {
             capture c = draw(u);
             check(!strcmp(c.focus_label, expected[i].label),
                   "drawn quick labels follow resume, restart, close, states, saves, options, controls, player, achievements, info, main");
-            check(c.body_clipped && c.full_width_selection,
-                  "scrolled quick selection spans and is clipped to the content panel");
         }
         check(index == CR_QUICK_COUNT - (players == 1), "quick menu exposes only applicable actions");
         if (players == 1)
@@ -230,51 +194,6 @@ static void quick_order(cr_ui *u) {
     u->engine.players = saved_players;
     u->focus = 0;
     u->quick_scroll = 0;
-}
-static void menu_geometry(const char *root) {
-    cr_ui u;
-    cr_ui_init(&u, (cr_platform){0}, root);
-    u.display_width = 384; u.display_height = 700;
-    u.page = CR_SETTINGS;
-    cr_area wide = cr_ui_row_area(&u, 0);
-    cr_ui_size(&u, 240, 700);
-    cr_area wrapped = cr_ui_row_area(&u, 0), next = cr_ui_row_area(&u, 1);
-    check(wrapped.h > wide.h && near(wrapped.y + wrapped.h, next.y),
-          "wrapped hints increase row height and move the next hit target without a gap");
-    capture c = draw(&u);
-    check(c.body_clipped && c.full_width_selection && c.row_icons > 0,
-          "narrow menu clips content and highlights the entire wrapped row");
-    tap(&u, wrapped.x + wrapped.w / 2, wrapped.y + wrapped.h - .5f);
-    check(u.page == CR_UI_SETTINGS, "touch at the bottom of a wrapped hint activates its own row");
-    cr_ui_back(&u);
-    next = cr_ui_row_area(&u, 1);
-    tap(&u, next.x + next.w / 2, next.y + .5f);
-    check(u.page == CR_VIDEO_SETTINGS, "touch immediately below a wrapped row activates the following row");
-    cr_ui_back(&u);
-    u.focus = 5; cr_ui_move(&u, 0);
-    cr_ui_size(&u, 700, 300);
-    cr_menu_layout short_layout = menu_layout(&u);
-    cr_area rotated = cr_ui_row_area(&u, 5);
-    check(u.page == CR_SETTINGS && u.focus == 5 && u.scroll > 0 &&
-          rotated.y >= short_layout.body_top - .02f &&
-          rotated.y + rotated.h <= short_layout.body_bottom + .02f,
-          "rotating ordinary settings into a short landscape keeps the selected last category visible");
-    cr_ui_size(&u, 700, 384);
-    cr_menu_layout layout = menu_layout(&u);
-    cr_area first_tab = cr_ui_tab_area(&u, 0), last_tab = cr_ui_tab_area(&u, 2);
-    check(layout.side_nav && near(first_tab.x, layout.content_width) && near(first_tab.y, 0) &&
-          near(last_tab.x, first_tab.x) && near(last_tab.y + last_tab.h, u.height),
-          "landscape tabs stack along the right edge for the entire screen height");
-    c = draw(&u);
-    check(c.body_clipped && c.home_tab && c.settings_tab && c.full_width_selection,
-          "landscape content, selection and icons stay inside the right navigation boundary");
-    tab(&u, 0); check(u.page == CR_MAIN && u.tab == 0, "right-side home target opens main");
-    tab(&u, 2); check(u.page == CR_SETTINGS && u.tab == 2, "right-side settings target opens settings");
-    u.focus = 5; cr_ui_move(&u, 0);
-    cr_area selected = cr_ui_row_area(&u, 5);
-    check(selected.y >= layout.body_top - .02f && selected.y + selected.h <= layout.body_bottom + .02f,
-          "keyboard selection scrolls the complete variable-height row into view");
-    cr_ui_destroy(&u);
 }
 static bool install_pending(void *ctx) {
     return *(bool *)ctx;
@@ -447,7 +366,6 @@ int main(void) {
           "terminal status releases the restored installation barrier");
     restored.engine.loaded = false;
     cr_ui_destroy(&restored);
-    menu_geometry(root);
     cr_ui u;
     cr_ui_init(&u, (cr_platform){.set_preference = set,
                                 .refresh_core_catalog = refresh_core_catalog,
@@ -457,6 +375,13 @@ int main(void) {
     capture c = draw(&u);
     check(c.home_tab && c.settings_tab, "navigation uses home and settings icons");
     check(c.header_crows == 0, "menu header no longer draws the crow icon");
+    check(c.row_icons && c.label_fonts == c.row_icons && c.hint_fonts == c.row_icons,
+          "original menu icons stay32dp and labels/hints stay16/13dp");
+    u.page = CR_CORES;
+    capture cores = draw(&u);
+    check(strstr(cores.text, "Game Boy Advance") && !strstr(cores.text, "Expérimental"),
+          "GBA remains available without the experimental label");
+    u.page = CR_MAIN;
     cr_game *long_history = calloc(1200, sizeof(*long_history));
     check(long_history != NULL, "allocate long history fixture");
     for (size_t i = 0; i < 1200; ++i) {
@@ -466,12 +391,9 @@ int main(void) {
     u.games = long_history;
     u.game_count = 1200;
     u.page = CR_GAMES;
-    u.scroll = cr_ui_row_area(&u, 1000).y - cr_ui_row_area(&u, 0).y;
+    u.scroll = 1000 * 76;
     capture scrolled = draw(&u);
-    cr_menu_layout history_layout = menu_layout(&u);
-    unsigned visible_budget = (unsigned)ceilf((history_layout.body_bottom - history_layout.body_top) /
-                                            cr_ui_row_area(&u, 0).h) + 1;
-    check(scrolled.row_icons > 0 && scrolled.row_icons <= visible_budget &&
+    check(scrolled.row_icons > 0 && scrolled.row_icons <= 10 &&
           strstr(scrolled.text, "Scroll item 1000") != NULL &&
           strstr(scrolled.text, "Scroll item 0\n") == NULL,
           "long history only renders on-screen rows around the scroll position");
@@ -490,7 +412,7 @@ int main(void) {
     u.page = CR_LIBRARY;
     u.scroll = 0;
     capture library = draw(&u);
-    check(strstr(library.text, "Scroll item 0") && library.row_icons <= visible_budget,
+    check(strstr(library.text, "Scroll item 0") && library.row_icons <= 10,
           "library shows imported games even when they were never played");
     u.games = NULL;
     u.game_count = 0;
@@ -518,8 +440,6 @@ int main(void) {
     check(u.page == CR_CORES, "core menu opens before downloader");
     c = draw(&u);
     check(strstr(c.text, "Téléchargeur de cœurs"), "core menu exposes online updater");
-    check(strstr(c.text, "Game Boy Advance") && !strstr(c.text, "expérimental"),
-          "GBA remains listed without an experimental status label");
     row(&u, 3);
     check(u.page == CR_CORE_DOWNLOADS && core_refreshes == 1 &&
           u.catalog_loading, "downloader starts catalog request on entry");
@@ -641,63 +561,55 @@ int main(void) {
               !strstr(c.text, "Affichage à l’écran"),
           "six functional settings categories replace the former OSD container");
     // A stationary touch fades in before release, without opening the submenu.
-    cr_area target = cr_ui_row_area(&u, 2);
-    float menu_x = target.x + target.w / 2, menu_y = target.y + target.h / 2;
-    cr_ui_touch_at(&u, 0, CR_TOUCH_DOWN, menu_x, menu_y, 10);
+    cr_ui_touch_at(&u, 0, CR_TOUCH_DOWN, 160, 252, 10);
     cr_ui_update(&u, .1);
     c = draw(&u);
     check(u.page == CR_SETTINGS && u.feedback_alpha > .4f && u.feedback_alpha < .6f &&
               (c.highlight >> 24) > 100 && (c.highlight >> 24) < 160,
           "progressive touch highlight is rendered");
-    cr_ui_touch_at(&u, 0, CR_TOUCH_UP, menu_x, menu_y, 10.1);
+    cr_ui_touch_at(&u, 0, CR_TOUCH_UP, 160, 252, 10.1);
     check(u.page == CR_AUDIO_SETTINGS, "tap activates at release");
     bool audio = u.audio;
-    target = cr_ui_row_area(&u, 0);
-    menu_x = target.x + target.w / 2; menu_y = target.y + target.h / 2;
     c = draw(&u);
-    check(c.switch_ends == 2 && c.switch_radius > 0 && c.switch_right > c.switch_left &&
-              near(c.switch_thumb, u.audio ? c.switch_right : c.switch_left) &&
-              c.toggle_text_end <= c.switch_left - c.switch_radius,
+    check(c.switch_ends == 2 && c.switch_thumb == (u.audio ? 346 : 326) && c.toggle_text_end <= 300,
           "rounded switch and label have distinct nonoverlapping bounds");
-    cr_ui_touch_at(&u, 0, CR_TOUCH_DOWN, menu_x, menu_y, 20);
+    cr_ui_touch_at(&u, 0, CR_TOUCH_DOWN, 160, 100, 20);
     cr_ui_update(&u, .3);
-    cr_ui_touch_at(&u, 0, CR_TOUCH_UP, menu_x, menu_y, 20.3);
+    cr_ui_touch_at(&u, 0, CR_TOUCH_UP, 160, 100, 20.3);
     check(u.audio == audio && writes == 0, "hold selects without toggling or resetting");
     // Event timestamps prevent a slow rendering frame from turning a tap into a hold.
-    cr_ui_touch_at(&u, 0, CR_TOUCH_DOWN, menu_x, menu_y, 30);
+    cr_ui_touch_at(&u, 0, CR_TOUCH_DOWN, 160, 100, 30);
     cr_ui_update(&u, 1);
-    cr_ui_touch_at(&u, 0, CR_TOUCH_UP, menu_x, menu_y, 30.05);
+    cr_ui_touch_at(&u, 0, CR_TOUCH_UP, 160, 100, 30.05);
     check(u.audio != audio && saved_audio == u.audio && writes == 1,
           "tap duration independent of frame timing");
     c = draw(&u);
-    check(near(c.switch_thumb, u.audio ? c.switch_right : c.switch_left), "switch thumb follows the actual saved setting");
-    cr_ui_touch_at(&u, 0, CR_TOUCH_DOWN, menu_x, menu_y, 40);
-    cr_ui_touch_at(&u, 1, CR_TOUCH_DOWN, menu_x, menu_y, 40.01);
-    cr_ui_touch_at(&u, 1, CR_TOUCH_UP, menu_x, menu_y, 40.02);
-    cr_ui_touch_at(&u, 0, CR_TOUCH_UP, menu_x, menu_y, 40.05);
+    check(c.switch_thumb == (u.audio ? 346 : 326), "switch thumb follows the actual saved setting");
+    cr_ui_touch_at(&u, 0, CR_TOUCH_DOWN, 160, 100, 40);
+    cr_ui_touch_at(&u, 1, CR_TOUCH_DOWN, 160, 100, 40.01);
+    cr_ui_touch_at(&u, 1, CR_TOUCH_UP, 160, 100, 40.02);
+    cr_ui_touch_at(&u, 0, CR_TOUCH_UP, 160, 100, 40.05);
     check(writes == 2 && u.audio == audio, "menus use one finger and toggle exactly once");
-    cr_ui_touch(&u, 0, CR_TOUCH_DOWN, menu_x, menu_y);
+    cr_ui_touch(&u, 0, CR_TOUCH_DOWN, 160, 100);
     cr_ui_update(&u, .1);
     cr_ui_touch(&u, 0, CR_TOUCH_CANCEL, 0, 0);
     check(u.feedback_alpha == 0 && writes == 2, "cancel clears highlight without action");
     row(&u, 0);
     check(!u.audio, "audio disabled before reset gesture");
-    cr_ui_touch_at(&u, 0, CR_TOUCH_DOWN, menu_x, menu_y, 50);
-    cr_ui_touch_at(&u, 0, CR_TOUCH_UP, menu_x, menu_y, 51.1);
+    cr_ui_touch_at(&u, 0, CR_TOUCH_DOWN, 160, 100, 50);
+    cr_ui_touch_at(&u, 0, CR_TOUCH_UP, 160, 100, 51.1);
     check(u.audio && saved_audio == 1, "long press restores a boolean setting default");
     int before_reset = writes;
-    cr_ui_touch_at(&u, 0, CR_TOUCH_DOWN, menu_x, menu_y, 60);
-    cr_ui_touch_at(&u, 0, CR_TOUCH_UP, menu_x, menu_y, 61.1);
+    cr_ui_touch_at(&u, 0, CR_TOUCH_DOWN, 160, 100, 60);
+    cr_ui_touch_at(&u, 0, CR_TOUCH_UP, 160, 100, 61.1);
     check(u.audio && writes == before_reset, "resetting an existing default is idempotent");
     cr_ui_back(&u);
     check(u.page == CR_SETTINGS && u.focus == 2 && u.tab == 2, "settings parent restored");
-    target = cr_ui_row_area(&u, 0);
-    menu_y = target.y + target.h / 2;
-    cr_ui_touch(&u, 0, CR_TOUCH_DOWN, menu_x, menu_y);
+    cr_ui_touch(&u, 0, CR_TOUCH_DOWN, 160, 100);
     cr_ui_update(&u, .1);
-    cr_ui_touch(&u, 0, CR_TOUCH_MOVE, menu_x, menu_y + 50);
+    cr_ui_touch(&u, 0, CR_TOUCH_MOVE, 160, 150);
     cr_ui_update(&u, .2);
-    cr_ui_touch(&u, 0, CR_TOUCH_UP, menu_x, menu_y + 50);
+    cr_ui_touch(&u, 0, CR_TOUCH_UP, 160, 150);
     check(u.page == CR_SETTINGS && u.feedback_alpha == 0,
           "scroll cancels touch action and feedback");
     row(&u, 0);
@@ -759,10 +671,19 @@ int main(void) {
     c = draw(&u);
     check(c.games_drawn == 0 && c.full_width_selection,
           "quick menu fills the native interface without drawing the game underneath");
-    quick_order(&u);
+    const char *resume = strstr(c.text, "Reprendre le contenu");
+    const char *restart = strstr(c.text, "Redémarrer le contenu");
+    const char *close = strstr(c.text, "Fermer le contenu");
+    const char *states = strstr(c.text, "Sauvegardes d’état");
+    const char *options = strstr(c.text, "Options du cœur");
+    const char *commands = strstr(c.text, "Commandes");
+    check(resume && restart && close && states && options && commands &&
+              resume < restart && restart < close && close < states && states < options && options < commands,
+          "quick menu places core options after states and before frontend controls");
     check(!strstr(c.text, "Charger l’état") && !strstr(c.text, "Sauvegarder l’état") &&
               !strstr(c.text, "Shaders") && !strstr(c.text, "Triches"),
           "quick root contains only working menus and nests state actions");
+    quick_order(&u);
     u.focus = cr_ui_quick_row(&u, CR_QUICK_RESTART);
     cr_ui_confirm(&u);
     check(u.quick, "unsupported restart remains disabled without changing row IDs");

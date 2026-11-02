@@ -359,7 +359,6 @@ bool cr_android_init(cr_android *p, struct android_app *app) {
     if (cr_android_clear_error(p) || !p->field)                                                               \
     return false
     METHOD(density, "density", "()F");
-    METHOD(menu_metrics, "menuMetrics", "()[F");
     METHOD(safe_area, "safeWindowArea", "()[I");
     METHOD(atlas, "atlas", "()Landroid/graphics/Bitmap;");
     METHOD(advances, "advances", "()[F");
@@ -447,20 +446,6 @@ float cr_android_density(cr_android *p) {
     if (cr_android_clear_error(p) || n <= 0)
         n = 1;
     return n;
-}
-void cr_android_menu_metrics(cr_android *p, float values[4]) {
-    static const float defaults[4] = {90, 1.2f, .93f, .556f};
-    memcpy(values, defaults, sizeof(defaults));
-    jfloatArray result = (*p->env)->CallObjectMethod(p->env, p->app->activity->clazz, p->menu_metrics);
-    bool failed = cr_android_clear_error(p);
-    if (!failed && result && (*p->env)->GetArrayLength(p->env, result) == 4) {
-        float actual[4];
-        (*p->env)->GetFloatArrayRegion(p->env, result, 0, 4, actual);
-        if (!cr_android_clear_error(p))
-            for (unsigned i = 0; i < 4; ++i)
-                if (isfinite(actual[i]) && actual[i] > 0) values[i] = actual[i];
-    }
-    if (result) (*p->env)->DeleteLocalRef(p->env, result);
 }
 void cr_android_root(cr_android *p, char *out, size_t size) {
     jstring s = (*p->env)->CallObjectMethod(p->env, p->app->activity->clazz, p->root);

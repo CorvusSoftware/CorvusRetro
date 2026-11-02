@@ -201,12 +201,8 @@ static void press_controls(cr_ui *u, unsigned mask) {
         if (mask & (1u << i))
             u->control_feedback[i] = 1;
 }
-static cr_menu_layout menu_layout(const cr_ui *u) {
-    cr_menu_layout m = cr_menu_layout_make(u->width, u->height, u->pixel_density,
-        u->display_width, u->display_height, u->menu_dpi,
-        u->font_line_ratio, u->font_ascent_ratio, u->font_glyph_ratio);
-    m.glyph_advance = u->font_advance; m.glyph_context = u->font_context;
-    return m;
+static float body_bottom(const cr_ui *u) {
+    return u->height - 100;
 }
 static int rows(const cr_ui *u) {
     if (u->quick) return CR_QUICK_COUNT - (u->engine.players > 1 ? 0 : 1);
@@ -581,64 +577,12 @@ static row get_row(const cr_ui *u, int index) {
     }
     return r;
 }
-static float row_text_width(const cr_menu_layout *m, bool toggle) {
-    return fmaxf(1, m->content_width - m->margin * 2 - m->icon -
-                 (toggle ? m->icon : m->icon * .55f) - m->hint_padding);
-}
-static float hint_height(const cr_menu_layout *m, const char *hint, bool toggle) {
-    unsigned lines = cr_menu_wrap_hint(hint, row_text_width(m, toggle), m->hint_font,
-                                       m->glyph_ratio, m->glyph_advance, m->glyph_context, NULL);
-    return fmaxf(48, m->label_line + lines * m->hint_line + m->padding);
-}
-/* History is scanned once, including its core-dependent hint, for long lists. */
-static float row_offset(const cr_ui *u, int stop, float position, int *hit) {
-    cr_menu_layout m = menu_layout(u);
-    float total = 0;
-    int count = rows(u), index = 0;
-    if (hit) *hit = -1;
-    for (size_t game = 0; index < count && index < stop;) {
-        char hint[256]; bool toggle = false;
-        if (!u->quick && u->page == CR_GAMES) {
-            while (game < u->game_count && !(u->filter < 0 ? u->games[game].played > 0 :
-                   u->games[game].system == u->filter)) ++game;
-            if (game == u->game_count) break;
-            if (!u->engine.handle)
-                snprintf(hint, sizeof(hint), "Chargez un cœur avant de lancer ce jeu");
-            else if (u->engine.system != u->games[game].system)
-                snprintf(hint, sizeof(hint), "Chargez le cœur associé : %.180s", core_name(u->games[game].system));
-            else snprintf(hint, sizeof(hint), "%s", core_name(u->games[game].system));
-            ++game;
-        } else {
-            row r = get_row(u, index); toggle = r.toggle;
-            memcpy(hint, r.hint, sizeof(hint)); hint[sizeof(hint)-1] = 0;
-        }
-        float height = hint_height(&m, hint, toggle);
-        if (hit && position >= total && position < total + height) { *hit = index; return total; }
-        total += height; ++index;
-    }
-    return total;
-}
-cr_area cr_ui_row_area(const cr_ui *u, int index) {
-    cr_menu_layout m = menu_layout(u);
-    if (index < 0 || index >= rows(u)) return (cr_area){0};
-    row r = get_row(u, index);
-    return (cr_area){0, m.header + row_offset(u, index, 0, NULL) -
-        (u->quick ? u->quick_scroll : u->scroll), m.content_width,
-        hint_height(&m, r.hint, r.toggle)};
-}
-cr_area cr_ui_tab_area(const cr_ui *u, int tab) {
-    cr_menu_layout m = menu_layout(u);
-    if (tab < 0 || tab > 2) return (cr_area){0};
-    return m.side_nav ? (cr_area){m.content_width, m.height * tab / 3, m.nav_size, m.height / 3} :
-        (cr_area){m.width * tab / 3, m.body_bottom, m.width / 3, m.nav_size};
-}
 static void clamp_scroll(cr_ui *u) {
-    cr_menu_layout m = menu_layout(u);
-    float content = row_offset(u, rows(u), 0, NULL);
+    float content = (float)rows(u) * 76;
     if (u->page == CR_ABOUT || u->page == CR_LICENSE || u->page == CR_CORE_INFO ||
         ((u->page == CR_SUBSYSTEMS || u->page == CR_CORE_OPTIONS) && !rows(u)))
-        content = u->text_height + 2 * m.margin;
-    float max = fmaxf(0, content - fmaxf(1, m.body_bottom - m.header));
+        content = fmaxf(400, u->text_height);
+    float max = fmaxf(0, content - fmaxf(1, body_bottom(u) - 64));
     u->scroll = fminf(max, fmaxf(0, u->scroll));
 }
 static void view(cr_ui *u, int p) {
@@ -818,10 +762,6 @@ void cr_ui_init(cr_ui *u, cr_platform p, const char *root) {
     u->show_input = true;
     cr_engine_init(&u->engine, root);
     u->pixel_density = 1;
-    u->menu_dpi = 160;
-    u->font_line_ratio = 1.2f;
-    u->font_ascent_ratio = .93f;
-    u->font_glyph_ratio = .556f;
     u->controller_capture = -1;
     for (int i = 0; i < SET_COUNT; ++i) {
         const setting_spec *spec = &settings[i];
@@ -876,7 +816,7 @@ void cr_ui_size(cr_ui *u, float w, float h) {
     u->height = fmaxf(1, h);
     cr_ui_clear_input(u);
     clamp_scroll(u);
-    if (u->quick || u->page != CR_PLAY)
+    if (u->quick)
         cr_ui_move(u, 0);
 }
 void cr_ui_clear_input(cr_ui *u) {
@@ -1652,12 +1592,23 @@ void cr_ui_move(cr_ui *u, int direction) {
     if (count <= 0)
         return;
     u->focus = (u->focus + direction + count) % count;
-    cr_menu_layout m = menu_layout(u);
-    cr_area area = cr_ui_row_area(u, u->focus);
-    float *scroll = u->quick ? &u->quick_scroll : &u->scroll;
-    if (area.y < m.header) *scroll -= m.header - area.y;
-    if (area.y + area.h > m.body_bottom) *scroll += area.y + area.h - m.body_bottom;
-    if (u->quick) quick_clamp(u); else clamp_scroll(u);
+    if (u->quick) {
+        float top = u->focus * 76;
+        float view = fmaxf(1, body_bottom(u) - 64);
+        if (top < u->quick_scroll)
+            u->quick_scroll = top;
+        if (top + 76 > u->quick_scroll + view)
+            u->quick_scroll = top + 76 - view;
+        quick_clamp(u);
+    } else {
+        float top = u->focus * 76;
+        float view = fmaxf(1, body_bottom(u) - 64);
+        if (top < u->scroll)
+            u->scroll = top;
+        if (top + 76 > u->scroll + view)
+            u->scroll = top + 76 - view;
+        clamp_scroll(u);
+    }
 }
 void cr_ui_key(cr_ui *u, unsigned mask, bool down) {
     if (down) {
@@ -1692,9 +1643,8 @@ static unsigned button_at(const cr_ui *u, float x, float y) {
     return cr_play_hit(&layout, x, y);
 }
 static void quick_clamp(cr_ui *u) {
-    cr_menu_layout m = menu_layout(u);
     u->quick_scroll = fmaxf(0, fminf(u->quick_scroll,
-        row_offset(u, rows(u), 0, NULL) - fmaxf(1, m.body_bottom - m.header)));
+                       rows(u) * 76 - fmaxf(1, body_bottom(u) - 64)));
 }
 static int target(const cr_ui *u, float x, float y) {
     if (x < 0 || y < 0 || x >= u->width || y >= u->height)
@@ -1704,14 +1654,14 @@ static int target(const cr_ui *u, float x, float y) {
         return cr_area_contains(layout.menu, x, y) ? -3 :
                cr_area_contains(layout.hide, x, y) ? -5 : -1;
     }
-    cr_menu_layout m = menu_layout(u);
-    for (int tab = 0; tab < 3; ++tab)
-        if (cr_area_contains(cr_ui_tab_area(u, tab), x, y)) return -100 - tab;
-    if (y < m.header) return x < m.header && has_back(u) ? -2 : -1;
-    if (x >= m.content_width || y >= m.body_bottom) return -1;
-    int index;
-    row_offset(u, rows(u), y - m.header + (u->quick ? u->quick_scroll : u->scroll), &index);
-    return index < 0 ? -1 : u->quick ? 10000 + index : index;
+    if (y < 56)
+        return x < 56 && has_back(u) ? -2 : -1;
+    if (y >= u->height - 72)
+        return -100 - (int)fminf(2, fmaxf(0, floorf(x / u->width * 3)));
+    if (y < 64 || y >= body_bottom(u))
+        return -1;
+    int i = (int)((y - 64 + (u->quick ? u->quick_scroll : u->scroll)) / 76);
+    return i < rows(u) ? (u->quick ? 10000 + i : i) : -1;
 }
 void cr_ui_touch(cr_ui *u, int id, int phase, float x, float y) {
     cr_ui_touch_at(u, id, phase, x, y, u->time);
@@ -1849,12 +1799,12 @@ static void rect(const cr_painter *p, float x, float y, float w, float h, uint32
     if (w > 0 && h > 0)
         p->rect(p->context, x, y, w, h, c);
 }
-static void toggle(const cr_painter *p, const cr_theme *theme, float x, float y, float scale, bool checked) {
+static void toggle(const cr_painter *p, const cr_theme *theme, float x, float y, bool checked) {
     uint32_t track = checked ? theme->accent : theme->divider;
-    p->circle(p->context, x + 14*scale, y + 14*scale, 14*scale, track);
-    rect(p, x + 14*scale, y, 20*scale, 28*scale, track);
-    p->circle(p->context, x + 34*scale, y + 14*scale, 14*scale, track);
-    p->circle(p->context, x + (checked ? 34 : 14)*scale, y + 14*scale, 10*scale,
+    p->circle(p->context, x + 14, y + 14, 14, track);
+    rect(p, x + 14, y, 20, 28, track);
+    p->circle(p->context, x + 34, y + 14, 14, track);
+    p->circle(p->context, x + (checked ? 34 : 14), y + 14, 10,
               checked ? 0xffffffff : theme->muted);
 }
 static void text(const cr_painter *p, const char *s, float x, float y, float size, uint32_t c,
@@ -1864,8 +1814,11 @@ static void text(const cr_painter *p, const char *s, float x, float y, float siz
 static float width(const cr_painter *p, const char *s, float size) {
     return p->measure(p->context, s, size);
 }
+static void center(const cr_painter *p, const char *s, float x, float y, float size, uint32_t c) {
+    text(p, s, x - width(p, s, size) / 2, y, size, c, 10000);
+}
 static float paragraphs(const cr_painter *p, const char *s, float x, float top, float w, float line,
-                        uint32_t color, float scroll, float bottom, const cr_menu_layout *m) {
+                        uint32_t color, float scroll, float bottom) {
     char buffer[1024];
     size_t at = 0;
     float y = top - scroll;
@@ -1879,9 +1832,9 @@ static float paragraphs(const cr_painter *p, const char *s, float x, float top, 
         size_t part = len < sizeof(next) - 1 ? len : sizeof(next) - 1;
         memcpy(next, word, part);
         next[part] = 0;
-        if (at && width(p, buffer, m->label_font) + width(p, next, m->label_font) > w) {
-            if (y >= m->header && y <= bottom + line)
-                text(p, buffer, x, y, m->label_font, color, w);
+        if (at && width(p, buffer, 14) + width(p, next, 14) > w) {
+            if (y >= 56 && y <= bottom + line)
+                text(p, buffer, x, y, 14, color, w);
             y += line;
             at = 0;
             buffer[0] = 0;
@@ -1892,8 +1845,8 @@ static float paragraphs(const cr_painter *p, const char *s, float x, float top, 
         at += len;
         buffer[at] = 0;
         if (*end == '\n') {
-            if (y >= m->header && y <= bottom + line)
-                text(p, buffer, x, y, m->label_font, color, w);
+            if (y >= 56 && y <= bottom + line)
+                text(p, buffer, x, y, 14, color, w);
             y += line;
             at = 0;
             buffer[0] = 0;
@@ -1903,8 +1856,8 @@ static float paragraphs(const cr_painter *p, const char *s, float x, float top, 
         }
         word = *end ? end + 1 : end;
     }
-    if (at && y >= m->header && y <= bottom + line)
-        text(p, buffer, x, y, m->label_font, color, w);
+    if (at && y >= 56 && y <= bottom + line)
+        text(p, buffer, x, y, 14, color, w);
     return y + scroll - top + line;
 }
 void cr_ui_draw(cr_ui *u, const cr_painter *p) {
@@ -1913,7 +1866,6 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
     uint32_t fg = theme->text, muted = theme->muted, accent = theme->accent;
     uint32_t line = theme->divider, focus = theme->focus;
     float w = u->width, h = u->height;
-    cr_menu_layout m = menu_layout(u);
     rect(p, 0, 0, w, h, bg);
     if (u->page == CR_PLAY && !u->quick) {
         rect(p, 0, 0, w, h, 0xff000000);
@@ -2045,57 +1997,48 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         default:
             break;
         }
-        if (p->clip) p->clip(p->context, 0, m.header, m.content_width, m.body_bottom - m.header);
-        int count = rows(u), first = -1;
+        if (p->clip)
+            p->clip(p->context, 0, 56, w, fmaxf(1, body_bottom(u) - 56));
+        int count = rows(u);
         float scroll = u->quick ? u->quick_scroll : u->scroll;
-        float offset = row_offset(u, count, scroll, &first);
-        float y = m.header + offset - scroll;
-        for (int i = first; i >= 0 && i < count && y < m.body_bottom; ++i) {
+        int first = (int)fmaxf(0, floorf((scroll - 84) / 76));
+        int end = (int)fminf(count, floorf((scroll + body_bottom(u) - 64) / 76) + 1);
+        for (int i = first; i < end; i++) {
+            float y = 64 + i * 76 - scroll;
+            if (y + 76 < 56 || y > body_bottom(u))
+                continue;
             row r = get_row(u, i);
-            char hints[CR_MENU_MAX_HINT_LINES][CR_MENU_HINT_BYTES];
-            float text_width = row_text_width(&m, r.toggle);
-            unsigned lines = cr_menu_wrap_hint(r.hint, text_width, m.hint_font, m.glyph_ratio, m.glyph_advance, m.glyph_context, hints);
-            float row_height = hint_height(&m, r.hint, r.toggle);
-            float text_height = m.label_line + lines * m.hint_line;
-            float top = y + (row_height - text_height) / 2 - m.gap + 1 / u->pixel_density;
-            float label_center = top + m.label_line / 2;
-            if (i == u->focus) rect(p, 0, y, m.content_width, row_height, focus);
+            if (i == u->focus)
+                rect(p, 0, y, w, 76, focus);
             else if (u->feedback_target == (u->quick ? 10000 + i : i) && u->feedback_alpha > 0)
-                rect(p, 0, y, m.content_width, row_height, alpha_color(focus, u->feedback_alpha));
-            p->icon(p->context, r.icon, 0, y + (row_height-m.icon)/2, m.icon, r.disabled ? muted : theme->icon);
-            float text_x = m.margin + m.icon;
-            text(p, r.label, text_x, top + m.label_font*m.ascent_ratio, m.label_font,
-                 r.disabled ? muted : fg, text_width);
-            for (unsigned j = 0; j < lines; ++j)
-                text(p, hints[j], text_x, top + m.label_line + m.gap +
-                     m.hint_font*m.ascent_ratio + j*m.hint_line, m.hint_font, muted, text_width);
+                rect(p, 0, y, w, 76, alpha_color(focus, u->feedback_alpha));
+            p->icon(p->context, r.icon, 20, y + 22, 32, r.disabled ? muted : theme->icon);
+            float text_width = w - (r.toggle ? 150 : 110);
+            text(p, r.label, 66, y + 29, 16, r.disabled ? muted : fg, text_width);
+            text(p, r.hint, 66, y + 53, 13, muted, text_width);
             if (r.toggle) {
-                float scale = m.icon/48;
-                toggle(p, theme, m.content_width-m.margin-48*scale, label_center-14*scale, scale, r.checked);
+                toggle(p, theme, w - 72, y + 24, r.checked);
             } else if (r.checked)
-                text(p, "✓", m.content_width-m.margin-m.icon*.5f, top+m.label_font*m.ascent_ratio,
-                     m.label_font, accent, m.icon*.5f);
+                text(p, "✓", w - 36, y + 41, 20, accent, 28);
             else if (r.action != ACT_NONE)
-                p->icon(p->context, CR_ICON_NEXT, m.content_width-m.margin-m.icon*.5f,
-                        label_center-m.icon*.25f, m.icon*.5f, muted);
-            rect(p, text_x, y+row_height-1/u->pixel_density, m.content_width-text_x, 1/u->pixel_density, line);
-            y += row_height;
+                p->icon(p->context, CR_ICON_NEXT, w - 36, y + 29, 18, muted);
+            rect(p, 66, y + 75, w - 66, 1, line);
         }
         if (u->page == CR_CORE_DOWNLOADS && u->core_catalog.count == 0) {
             text(p, u->catalog_loading ? "Recherche des cœurs officiels..." :
                     "Aucun cœur disponible pour cette version.",
-                 m.margin, m.header+row_offset(u,count,0,NULL)+m.margin+m.label_font*m.ascent_ratio, m.label_font, fg, m.content_width-2*m.margin);
+                 20, 236, 14, fg, w - 40);
         }
         if (u->page == CR_LIBRARY && count == 1) {
             text(p, "Aucun jeu dans la bibliothèque.",
-                 m.margin, m.header+row_offset(u,count,0,NULL)+m.margin+m.label_font*m.ascent_ratio, m.label_font, fg, m.content_width-2*m.margin);
+                 20, 246, 14, fg, w - 40);
         }
         if (u->page == CR_GAMES && !count) {
             text(p,
                  u->filter < 0 ? "Aucun contenu dans l’historique."
                                : "Aucun contenu dans cette liste.",
-                 m.margin, m.header+m.margin+m.label_font*m.ascent_ratio, m.label_font, fg, m.content_width-2*m.margin);
-            text(p, "Utilisez Charger du contenu.", m.margin, m.header+m.margin+m.label_line+m.hint_line+m.hint_font*m.ascent_ratio, m.hint_font, muted, m.content_width-2*m.margin);
+                 20, 106, 15, fg, w - 40);
+            text(p, "Utilisez Charger du contenu.", 20, 137, 13, muted, w - 40);
         }
         if (u->page == CR_ABOUT)
             u->text_height = paragraphs(
@@ -2105,7 +2048,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
                 "Boy Color, Game Boy Advance.\n\nNavigation inspirée de "
                 "MaterialUI. Thèmes CorvusRetro, ASUS et NVIDIA Shield.\n\nCopyright (C) 2026 "
                 "CorvusSoftware\nSPDX-License-Identifier: AGPL-3.0-only",
-                m.margin, m.header+m.margin+m.label_font*m.ascent_ratio, m.content_width-2*m.margin, m.label_line, fg, u->scroll, m.body_bottom, &m);
+                20, 92, w - 40, 24, fg, u->scroll, body_bottom(u));
         if ((u->page == CR_SUBSYSTEMS || u->page == CR_CORE_OPTIONS) && !count) {
             const char *empty = !u->engine.handle ? "Aucun cœur chargé." :
                 u->page == CR_SUBSYSTEMS ?
@@ -2113,7 +2056,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
                     "Ce module ne déclare pas de configuration de plusieurs contenus." :
                     "Aucune option de cœur disponible.\n\n"
                     "Ce module ne déclare pas de réglage modifiable.";
-            u->text_height = paragraphs(p, empty, m.margin, m.header+m.margin+m.label_font*m.ascent_ratio, m.content_width-2*m.margin, m.label_line, fg, u->scroll, m.body_bottom, &m);
+            u->text_height = paragraphs(p, empty, 20, 92, w - 40, 24, fg, u->scroll, body_bottom(u));
         }
         if (u->page == CR_CORE_INFO) {
             char info[2048];
@@ -2135,41 +2078,50 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
             }
             else
                 snprintf(info, sizeof(info), "Aucun cœur chargé");
-            u->text_height = paragraphs(p, info, m.margin, m.header+m.margin+m.label_font*m.ascent_ratio, m.content_width-2*m.margin, m.label_line, fg, u->scroll, m.body_bottom, &m);
+            u->text_height = paragraphs(p, info, 20, 92, w - 40, 24, fg, u->scroll, body_bottom(u));
         }
         if (u->page == CR_LICENSE)
-            u->text_height = paragraphs(p, u->license ? u->license : "Licence indisponible", m.margin, m.header+m.margin+m.label_font*m.ascent_ratio,
-                                        m.content_width-2*m.margin, m.label_line, fg, u->scroll, m.body_bottom, &m);
+            u->text_height = paragraphs(p, u->license ? u->license : "Licence indisponible", 20, 92,
+                                        w - 40, 23, fg, u->scroll, body_bottom(u));
         if (p->clip)
             p->clip(p->context, 0, 0, w, h);
-        rect(p, 0, 0, m.content_width, m.header, header);
+        // Cover scrolled content before drawing the fixed header and navigation.
+        rect(p, 0, 0, w, 56, header);
         if (has_back(u) && u->feedback_target == -2 && u->feedback_alpha > 0)
-            p->circle(p->context, m.header/2, m.header/2, m.header*.4f, alpha_color(focus, u->feedback_alpha));
-        if (has_back(u)) p->icon(p->context, CR_ICON_BACK, 0, 0, m.header, theme->header_text);
-        float title_x = has_back(u) ? m.header : m.margin;
-        text(p, title, title_x, m.header/2 + m.title_font*(m.ascent_ratio-u->font_line_ratio/2),
-             m.title_font, theme->header_text, m.content_width-title_x-m.margin);
-        if (m.side_nav) rect(p, m.content_width, 0, m.nav_size, h, nav);
-        else rect(p, 0, m.body_bottom, w, m.nav_size, nav);
-        const int icons[] = {CR_ICON_HOME, CR_ICON_LIST, CR_ICON_SETTINGS};
+            p->circle(p->context, 28, 28, 22, alpha_color(focus, u->feedback_alpha));
+        if (has_back(u))
+            p->icon(p->context, CR_ICON_BACK, 12, 16, 24, theme->header_text);
+        text(p, title, has_back(u) ? 56 : 20, 35, 19, theme->header_text, w - 100);
+        rect(p, 0, body_bottom(u), w, 100, bg);
+        char footer[256];
+        if (u->engine.handle) {
+            corvus_core_info info = {.struct_size = sizeof(info)};
+            bool known = cr_engine_core_info(&u->engine, &info);
+            snprintf(footer, sizeof(footer), "Cœur chargé : %s · %s", known ? info.name : "?",
+                     known ? info.version : "?");
+        } else
+            snprintf(footer, sizeof(footer), "Aucun cœur");
+        text(p, footer, 20, h - 84, 11, muted, w - 40);
+        rect(p, 0, h - 72, w, 72, nav);
+        rect(p, 0, h - 72, w, 1, line);
+        const char *labels[] = {"Menu principal", "Listes de lecture", "Réglages"};
+        int icons[] = {CR_ICON_HOME, CR_ICON_LIST, CR_ICON_SETTINGS};
+        int selected = u->tab;
         for (int i = 0; i < 3; i++) {
-            cr_area a = cr_ui_tab_area(u, i);
-            uint32_t c = i == u->tab ? theme->navigation_active : theme->navigation_passive;
-            if (u->feedback_target == -100-i && u->feedback_alpha > 0)
-                rect(p, a.x, a.y, a.w, a.h, alpha_color(focus, u->feedback_alpha));
-            p->icon(p->context, icons[i], a.x+(a.w-m.icon)/2, a.y+(a.h-m.icon)/2, m.icon, c);
-            if (i == u->tab) {
-                if (m.side_nav) rect(p, a.x, a.y, 2/u->pixel_density, a.h, c);
-                else rect(p, a.x, a.y, a.w, 2/u->pixel_density, c);
-            }
+            float x = w * (i + .5f) / 3;
+            uint32_t c = i == selected ? theme->navigation_active : theme->navigation_passive;
+            if (u->feedback_target == -100 - i && u->feedback_alpha > 0)
+                rect(p, i * w / 3, h - 72, w / 3, 72, alpha_color(focus, u->feedback_alpha));
+            p->icon(p->context, icons[i], x - 12, h - 61, 24, c);
+            center(p, labels[i], x, h - 17, 10, c);
         }
     }
     if (u->message_time > 0 && u->message[0]) {
-        float y = u->page == CR_PLAY && !u->quick ? h-108 : m.body_bottom-52-m.margin;
+        float y = u->page == CR_PLAY ? h - 108 : h - 142;
         rect(p, 12, y, w - 24, 52, 0xf0333333);
         text(p, u->message, 24, y + 32, 13, 0xffffffff, w - 48);
     }
-    float popup_left = 0, popup_right = m.content_width, popup_top = m.header, popup_bottom = m.body_bottom;
+    float popup_left = 0, popup_right = w, popup_top = 56, popup_bottom = h - 72;
     if (u->page == CR_PLAY && !u->quick) {
         cr_play_layout layout = play_layout(u);
         popup_top = 0;
@@ -2181,7 +2133,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         }
     }
     if (u->message_time > 0)
-        popup_bottom = fminf(popup_bottom, (u->page == CR_PLAY && !u->quick ? h-112 : m.body_bottom-56-m.margin));
+        popup_bottom = fminf(popup_bottom, h - (u->page == CR_PLAY ? 112 : 146));
     cr_notifications_prepare(&u->notifications, p);
     cr_notifications_draw_region(&u->notifications, p, popup_left, popup_top, popup_right, popup_bottom, theme);
     if (u->notifications.count && p->clip) p->clip(p->context, 0, 0, w, h);

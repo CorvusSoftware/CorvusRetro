@@ -337,7 +337,10 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
         android.os.SystemClock.sleep(500);
     }
     private void tab(MainActivity activity, int index) throws Exception {
-        MenuTestNavigation.tapTab(this, activity, index);
+        int[] area = activity.safeWindowArea();
+        float density = activity.getResources().getDisplayMetrics().density;
+        tap(activity, (area[0] - area[2] - area[4]) / density * (index + .5f) / 3,
+                (area[1] - area[3] - area[5]) / density - 32);
     }
     private String frontendState() throws Exception {
         Process process = Runtime.getRuntime().exec(new String[] {"logcat", "-d", "--pid=" + android.os.Process.myPid(),
@@ -362,8 +365,8 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
         } finally { image.recycle(); }
     }
     private void selectFixtureCore(MainActivity activity) throws Exception {
-        tab(activity, 0); MenuTestNavigation.tapRow(this, activity, 0); state(3, -1, 0, 0);
-        MenuTestNavigation.tapRow(this, activity, 0);
+        tab(activity, 0); tap(activity, 150, 100); state(3, -1, 0, 0);
+        tap(activity, 150, 100);
         state(0, 0, 0, 0);
     }
     private void closeContent() throws Exception {
@@ -815,7 +818,7 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             check(getUiAutomation().setRotation(landscape ? android.app.UiAutomation.ROTATION_FREEZE_90 : android.app.UiAutomation.ROTATION_FREEZE_0), "overlay test rotation");
             waitFor(() -> { int[] area = activity.safeWindowArea(); return area != null && (area[0] > area[1]) == landscape; }, "overlay safe viewport");
             state(0, -1, 0, 0);
-            MenuTestNavigation.tapRow(this, activity, 0); state(3, -1, 0, 0);
+            tap(activity, 150, 100); state(3, -1, 0, 0);
             for (int i = 0; i < overlaySystem; ++i) sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_DOWN);
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER);
             state(0, overlaySystem, 0, 0);
@@ -824,8 +827,8 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER); state(19, overlaySystem, 0, 0);
             screenshot("overlay-" + overlaySystem + "-subsystems");
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK); state(0, overlaySystem, 0, 0);
-            tab(activity, 1); MenuTestNavigation.tapRow(this, activity, 0); state(4, overlaySystem, 0, 0);
-            MenuTestNavigation.tapRow(this, activity, 0);
+            tab(activity, 1); tap(activity, 150, 100); state(4, overlaySystem, 0, 0);
+            tap(activity, 150, 100);
             state(8, overlaySystem, 1, 0); android.os.SystemClock.sleep(700);
             screenshot("overlay-" + overlaySystem + "-playing");
             float[] m = overlayMetrics(activity); float w = m[0], h = m[1], s = m[2];
@@ -876,33 +879,33 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             try (FileOutputStream out = new FileOutputStream(new File(context.getFilesDir(), "test-navigation-launcher.png"))) {
                 launcher.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out);
             } finally { launcher.recycle(); }
-            MenuTestNavigation.tapRow(this, activity, 1);
+            tap(activity, 150, 176);
             check(activity.hasWindowFocus() && frontendState().contains("core=-1 content=0"), "content picker stays closed without a selected core");
             tab(activity, 1); screenshot("history-only");
-            MenuTestNavigation.tapRow(this, activity, 0); state(4, -1, 0, 0);
-            MenuTestNavigation.tapRow(this, activity, 0); state(4, -1, 0, 0); screenshot("blocked-history");
+            tap(activity, 150, 100); state(4, -1, 0, 0);
+            tap(activity, 150, 100); state(4, -1, 0, 0); screenshot("blocked-history");
             selectFixtureCore(activity);
-            tab(activity, 1); MenuTestNavigation.tapRow(this, activity, 0); state(4, 0, 0, 0);
-            MenuTestNavigation.tapRow(this, activity, 0);
+            tab(activity, 1); tap(activity, 150, 100); state(4, 0, 0, 0);
+            tap(activity, 150, 100);
             state(8, 0, 1, 0); screenshot("playing");
             closeContent(); screenshot("closed-core-kept");
-            tab(activity, 1); MenuTestNavigation.tapRow(this, activity, 0); state(4, 0, 0, 0);
-            MenuTestNavigation.tapRow(this, activity, 0);
+            tab(activity, 1); tap(activity, 150, 100); state(4, 0, 0, 0);
+            tap(activity, 150, 100);
             state(8, 0, 1, 0);
-            closeContent(); MenuTestNavigation.tapRow(this, activity, 0); state(0, -1, 0, 0);
-            tab(activity, 1); MenuTestNavigation.tapRow(this, activity, 0); state(4, -1, 0, 0);
-            MenuTestNavigation.tapRow(this, activity, 0); state(4, -1, 0, 0);
+            closeContent(); tap(activity, 150, 100); state(0, -1, 0, 0);
+            tab(activity, 1); tap(activity, 150, 100); state(4, -1, 0, 0);
+            tap(activity, 150, 100); state(4, -1, 0, 0);
             for (int theme : new int[] {0, 3, 2}) {
-                tab(activity, 2); MenuTestNavigation.tapRow(this, activity, 0); state(9, -1, 0, 0);
-                MenuTestNavigation.tapRow(this, activity, 0); state(7, -1, 0, 0);
-                MenuTestNavigation.tapRow(this, activity, theme == 0 ? 1 : theme == 3 ? 2 : 0);
+                tab(activity, 2); tap(activity, 150, 100); state(9, -1, 0, 0);
+                tap(activity, 150, 100); state(7, -1, 0, 0);
+                tap(activity, 150, 100 + 76 * (theme == 0 ? 1 : theme == 3 ? 2 : 0));
                 waitFor(() -> activity.preference("theme", -1) == theme, "native theme selection persisted");
-                tab(activity, 2); MenuTestNavigation.tapRow(this, activity, 2); state(11, -1, 0, 0);
+                tab(activity, 2); tap(activity, 150, 252); state(11, -1, 0, 0);
                 screenshot("switch-on-" + theme);
-                MenuTestNavigation.tapRow(this, activity, 0);
+                tap(activity, 150, 100);
                 waitFor(() -> activity.preference("audio", -1) == 0, "native switch disabled audio once");
                 screenshot("switch-off-" + theme);
-                MenuTestNavigation.tapRow(this, activity, 0);
+                tap(activity, 150, 100);
                 waitFor(() -> activity.preference("audio", -1) == 1, "native switch enabled audio once");
             }
             tab(activity, 0); screenshot("main");
@@ -957,8 +960,8 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
                         "fixture image ready before timed popup capture");
             android.os.SystemClock.sleep(800);
             selectFixtureCore(activity);
-            tab(activity, 1); MenuTestNavigation.tapRow(this, activity, 0); state(4, 0, 0, 0);
-            MenuTestNavigation.tapRow(this, activity, 0);
+            tab(activity, 1); tap(activity, 150, 100); state(4, 0, 0, 0);
+            tap(activity, 150, 100);
             state(8, 0, 1, 0);
             waitFor(() -> metadataRequested, "game identification is pending");
             noLaunchPlaceholder(activity, "waiting-metadata", null);
@@ -986,7 +989,7 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             android.graphics.Bitmap cleared = getUiAutomation().takeScreenshot();
             check(cleared != null && !hasColor(cleared, UNLOCK_COLOR), "closing content keeps the core and removes the old game's popup");
             if (cleared != null) cleared.recycle();
-            MenuTestNavigation.tapRow(this, activity, 0); state(0, -1, 0, 0);
+            tap(activity, 150, 100); state(0, -1, 0, 0);
         } finally {
             metadataRelease.countDown(); gameImageRelease.countDown();
             activity.achievementCredentialsSet("", ""); storageDrained(); runOnMainSync(activity::finish);

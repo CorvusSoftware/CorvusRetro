@@ -105,12 +105,6 @@ bool cr_gl_init(cr_gl *g, cr_android *platform) {
     glGenTextures(1, &g->atlas);
     glGenTextures(1, &g->game);
     cr_android *p = platform;
-    float menu_metrics[4];
-    cr_android_menu_metrics(p, menu_metrics);
-    g->menu_dpi = menu_metrics[0];
-    g->font_line_ratio = menu_metrics[1];
-    g->font_ascent_ratio = menu_metrics[2];
-    g->font_glyph_ratio = menu_metrics[3];
     jobject bitmap = (*p->env)->CallObjectMethod(p->env, p->app->activity->clazz, p->atlas);
     bool ok = bitmap_upload(p, g->atlas, bitmap, 0, 0, true);
     if (bitmap)
@@ -283,14 +277,6 @@ static int glyph_index(cr_gl *g, uint32_t cp) {
     g->stamps[slot] = ++g->stamp;
     return slot;
 }
-static float slot_advance(cr_gl *g, int slot, float size) {
-    return g->advances[slot] * size / 40;
-}
-float cr_gl_glyph_advance(void *ctx, uint32_t cp, float size) {
-    cr_gl *g = ctx;
-    if (!g || !g->context || !g->atlas) return -1;
-    return slot_advance(g, glyph_index(g, cp), size);
-}
 static float measure(void *ctx, const char *text, float size) {
     cr_gl *g = ctx;
     float w = 0;
@@ -298,7 +284,8 @@ static float measure(void *ctx, const char *text, float size) {
         uint32_t cp = next_utf8(&text);
         if (cp == '\n')
             break;
-        w += cr_gl_glyph_advance(g, cp, size);
+        int slot = glyph_index(g, cp);
+        w += g->advances[slot] * size / 40;
     }
     return w;
 }
@@ -311,8 +298,8 @@ static void draw_text(void *ctx, const char *text, float x, float baseline, floa
         if (cp == '\n')
             break;
         int i = glyph_index(g, cp);
-        float advance = slot_advance(g, i, size);
-        if (x + advance > end + .01f)
+        float advance = g->advances[i] * size / 40;
+        if (x + advance > end)
             break;
         quad(g, x, baseline - 46 * size / 40, 64 * size / 40, 64 * size / 40,
              ((i % 16) * 64 + .5f) / 1024, ((i / 16) * 64 + .5f) / 2048, 63.f / 1024, 63.f / 2048,
