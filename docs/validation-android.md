@@ -426,3 +426,39 @@ les trames sont observés, pas la qualité sonore sur haut-parleur. La déconnex
 audio est injectée dans le test du pilote hôte ; aucune campagne sur téléphone
 physique, Bluetooth ou runtime ARM64 n'est revendiquée. Android reste responsable
 de l'atténuation audio pendant les appels et de ses politiques système.
+
+### Publication signée 0.22.0
+
+La [release v0.22.0](https://github.com/CorvusSoftware/CorvusRetro/releases/tag/v0.22.0)
+provient du commit de fusion de PR #24
+`c97ccaf61563ecc7a6ced6421424a28b572031aa`, versionCode28. Son arbre est identique
+à la tête de PR `751c1a7`, dont les parcours fonctionnels sont décrits ci-dessus.
+La CI de main
+[41493981097](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41493981097),
+le build signé
+[41494442678](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41494442678)
+et la publication
+[41495125139](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41495125139)
+sont réussis sur ce commit exact.
+
+Le certificat conserve l'empreinte
+`cb431e5abf3ae73ddd5c706a9c485ff6e627be2135bb2557b6191f04ac3a5211`.
+L'APK public a été retéléchargé et comparé octet pour octet à l'artefact signé
+qualifié. SHA-256 :
+`9adf6208b05349671855f7b1e53dfb0873d01dcc0b7135d6c7ec9217f57aa4e1`.
+Version 0.22.0/code28, frontends arm64-v8a/x86_64, alignement 16 Ko, absence de
+cœur et de provider de tests, provenance des trois sous-modules et empreinte du
+MP3 fourni ont été vérifiés. Aucune révision de moteur ou d'API n'a changé.
+
+Sur le profil signé Android 10/API29 x86_64 existant, la mise à jour
+0.21.0/code27 vers 0.22.0/code28 est acceptée sans désinstallation. UID10116,
+dossier de données et première date d'installation restent identiques. Le thème
+ASUS et la ligne d'historique `Corvus-preserved.gba` sont conservés ; la région
+de cette ligne est identique en pixels. Les captures après mise à jour ont été
+inspectées et la liste sans cœur propose toujours le téléchargeur. Aucun nouveau
+crash de l'application n'a été observé dans le buffer consulté.
+
+Les contrôles fonctionnels précédents restent ceux de l'émulateur API29 et des
+tests hôtes. Aucune écoute physique, connexion Bluetooth ou exécution sur
+appareil ARM64 n'est revendiquée. Le tag `v0.22.0` et son APK restent immuables ;
+la présente documentation ne modifie pas la source du binaire publié.
