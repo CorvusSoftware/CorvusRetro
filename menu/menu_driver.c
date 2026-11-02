@@ -2169,6 +2169,19 @@ static void rounded(const cr_painter *p, float x, float y, float w, float h,
 }
 static void art_pine(const cr_painter *, float, float, float, uint32_t);
 static void art_mountains(const cr_painter *, float, float, float, float, uint32_t, int);
+static void draw_backdrop(const cr_painter *p, float w, float h) {
+    static const uint32_t steps[] = {0xff0a1027, 0xff0d1231, 0xff0d1335,
+                                     0xff0b1232, 0xff0b122c, 0xff101339};
+    for (int i = 0; i < 48; ++i)
+        rect(p, 0, i * h / 48, w, h / 48 + 1, steps[i * 6 / 48]);
+    if (p->circle) {
+        for (int i = 0; i < 9; ++i) {
+            float r = 130 + i * 20;
+            p->circle(p->context, w + 105, -40, r, 0x092d1d88);
+            p->circle(p->context, w * .73f, h + 155, r, 0x092d208f);
+        }
+    }
+}
 static void draw_home(cr_ui *u, const cr_painter *p, const cr_theme *theme) {
     float s = home_scale(u), w = u->width, x = 16 * s, gap = 9 * s;
     float card_w = (w - 2 * x - 2 * gap) / 3, scroll = u->scroll;
@@ -2467,6 +2480,8 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
     uint32_t line = theme->divider, focus = theme->focus;
     float w = u->width, h = u->height;
     rect(p, 0, 0, w, h, bg);
+    if (u->theme == CR_THEME_CORVUS && u->page != CR_PLAY && !u->quick)
+        draw_backdrop(p, w, h);
     if (u->page == CR_PLAY && !u->quick) {
         rect(p, 0, 0, w, h, 0xff000000);
         cr_play_layout layout = play_layout(u);
