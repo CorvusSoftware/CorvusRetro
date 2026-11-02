@@ -313,6 +313,7 @@ void android_main(struct android_app *app) {
     app->onInputEvent = input;
     a->last_draw = now();
     a->applied_theme = -1;
+    bool last_fast_forward = false;
 #ifndef NDEBUG
     unsigned last_players = ~0u, last_controlled = ~0u;
     int last_page = -1, last_core = -2, last_content = -1, last_quick = -1, last_theme = -1,
@@ -366,6 +367,11 @@ void android_main(struct android_app *app) {
         active = a->window && a->resumed && a->focused;
         running = active && cr_ui_running(&a->ui);
         time = now();
+        if (last_fast_forward != a->ui.fast_forward) {
+            a->deadline = time;
+            cr_audio_pause(&a->audio);
+            last_fast_forward = a->ui.fast_forward;
+        }
         bool awake = running && a->ui.awake;
         if (a->applied_theme != a->ui.theme || a->applied_awake != awake) {
             cr_platform services = a->ui.platform;
@@ -410,7 +416,7 @@ void android_main(struct android_app *app) {
             cr_ui_inputs(&a->ui, masks);
             if (cr_engine_step_players(&a->ui.engine, masks)) {
                 cr_ui_achievement_frame(&a->ui);
-                if (a->ui.audio) {
+                if (a->ui.audio && !a->ui.fast_forward) {
                     if (cr_audio_start(&a->audio, a->ui.engine.rate)) {
                         cr_audio_set_volume(&a->audio, a->ui.volume);
                         cr_audio_write(&a->audio, a->ui.engine.audio, a->ui.engine.audio_count);
@@ -429,8 +435,9 @@ void android_main(struct android_app *app) {
                 cr_controller_ports_clear(&a->controllers);
                 cr_audio_pause(&a->audio);
             }
-            a->deadline += 1.0 / a->ui.engine.fps;
-            if (time - a->deadline > 2.0 / a->ui.engine.fps)
+            double period = 1.0 / (a->ui.engine.fps * (a->ui.fast_forward ? 2.0 : 1.0));
+            a->deadline += period;
+            if (time - a->deadline > 2.0 * period)
                 a->deadline = time;
             if (time - a->battery_time > 5) {
                 save(a);
