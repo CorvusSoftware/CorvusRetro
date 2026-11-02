@@ -2190,6 +2190,100 @@ static void draw_home(cr_ui *u, const cr_painter *p, const cr_theme *theme) {
         center(p, "Décharger le cœur", x + 3*(w - 2*x)/4, y + 29*s, 11*s, muted);
     }
 }
+static uint32_t library_art_hash(const char *id) {
+    uint32_t h = 2166136261u;
+    for (const unsigned char *c = (const unsigned char *)id; *c; ++c)
+        h = (h ^ *c) * 16777619u;
+    return h;
+}
+static void draw_library(cr_ui *u, const cr_painter *p, const cr_theme *theme) {
+    float w = u->width, bottom = body_bottom(u);
+    static const char *filters[] = {"Tous", "GB", "GBC", "GBA"};
+    for (int i = 0; i < 4; ++i) {
+        float cell = (w - 32) / 4, x = 16 + i * cell;
+        bool selected = u->library_filter == i - 1;
+        rounded(p, x + 2, 79, cell - 4, 36, 18,
+                selected ? theme->accent : 0xff1d243c);
+        center(p, filters[i], x + cell / 2, 102, 13,
+               selected ? 0xff160f30 : theme->text);
+    }
+    rounded(p, 16, 128, w - 32, 40, 11, 0xff202640);
+    p->icon(p->context, CR_ICON_FOLDER, 28, 138, 20, theme->accent);
+    text(p, "Importer un dossier", 58, 152, 13, theme->text, w - 102);
+    if (u->library_query[0]) {
+        rounded(p, 16, 172, w - 32, 23, 9, 0xff352957);
+        text(p, u->library_editing ? u->library_preview : u->library_query,
+             26, 189, 11, 0xffe4d7ff, w - 56);
+    }
+    float grid_top = u->library_query[0] ? 207 : 184;
+    float tile_w = (w - 44) / 2;
+    int total = library_count(u);
+    if (!total) {
+        text(p, u->game_count ? "Aucun jeu pour ce filtre." : "Aucun jeu dans la bibliothèque.",
+             20, grid_top + 57, 15, theme->text, w - 40);
+        text(p, u->game_count ? "Essayez un autre filtre ou une recherche." :
+             "Importez un dossier avec le cœur approprié.",
+             20, grid_top + 85, 12, theme->muted, w - 40);
+        return;
+    }
+    if (p->clip) p->clip(p->context, 0, grid_top, w, fmaxf(1, bottom - grid_top));
+    int first = (int)fmaxf(0, floorf(u->scroll / 208));
+    int last = (int)fminf((total + 1) / 2,
+                          ceilf((u->scroll + bottom - grid_top) / 208) + 1);
+    for (int line = first; line < last; ++line) {
+        float y = grid_top + line * 208 - u->scroll;
+        if (y + 196 < grid_top || y >= bottom) continue;
+        for (int col = 0; col < 2; ++col) {
+            int position = line * 2 + col;
+            if (position >= total) break;
+            int index = library_index(u, position);
+            if (index < 0) continue;
+            const cr_game *game = &u->games[index];
+            uint32_t art = library_art_hash(game->id[0] ? game->id : game->title);
+            int system = library_system(game);
+            uint32_t sky = system == 2 ? 0xff284d75 : system == 1 ? 0xff51428d : 0xff527868;
+            uint32_t glow = system == 2 ? 0xff4fa9df : system == 1 ? 0xffbe79d9 : 0xff96ce7a;
+            float x = 16 + col * (tile_w + 12);
+            bool focused = u->focus == position + 1;
+            rounded(p, x, y, tile_w, 196, 13, focused ? theme->accent : 0xff1d2541);
+            rounded(p, x + 3, y + 3, tile_w - 6, 154, 11, sky);
+            float moon_x = x + (50 + art % 55) * tile_w / 170;
+            p->circle(p->context, moon_x, y + 55, 30, glow);
+            for (int k = 0; k < 7; ++k) {
+                float sx = x + 12 + ((art >> (k % 8)) + 43 * k) % 145 * (tile_w - 24) / 170;
+                float sy = y + 14 + (k * 17 + (art >> (k + 4)) % 20) % 89;
+                rect(p, sx, sy, 3, 3, 0xffe9e8ff);
+            }
+            for (int k = 0; k < 16; ++k) {
+                float step = (tile_w - 6) / 16;
+                float rise = 87 + (k * 11 + (art >> (k % 12)) % 30) % 43;
+                rect(p, x + 3 + k * step, y + rise, step + 1, 154 - rise,
+                     k % 2 ? 0xff242d56 : 0xff2d335e);
+                float close = 126 + (k * 7 + (art >> (k % 16)) % 16) % 22;
+                rect(p, x + 3 + k * step, y + close, step + 1, 154 - close,
+                     k % 3 ? 0xff141c3d : 0xff20264b);
+            }
+            char initials[4] = {0};
+            int n = 0;
+            for (const char *at = game->title; *at && n < 2; ++at)
+                if ((at == game->title || at[-1] == ' ' || at[-1] == '_') &&
+                    (unsigned char)*at < 128 && isalnum((unsigned char)*at))
+                    initials[n++] = (char)toupper((unsigned char)*at);
+            if (!n) snprintf(initials, sizeof(initials), "CR");
+            center(p, initials, x + tile_w / 2, y + 102, 30, 0xfff8edff);
+            rect(p, x + 3, y + 157, tile_w - 6, 36, 0xff11182b);
+            text(p, game->title, x + 11, y + 175, 12, theme->text, tile_w - 22);
+            const char *label = system == 0 ? "GB" : system == 1 ? "GBC" :
+                                system == 2 ? "GBA" : "Autre";
+            text(p, label, x + 11, y + 190, 10,
+                 game->system == u->engine.system && u->engine.handle ?
+                 theme->accent : theme->muted, tile_w - 22);
+            if (focused)
+                rect(p, x + 5, y + 194, tile_w - 10, 2, theme->accent);
+        }
+    }
+    if (p->clip) p->clip(p->context, 0, 56, w, fmaxf(1, bottom - 56));
+}
 void cr_ui_draw(cr_ui *u, const cr_painter *p) {
     const cr_theme *theme = cr_theme_get(u->theme);
     uint32_t bg = theme->background, header = theme->header, nav = theme->navigation;
@@ -2337,6 +2431,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         int first = (int)fmaxf(0, floorf((scroll - 84) / 76));
         int end = (int)fminf(count, floorf((scroll + body_bottom(u) - 64) / 76) + 1);
         if (home_cards(u)) draw_home(u, p, theme);
+        else if (library_grid(u)) draw_library(u, p, theme);
         else for (int i = first; i < end; i++) {
             float y = 64 + i * 76 - scroll;
             if (y + 76 < 56 || y > body_bottom(u))
@@ -2363,7 +2458,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
                     "Aucun cœur disponible pour cette version.",
                  20, 236, 14, fg, w - 40);
         }
-        if (u->page == CR_LIBRARY && count == 1) {
+        if (u->page == CR_LIBRARY && !library_grid(u) && count == 1) {
             text(p, "Aucun jeu dans la bibliothèque.",
                  20, 246, 14, fg, w - 40);
         }
@@ -2425,7 +2520,11 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
             p->circle(p->context, 28, 28, 22, alpha_color(focus, u->feedback_alpha));
         if (has_back(u))
             p->icon(p->context, CR_ICON_BACK, 12, 16, 24, theme->header_text);
-        if (home_cards(u)) {
+        if (library_grid(u)) {
+            text(p, title, has_back(u) ? 56 : 20, 35, 19, theme->header_text, w - 120);
+            p->icon(p->context, CR_ICON_INFO, w - 91, 17, 22, accent);
+            p->icon(p->context, CR_ICON_FOLDER, w - 41, 17, 22, accent);
+        } else if (home_cards(u)) {
             p->icon(p->context, CR_ICON_CROW, 16, 16, 25, accent);
             text(p, title, 51, 35, 19, theme->header_text, w - 105);
             p->icon(p->context, CR_ICON_SETTINGS, w - 39, 17, 22, accent);
