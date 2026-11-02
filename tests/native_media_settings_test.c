@@ -105,11 +105,11 @@ static void opacity_settings(void) {
     cr_overlay_draw(&layout,&painter,0,feedback,true,false,false);
     check(capture.first == 128 && capture.last == 160, "default resting opacity remains compatible");
     unsigned count = capture.count;
-    capture = (paint){0}; cr_overlay_draw_configured(&layout,&painter,0,feedback,true,false,false,50);
+    capture = (paint){0}; cr_overlay_draw_configured(&layout,&painter,0,feedback,true,false,false,false,50);
     check(capture.first == 64 && capture.count == count,
           "opacity setting changes resting controls without changing their geometry");
     check(capture.last == 160, "menu and hide stay visible independently of game button opacity");
-    capture = (paint){0}; cr_overlay_draw_configured(&layout,&painter,1,feedback,true,false,false,0);
+    capture = (paint){0}; cr_overlay_draw_configured(&layout,&painter,1,feedback,true,false,false,false,0);
     check(capture.first == 255 && capture.last == 160, "pressed feedback stays bright at low resting opacity");
 }
 static void audio_settings(void) {
