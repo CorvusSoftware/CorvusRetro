@@ -166,6 +166,12 @@ void cr_audio_write(cr_audio *a, const int16_t *samples, size_t count) {
     size_t space = CR_AUDIO_RING_FRAMES - (write - read);
     size_t frames = count / 2;
     if (frames > space) frames = space;
+    if (!a->playing && frames) {
+        /* Two PCM batches cover a missed display tick. Fractional rates alternate by one frame. */
+        size_t target = frames * 2 - 1;
+        if (target > CR_AUDIO_RING_FRAMES) target = CR_AUDIO_RING_FRAMES;
+        if (target > (size_t)a->prime_frames) a->prime_frames = (int)target;
+    }
     /* Only the callback advances read; overflow discards new complete stereo frames. */
     for (size_t i = 0; i < frames; ++i) {
         size_t slot = ((write + (unsigned)i) % CR_AUDIO_RING_FRAMES) * 2;

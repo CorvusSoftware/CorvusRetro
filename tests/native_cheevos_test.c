@@ -15,6 +15,7 @@ typedef struct {
     uint64_t held_id;
     unsigned calls, awards, notices, credential_saves;
     bool hold, fail, refuse_login, measured;
+    const char *definition;
     unsigned games, unlocks, progresses, hides, clears, completions;
     unsigned sounds;
     int sound_volume;
@@ -55,7 +56,7 @@ static void request(void *context, uint64_t id, const char *url, const char *pos
     if (strstr(post, "r=login2")) body = f->refuse_login ? "{\"Success\":false,\"Error\":\"Invalid credentials\"}" : login_response;
     else if (strstr(post, "r=achievementsets")) {
         snprintf(definition, sizeof(definition), game_response, f->measured ? "M:0xH0001=10" : "0xH0001=7");
-        body = definition;
+        body = f->definition ? f->definition : definition;
     }
     else if (strstr(post, "r=startsession")) {
         check(strstr(post, "&h=0") != NULL, "only normal mode is advertised");
@@ -101,6 +102,50 @@ static cr_cheevos_status status(cr_cheevos *c) { cr_cheevos_status s; cr_cheevos
 static void achievement_sound(void *context, int volume) {
     fixture *f = context; ++f->sounds; f->sound_volume = volume;
 }
+static void interleaved_progress(const char *path) {
+    char definition[4096];
+    snprintf(definition,sizeof(definition),game_response,"M:0xH0001=10");
+    char *tail=strstr(definition,"}],\"Leaderboards\"");
+    check(tail!=NULL,"two-achievement synthetic response has a valid insertion point");
+    snprintf(tail,sizeof(definition)-(size_t)(tail-definition),
+        "},{\"ID\":9002,\"Title\":\"Second counter\",\"Description\":\"Independent progress\","
+        "\"Flags\":3,\"Points\":5,\"MemAddr\":\"M:0xH0002=10\",\"Author\":\"CorvusSoftware\","
+        "\"BadgeName\":\"00002\",\"Created\":1700000000,\"Modified\":1700000000}],\"Leaderboards\":[]}]}"
+    );
+    fixture f={.definition=definition}; cr_cheevos *c=create(&f);
+    check(cr_cheevos_load_game(c,path,4,memory,&f) &&
+          cr_cheevos_login_token(c,"CorvusTest","SyntheticSessionToken"),"two measured achievements load");
+    pump(c); cr_cheevos_frame(c);
+    check(status(c).total==2,"both measured counters are active");
+    f.ram[1]=4; cr_cheevos_frame(c);
+    f.ram[2]=3; cr_cheevos_frame(c);
+    check(f.progresses==2 && f.progress.id==9002,"different achievements can announce their own values");
+    for (unsigned i=0;i<12;++i) {
+        f.ram[1]=f.ram[2]=0; cr_cheevos_frame(c);
+        f.ram[1]=4; cr_cheevos_frame(c);
+        f.ram[2]=3; cr_cheevos_frame(c);
+    }
+    check(f.progresses==2,"interleaved achievements retain independent duplicate histories");
+    f.ram[1]=5; cr_cheevos_frame(c);
+    check(f.progresses==3 && f.progress.id==9001 && !strcmp(f.progress.detail,"5/10"),
+          "a real advance remains immediate after duplicate suppression");
+    f.ram[1]=2; cr_cheevos_frame(c);
+    check(f.progresses==4 && !strcmp(f.progress.detail,"2/10"),"a genuine decrease is not hidden as a duplicate");
+    unsigned before=f.progresses;
+    cr_cheevos_reset(c); f.ram[1]=0; cr_cheevos_frame(c); f.ram[1]=2; cr_cheevos_frame(c);
+    check(f.progresses==before+1,"explicit restart allows the same value in a new attempt");
+    size_t size=cr_cheevos_progress_size(c); void *bytes=malloc(size);
+    check(bytes && cr_cheevos_progress_save(c,bytes,size),"serialize measured evaluation state");
+    check(cr_cheevos_progress_restore(c,bytes,size),"restore measured evaluation state"); free(bytes);
+    before=f.progresses;
+    f.ram[1]=0; cr_cheevos_frame(c); f.ram[1]=2; cr_cheevos_frame(c);
+    check(f.progresses==before+1,"restoring a state starts a fresh notification history");
+    before=f.progresses; cr_cheevos_unload_game(c);
+    check(cr_cheevos_load_game(c,path,4,memory,&f),"same game can be loaded again"); pump(c);
+    f.ram[1]=0; cr_cheevos_frame(c); f.ram[1]=2; cr_cheevos_frame(c);
+    check(f.progresses==before+1,"a previous game's progress cannot suppress a newly loaded game");
+    cr_cheevos_destroy(c);
+}
 static void frontend_sound(const char *path) {
     const struct { bool cards, audio, callback; int volume; unsigned sounds; } cases[] = {
         {true,true,true,100,1}, {true,true,true,30,1}, {true,false,true,100,0},
@@ -135,6 +180,18 @@ static void frontend_sound(const char *path) {
     pump(measured.client); cr_cheevos_frame(measured.client);
     measured.ram[1]=5; cr_cheevos_frame(measured.client); pump(measured.client);
     check(!measured.sounds && !measured.awards, "measured progress notification stays silent");
+    ui.notifications.progress.image_pending=false;
+    cr_notifications_update(&ui.notifications,2.1);
+    check(!ui.notifications.progress.visible,"measured popup reaches its normal expiry");
+    for (unsigned frame=0;frame<120;++frame) {
+        measured.ram[1]=0; cr_cheevos_frame(measured.client);
+        measured.ram[1]=5; cr_cheevos_frame(measured.client);
+    }
+    check(!ui.notifications.progress.visible && !ui.notifications.progress_time && !measured.sounds,
+          "transient counter resets cannot replay identical measured popups or sounds");
+    measured.ram[1]=6; cr_cheevos_frame(measured.client);
+    check(ui.notifications.progress.visible && !strcmp(ui.notifications.progress.text,"6/10"),
+          "genuine measured advances still reach the native popup");
     measured.ram[1]=10; cr_cheevos_frame(measured.client); pump(measured.client);
     check(measured.sounds==1 && measured.awards==1, "completing measured progress plays one unlock sound");
     cr_ui_destroy(&ui);
@@ -221,9 +278,16 @@ int main(void) {
     unsigned updates = measured.progresses;
     cr_cheevos_frame(c);
     check(measured.progresses == updates, "unchanged RAM does not flood progress notifications");
+    for (unsigned frame=0;frame<120;++frame) {
+        measured.ram[1]=0; cr_cheevos_frame(c);
+        measured.ram[1]=4; cr_cheevos_frame(c);
+    }
+    check(measured.progresses == updates,
+          "returning to the same measured value after transient zero does not spam events");
     measured.ram[1] = 5; cr_cheevos_frame(c);
     check(measured.progresses > updates && strcmp(measured.progress.detail, "5/10") == 0,
           "progress changes update the existing indicator");
+    interleaved_progress(path);
     unsigned hides = measured.hides;
     cr_cheevos_reset(c);
     check(measured.hides > hides, "reset explicitly hides stale measured progress");

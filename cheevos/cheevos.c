@@ -13,6 +13,7 @@
 
 #define CR_RA_REQUESTS 32
 #define CR_RA_RESPONSE_LIMIT (4u * 1024u * 1024u)
+#define CR_RA_PROGRESS_HISTORY 128
 
 typedef struct {
     uint64_t id;
@@ -21,6 +22,10 @@ typedef struct {
     char *url, *post;
     bool dispatched, authentication;
 } cr_ra_request;
+typedef struct {
+    uint32_t id;
+    char text[64];
+} cr_ra_progress;
 struct cr_cheevos {
     rc_client_t *client;
     cr_cheevos_host host;
@@ -31,6 +36,8 @@ struct cr_cheevos {
     char hash[33], message[256];
     bool selected, closing;
     uint64_t login_completions, load_completions;
+    cr_ra_progress progress[CR_RA_PROGRESS_HISTORY];
+    size_t progress_count;
 };
 static atomic_uint_fast64_t next_request = ATOMIC_VAR_INIT(1);
 static const char cancelled[] = "{\"Success\":false,\"Error\":\"Operation cancelled\",\"Code\":\"invalid_state\"}";
@@ -41,6 +48,22 @@ static void message(cr_cheevos *c, const char *text) {
 static void notify(cr_cheevos *c, const cr_cheevos_notification *notification) {
     if (!c->closing && c->host.notification)
         c->host.notification(c->host.context, notification);
+}
+static bool progress_changed(cr_cheevos *c, const cr_cheevos_notification *notification) {
+    if (!notification->detail[0]) return false;
+    cr_ra_progress value = {.id = notification->id};
+    snprintf(value.text, sizeof(value.text), "%.63s", notification->detail);
+    size_t slot = 0;
+    while (slot < c->progress_count && c->progress[slot].id != value.id) ++slot;
+    bool changed = slot == c->progress_count || strcmp(c->progress[slot].text,value.text);
+    if (slot == c->progress_count) {
+        if (c->progress_count < CR_RA_PROGRESS_HISTORY) ++c->progress_count;
+        else --slot;
+    }
+    /* Hiding a badge does not forget its last value; explicit resets do. */
+    memmove(c->progress + 1,c->progress,slot * sizeof(*c->progress));
+    c->progress[0] = value;
+    return changed;
 }
 static void erase_free(char *text) {
     if (!text) return;
@@ -190,7 +213,8 @@ static void event(const rc_client_event_t *event, rc_client_t *client) {
             if (rc_client_achievement_get_image_url(event->achievement, RC_CLIENT_ACHIEVEMENT_STATE_ACTIVE,
                     notification.image_url, sizeof(notification.image_url)) != RC_OK)
                 notification.image_url[0] = 0;
-            notify(c, &notification);
+            if (notification.image_url[0] && progress_changed(c,&notification))
+                notify(c, &notification);
         }
         break;
     case RC_CLIENT_EVENT_ACHIEVEMENT_PROGRESS_INDICATOR_HIDE:
@@ -239,6 +263,7 @@ cr_cheevos *cr_cheevos_create(cr_cheevos_host host) {
 }
 static void cancel(cr_cheevos *c, bool authentication) {
     c->closing = true;
+    c->progress_count = 0;
     if (authentication && c->login) rc_client_abort_async(c->client, c->login);
     if (c->load) rc_client_abort_async(c->client, c->load);
     if (authentication) c->login = NULL;
@@ -349,6 +374,7 @@ void cr_cheevos_frame(cr_cheevos *c) {
 void cr_cheevos_idle(cr_cheevos *c) { if (c) { rc_client_idle(c->client); dispatch(c); } }
 void cr_cheevos_reset(cr_cheevos *c) {
     if (c) {
+        c->progress_count = 0;
         rc_client_reset(c->client);
         notify(c, &(cr_cheevos_notification){.type = CR_CHEEVOS_PROGRESS_HIDE});
     }
@@ -359,6 +385,7 @@ bool cr_cheevos_progress_save(cr_cheevos *c, void *bytes, size_t size) {
 }
 bool cr_cheevos_progress_restore(cr_cheevos *c, const void *bytes, size_t size) {
     if (!c) return false;
+    c->progress_count = 0;
     if (bytes && rc_client_deserialize_progress_sized(c->client, bytes, size) == RC_OK) return true;
     rc_client_reset(c->client);
     return false;
