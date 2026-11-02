@@ -230,8 +230,9 @@ enum {
     HOME_HISTORY, HOME_INFO, HOME_PICK, HOME_SUBSYSTEM, HOME_UNLOAD, HOME_SETTINGS
 };
 enum {
-    LIBRARY_SEARCH = -300, LIBRARY_IMPORT, LIBRARY_ALL, LIBRARY_GB,
-    LIBRARY_GBC, LIBRARY_GBA, LIBRARY_GAME_BASE = -400
+    LIBRARY_SEARCH = -300, LIBRARY_IMPORT = -301, LIBRARY_ALL = -302,
+    LIBRARY_GB = -303, LIBRARY_GBC = -304, LIBRARY_GBA = -305,
+    LIBRARY_GAME_BASE = -400
 };
 static bool library_grid(const cr_ui *u) {
     return !u->quick && u->page == CR_LIBRARY && u->width >= 300 && u->height > u->width;
