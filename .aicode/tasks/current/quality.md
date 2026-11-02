@@ -1,19 +1,17 @@
 CorvusSoftware Quality Gate
-Status: PASS (correction locale de PR)
+Status: PASS (implémentation locale pour revue)
 Risk: STANDARD
-
 Criteria:
-- PASS : dimensions et disposition0.20.0 restaurées, autoDPI/menu latéral supprimés.
-- PASS : nouvelles icônes, ordre et retrait du libellé expérimental GBA conservés.
-- PASS : source de dessin/touch/scroll comparée à55e6181 ; différences du rendu limitées ààpropos/version/GBA.
+- PASS : commandes portrait plus espacées, tailles inchangées, géométrie commune au dessin et au toucher.
+- PASS : petites surfaces/configuration100..130% et positions±15 bornées, cibles téléphones48dp et absence chevauchement.
+- PASS : paysage et menus conservés.
 Evidence:
-- Native15/15 et ASan/UBSan15/15 réussis.
-- Androiddebug2ABI, lint, testsJVM et compilation instrumentation réussis.
-- APKzeroCore et ELF16Ko réussis.
-- Android SettingsInstrumentation323portrait+323paysage réussis ; captures des réglages inspectées.
+-15natives et15ASan/UBSan réussis.
+- Androiddebug2ABI/lint/testAPK ; APKzeroCore/ELF16Ko réussis.
+-177contrôles Android overlay portrait répartis surGB/GBC/GBA ; capturesGB/GBA inspectées. La première captureGBC est transitoirement noire, ses interactions et menus passent ; géométrie identiqueGB/GBC dans le code.
 Review:
-- Revue indépendante sans défaut, adaptations de tests cohérentes.
+- Indépendante sans défaut,127260configurations avec comparaison champ par champ au paysage précédent.
 Open risks:
-- Aucun téléphone physique testé. Pas de nouvelle release signée dans cette correction de PR.
+- Aucun téléphone physique testé. Pas de nouvelle release signée dans cette PR.
 Decision:
-- PR prête pour revue avec dimensions d'origine. Consulter les contrôles CI de son dernier commit avant fusion ; aucune fusion/release effectuée.
+- PR prête pour revue ; consulter CI du dernier commit avant fusion. Ni fusion ni release dans cette tâche.

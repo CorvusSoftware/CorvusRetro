@@ -52,8 +52,9 @@ static void geometry_tests(void) {
                     if (system != 2 && p.menu.x >= p.dpad.x + p.dpad.w)
                         check(p.dpad.y + p.dpad.h / 2 < h * .7f,
                               "wide GB portrait cross sits beside centered menu");
-                    check(p.controls[6].area.y + p.controls[6].area.h / 2 < h * .9f,
-                          "tall portrait utility buttons follow primary controls");
+                    check(fabsf(p.controls[6].area.y - p.hide.y) < .01f &&
+                          fabsf(p.controls[7].area.y - p.hide.y) < .01f,
+                          "portrait utility buttons occupy the separate bottom row");
                 }
             } else {
                 check(p.menu.x + p.menu.w <= p.video.x + .01f && p.menu.y < h / 2,
@@ -111,6 +112,19 @@ static void geometry_tests(void) {
             check(cr_play_hit(&p, p.controls[4].area.x, p.controls[4].area.y) == 0,
                   "round face button corners do not activate input");
         }
+    for (int system = 0; system < 3; ++system) {
+        cr_play_layout p = cr_play_layout_make(384, 851, system, 0, 0);
+        cr_area a = p.controls[4].area, b = p.controls[5].area;
+        check(a.y + 70*p.scale < b.y && a.x - b.x >= 70*p.scale,
+              "tall portrait face buttons have a more open diagonal");
+        float primary_bottom = fmaxf(p.dpad.y+p.dpad.h, b.y+b.h);
+        check(p.controls[6].area.y - primary_bottom > 40*p.scale,
+              "tall portrait separates utility actions from the directional and face buttons");
+        check(p.controls[6].area.x - p.controls[7].area.x - p.controls[7].area.w >= 48*p.scale,
+              "Select and Start have a clear horizontal gap");
+        check(a.w == 56*p.scale && p.dpad.w == 144*p.scale,
+              "more spacing does not enlarge primary controls");
+    }
     cr_play_layout full_height = cr_play_layout_make(720, 320, 0, 160, 144);
     check(fabsf(full_height.video.h - 320) < .01f,
           "landscape uses full video height when native aspect fits between gutters");

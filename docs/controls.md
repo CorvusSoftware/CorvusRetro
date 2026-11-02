@@ -25,7 +25,10 @@ Aucun fichier d'overlay ni image de RetroArch n'est embarqué.
 - Paysage : vidéo centrée entre les commandes, dans des gouttières latérales séparées.
 - Croix continue : quatre directions et quatre diagonales, centre neutre.
 - A/B : boutons circulaires avec toucher radial ; L/R uniquement pour GBA.
-- Select et Start suivent les commandes principales ; le menu circulaire reste accessible dans l'aire de jeu.
+- En portrait, A/B utilisent une diagonale plus ouverte si la hauteur disponible le permet.
+- Select et Start sont espacés sur la rangée inférieure, avec la commande de visibilité ; le menu circulaire reste centré au-dessus des commandes.
+- Le réglage de position déplace le groupe principal dans la place disponible avant cette rangée fixe.
+- Le paysage conserve sa disposition précédente.
 - La flèche masque et rétablit les commandes. Elle et le menu restent visibles lorsque les commandes sont masquées.
 
 Les traits gris deviennent plus clairs à l'appui. GB/GBC utilisent la croix,
