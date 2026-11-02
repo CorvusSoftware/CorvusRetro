@@ -691,6 +691,7 @@ static void clamp_scroll(cr_ui *u) {
 }
 static void view(cr_ui *u, int p) {
     u->controller_capture = -1;
+    if (p != CR_PLAY) u->fast_forward = false;
     u->page = p;
     u->tab =
         p == CR_PLAY ? u->tab
@@ -1840,8 +1841,13 @@ static int target(const cr_ui *u, float x, float y) {
         return -1;
     if (u->page == CR_PLAY && !u->quick) {
         cr_play_layout layout = play_layout(u);
-        return cr_area_contains(layout.menu, x, y) ? -3 :
-               cr_area_contains(layout.hide, x, y) ? -5 : -1;
+        if (cr_area_contains(layout.menu, x, y)) return -3;
+        if (cr_area_contains(layout.hide, x, y)) return -5;
+        if (cr_area_contains(layout.toolbar, x, y)) {
+            int slot = (int)((x - layout.toolbar.x) / (layout.toolbar.w / 4));
+            return slot >= 0 && slot < 3 ? -6 - slot : -1;
+        }
+        return -1;
     }
     if (y < 56) {
         if (library_grid(u) && x >= u->width - 100)
@@ -1961,6 +1967,23 @@ void cr_ui_touch_at(cr_ui *u, int id, int phase, float x, float y, double event_
         }
         if (t >= 10000) {
             quick_action(u, get_row(u, t - 10000).value);
+            return;
+        }
+        if (t >= -8 && t <= -6 && u->page == CR_PLAY && cr_ui_running(u)) {
+            if (t == -6) {
+                quick_action(u, CR_QUICK_RESTART);
+            } else if (t == -7) {
+                if (!cr_engine_can_state(&u->engine))
+                    cr_ui_message(u, "Sauvegarde d'état indisponible pour ce cœur");
+                else if (result(u, cr_engine_save_state(&u->engine)))
+                    cr_ui_message(u, "État sauvegardé");
+                cr_ui_clear_input(u);
+            } else {
+                u->fast_forward = !u->fast_forward;
+                cr_ui_clear_input(u);
+                cr_ui_message(u, u->fast_forward ? "Avance rapide x2 - audio coupé" :
+                                               "Vitesse normale");
+            }
             return;
         }
         if (t == -5) {
@@ -2376,7 +2399,8 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
                 menu_down |= u->pointers[i].target == -3 && !u->pointers[i].dragged;
                 hide_down |= u->pointers[i].target == -5 && !u->pointers[i].dragged;
             }
-        cr_overlay_draw_configured(&layout, p, input, u->control_feedback, u->show_input, menu_down, hide_down, u->overlay_opacity);
+        cr_overlay_draw_configured(&layout, p, input, u->control_feedback, u->show_input,
+                                   menu_down, hide_down, u->fast_forward, u->overlay_opacity);
     } else {
         const char *title = u->quick ? "Menu rapide" : u->page == CR_MAIN ? "CorvusRetro" : "Menu principal";
         switch (u->page) {
