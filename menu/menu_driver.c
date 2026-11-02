@@ -2031,7 +2031,7 @@ static void draw_home(cr_ui *u, const cr_painter *p, const cr_theme *theme) {
     rounded(p, x, core_y, w - 2*x, 70*s, 12*s, 0xff1b243c);
     text(p, "Cœur actif", x + 14*s, core_y + 23*s, 12*s, muted, w - 2*x);
     p->icon(p->context, CR_ICON_CORE, x + 14*s, core_y + 36*s, 24*s, accent);
-    text(p, u->engine.handle ? core_name(u->engine.system) : "Aucun cœur chargé",
+    text(p, u->engine.handle ? core_name(u->engine.system) : "Charger un cœur",
          x + 46*s, core_y + 53*s, 14*s, fg, w - 105*s);
     p->icon(p->context, CR_ICON_NEXT, w - 37*s, core_y + 29*s, 18*s, muted);
 
