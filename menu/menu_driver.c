@@ -450,7 +450,9 @@ static row get_row(const cr_ui *u, int index) {
         int slot = removable_core_at(u,index);
         if (slot >= 0) fill(&r,core_name(slot),"Supprimer ce cœur téléchargé",CR_ICON_CLOSE,ACT_CORE_REMOVE_CONFIRM,slot);
     } else if (u->page == CR_REMOVE_CORE_CONFIRM) {
-        fill(&r,index ? "Annuler" : "Supprimer ce cœur",index ? u->remove_core_name :
+        char label[160];
+        snprintf(label,sizeof(label),"Supprimer %.128s",u->remove_core_name);
+        fill(&r,index ? "Annuler" : label,index ? "Revenir à la liste des cœurs" :
              "Jeux et sauvegardes conservés",index ? CR_ICON_BACK : CR_ICON_CLOSE,
              index ? ACT_CORE_REMOVE_CANCEL : ACT_CORE_REMOVE,0);
     } else if (u->page == CR_CORES) {

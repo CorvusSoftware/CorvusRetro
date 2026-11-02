@@ -399,3 +399,30 @@ du déblocage réel d'un succès. Les étapes correspondantes et leurs sources s
 décrites dans la mémoire de tâche. La CI finale exécute15 suites natives et
 15 sous ASan/UBSan. Aucun test sur téléphone physique, manette physique ou
 runtime ARM64 n'est revendiqué.
+
+## Continuité audio et suppression des cœurs, préparation 0.22
+
+Sur l'émulateur x86_64, les phases `playback` portrait et paysage passent
+chacune 41 contrôles. Le volet de notifications retire le focus sans interrompre
+les trames ni l'état AAudio actif. HOME suspend effectivement les trames et le
+retour reconstruit la surface avec reprise audio. Le lanceur ramène le retour
+HOME en portrait ; seule la phase sous le volet et les commandes ont été
+vérifiées en paysage. La phase `core_removal` passe 91 contrôles : annulation,
+suppression d'un autre cœur gardant GBA chargé, suppression du cœur GBA chargé,
+préservation des empreintes ROM et batterie, historique conservé, réinstallation
+et relance immédiate. Les captures portrait et confirmation ont été inspectées.
+
+Les tests hôtes ajoutent la panne de stockage batterie, les trous du registre,
+les fichiers partagés, les liens symboliques, le rollback des préférences et les
+callbacks audio arrivant après fermeture ou destruction du propriétaire.
+Les 17 suites natives passent en mode strict et ASan/UBSan ; les 19 tests JVM,
+le frontend sans cœur, le lint, les builds Android debug/release et le contrôle
+du paquet debug deux ABI, signature et alignement 16 Ko passent également.
+La revue indépendante n'a plus de finding concret après correction des entrées
+maintenues lors de la perte EGL et de la durée de vie des callbacks d'erreur.
+
+L'émulateur utilise une sortie audio sans écoute physique. L'état AAudio et
+les trames sont observés, pas la qualité sonore sur haut-parleur. La déconnexion
+audio est injectée dans le test du pilote hôte ; aucune campagne sur téléphone
+physique, Bluetooth ou runtime ARM64 n'est revendiquée. Android reste responsable
+de l'atténuation audio pendant les appels et de ses politiques système.

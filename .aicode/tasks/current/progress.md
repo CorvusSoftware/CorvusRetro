@@ -1,8 +1,8 @@
-État : VERIFY. Branche feat/playback-and-core-management, base main 7303a32.
-Référence RetroArch documentée dans docs/av-retroarch-reference.md. Tous les changements fonctionnels sont implémentés.
+État : READY_FOR_REVIEW. Implémentation achevée, branche feat/playback-and-core-management, PR #24 ; préparation 0.22.0/code28.
+Référence RetroArch et décisions originales documentées dans docs/av-retroarch-reference.md.
 
-Preuves finales hôtes : 17 suites natives strictes et 17 avec ASan/UBSan passent, dont 284 contrôles AAudio ; frontend sans cœur et 8 tests de workflows passent. 11 nouveaux tests CoreStore passent, ainsi que les tests JVM existants. Base debug et runner compilés pour les deux ABI ; signature, alignement 16 Ko et zéro cœur vérifiés.
-Revue indépendante : entrées effacées après échec EGL et callback d'erreur AAudio tardif sécurisés. Nouvelle revue audio et exécution des 284 contrôles : aucun finding restant.
-Android : agent android_playback_removal_validation utilise exclusivement le profil debug TCP5563, phases playback/core_removal dans RetroAchievementsInstrumentation.java ; build final vert, essais en cours. Lint/JVM et build release finaux dans /workspace/av-android-final.log.
+Preuves : 17 suites natives strictes et 17 ASan/UBSan, 284 contrôles AAudio, 19 tests JVM dont 11 nouveaux CoreStore, frontend sans cœur, 8 tests de workflows, lint et builds Android debug/release passent. Base debug deux ABI, signature et alignement 16 Ko vérifiés. Revue indépendante terminée, deux findings corrigés et relus.
+Android : playback portrait et paysage 41 contrôles chacun, suppression/réinstallation portrait 91 contrôles ; ROM, batterie et historique conservés. HOME ramène l'écran en portrait ; pas de revendication de retour HOME en paysage. Captures inspectées. Dernière précision de libellé affichant le nom du cœur à supprimer : tests menu/registre/suppression stricts et ASan, build debug/runner/lint passent ; nouvelle capture ciblée en cours sans changement de logique.
+CI 41491545182 verte sur 5ccdb7b. Vérifier la CI du nouvel exact head après ce commit documentaire et de libellé avant de présenter la PR prête. Aucun merge/release pour ce lot.
 
-Prochaines actions : terminer et inspecter les parcours/captures Android, consigner les limites de matériel, commit/push PR, vérifier CI exacte. Ne pas modifier les moteurs, l'API, leurs pins ou les fichiers de contenu. Pas de fusion/release dans ce lot. Logs hors dépôt /workspace/av-* et playback-final-runtime.log.
+Journaux éphémères hors dépôt /workspace/av-* et /workspace/setup/playback-removal-runtime. L'émulateur ne permet pas une écoute physique ; aucune qualification téléphone/Bluetooth/runtime ARM64 revendiquée.
