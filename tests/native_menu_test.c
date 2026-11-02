@@ -27,12 +27,14 @@ typedef struct {
     float minimum_badge;
     float viewport_center;
     bool home_tab, settings_tab;
-    unsigned switch_ends, games_drawn, header_crows, row_icons;
+    unsigned switch_ends, games_drawn, header_crows, row_icons, pixel_tiles;
     bool full_width_selection;
     float switch_thumb, toggle_text_end;
 } capture;
 static void rect(void *ctx, float x, float y, float w, float h, uint32_t color) {
     capture *c = ctx;
+    if (w > 0 && w < 12 && h > 0 && h < 12 && x > 0 && y > 0)
+        ++c->pixel_tiles;
     if (c->layout && color == c->popup_color) {
         if (!c->popup_count)
             check(fabsf(x + w / 2 - c->viewport_center) < .01f, "launch and achievement cards stay centered in the viewport");
@@ -390,7 +392,8 @@ int main(void) {
     cr_ui_size(&u, 384, 700);
     capture c = draw(&u);
     check(c.home_tab && c.settings_tab && strstr(c.text, "Bienvenue !") &&
-              strstr(c.text, "Accès rapide") && strstr(c.text, "Bibliothèque"),
+              strstr(c.text, "Reprenez votre dernière partie") &&
+              strstr(c.text, "Bibliothèque"),
           "dashboard renders its primary panels and navigation");
     check(c.header_crows == 1, "home header uses the CorvusRetro crow");
     cr_ui_move(&u, 1);
@@ -458,8 +461,8 @@ int main(void) {
     u.scroll = 0;
     capture library = draw(&u);
     check(strstr(library.text, "Scroll item 0") && strstr(library.text, "GBC") &&
-              library.row_icons <= 10,
-          "library renders original two-column cover tiles for imported games");
+              library.row_icons <= 10 && library.pixel_tiles > 100,
+          "library renders original pixel motifs instead of letter placeholders");
     tap(&u, 315, 99);
     check(u.library_filter == 2 && u.scroll == 0, "GBA chip filters imported games without rewriting index");
     library = draw(&u);
