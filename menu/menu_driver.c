@@ -1795,6 +1795,24 @@ static void navigate_tab(cr_ui *u, int tab_index) {
     if (tab_index < 0 || tab_index >= 5) return;
     page(u, pages[tab_index]);
 }
+static int library_target(const cr_ui *u, float x, float y) {
+    float w = u->width;
+    if (y >= 78 && y < 121) {
+        int category = (int)floorf((x - 16) / ((w - 32) / 4));
+        if (x >= 16 && x < w - 16 && category >= 0 && category <= 3)
+            return LIBRARY_ALL - category;
+    }
+    if (y >= 127 && y < 169 && x >= 16 && x < w - 16) return LIBRARY_IMPORT;
+    if (y < 184 || y >= body_bottom(u) || x < 16 || x >= w - 16) return -1;
+    float tile_width = (w - 44) / 2, column_x = x - 16;
+    int column = column_x < tile_width ? 0 : column_x >= tile_width + 12 ? 1 : -1;
+    if (column < 0) return -1;
+    float offset = y - 184 + u->scroll;
+    int grid_row = (int)floorf(offset / 208);
+    if (grid_row < 0 || fmodf(offset, 208) >= 196) return -1;
+    int position = grid_row * 2 + column;
+    return position < library_count(u) ? LIBRARY_GAME_BASE - position : -1;
+}
 static int target(const cr_ui *u, float x, float y) {
     if (x < 0 || y < 0 || x >= u->width || y >= u->height)
         return -1;
@@ -1803,15 +1821,20 @@ static int target(const cr_ui *u, float x, float y) {
         return cr_area_contains(layout.menu, x, y) ? -3 :
                cr_area_contains(layout.hide, x, y) ? -5 : -1;
     }
-    if (y < 56)
+    if (y < 56) {
+        if (library_grid(u) && x >= u->width - 100)
+            return x < u->width - 50 ? LIBRARY_SEARCH : LIBRARY_IMPORT;
         return home_cards(u) && x >= u->width - 56 ? HOME_SETTINGS :
                x < 56 && has_back(u) ? -2 : -1;
+    }
     if (y >= u->height - 72)
         return -100 - (int)fminf(4, fmaxf(0, floorf(x / u->width * 5)));
     if (y < 64 || y >= body_bottom(u))
         return -1;
     if (home_cards(u))
         return home_target(u, x, y);
+    if (library_grid(u))
+        return library_target(u, x, y);
     int i = (int)((y - 64 + (u->quick ? u->quick_scroll : u->scroll)) / 76);
     return i < rows(u) ? (u->quick ? 10000 + i : i) : -1;
 }
@@ -1866,7 +1889,7 @@ void cr_ui_touch_at(cr_ui *u, int id, int phase, float x, float y, double event_
             return;
         }
         bool scrolling = p->dragged && ((u->quick && p->target >= 10000) ||
-                         (!u->quick && (p->target >= -1 || home_cards(u)) && u->page != CR_PLAY));
+                         (!u->quick && (p->target >= -1 || home_cards(u) || library_grid(u)) && u->page != CR_PLAY));
         if (scrolling) {
             float shift = p->last_y - y;
             double elapsed = event_time - p->last_event;
@@ -1890,7 +1913,7 @@ void cr_ui_touch_at(cr_ui *u, int id, int phase, float x, float y, double event_
         bool click = !p->dragged && target(u, x, y) == t;
         if (p->dragged && event_time >= p->last_event &&
             event_time - p->last_event <= .12 &&
-            ((u->quick && t >= 10000) || (!u->quick && (t >= -1 || home_cards(u)) && u->page != CR_PLAY)))
+            ((u->quick && t >= 10000) || (!u->quick && (t >= -1 || home_cards(u) || library_grid(u)) && u->page != CR_PLAY)))
             u->scroll_velocity = p->velocity;
         p->active = false;
         p->mask = 0;
@@ -1931,6 +1954,32 @@ void cr_ui_touch_at(cr_ui *u, int id, int phase, float x, float y, double event_
         }
         if (t == -2) {
             cr_ui_back(u);
+            return;
+        }
+        if (library_grid(u) && t <= LIBRARY_GAME_BASE) {
+            int visible = LIBRARY_GAME_BASE - t;
+            if (visible >= 0 && visible < library_count(u)) {
+                u->focus = visible + 1;
+                activate(u, get_row(u, u->focus));
+            }
+            return;
+        }
+        if (library_grid(u) && t >= LIBRARY_GBA && t <= LIBRARY_ALL) {
+            u->library_filter = t == LIBRARY_ALL ? -1 : LIBRARY_ALL - t - 1;
+            u->focus = 0;
+            u->scroll = 0;
+            return;
+        }
+        if (library_grid(u) && t == LIBRARY_SEARCH) {
+            if (u->platform.edit_text && !u->library_editing && !u->ra_editing) {
+                u->library_editing = true;
+                snprintf(u->library_preview, sizeof(u->library_preview), "%s", u->library_query);
+                u->platform.edit_text(u->platform.context, 3, u->library_query, false);
+            }
+            return;
+        }
+        if (library_grid(u) && t == LIBRARY_IMPORT) {
+            activate(u, get_row(u, 0));
             return;
         }
         if (t >= HOME_PRIMARY && t <= HOME_SETTINGS) {
