@@ -47,7 +47,8 @@ enum {
     CR_SAVE_SETTINGS,
     CR_RA_SETTINGS,
     CR_RA_ACCOUNT,
-    CR_GAME_BACKUPS
+    CR_GAME_BACKUPS,
+    CR_SAVE_HUB
 };
 /* Stable quick-menu row IDs; unsupported core operations stay disabled. */
 enum {
