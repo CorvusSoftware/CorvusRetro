@@ -125,7 +125,7 @@ un renommage atomique. Les tests reproduisent cette interdiction et les
 erreurs de synchronisation, y compris après publication du fichier.
 
 Les états groupés et les succès pendant le link sont indisponibles dans les
-modules officiels. Le link GBA reste expérimental. Aucun runtime ARM64,
+modules officiels. Aucun runtime ARM64,
 appareil physique ou compte RetroAchievements personnel n'est revendiqué.
 
 ## Distribution indépendante des cœurs
@@ -331,3 +331,26 @@ La [release v0.20.0](https://github.com/CorvusSoftware/CorvusRetro/releases/tag/
 est publiée par [41316487558](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41316487558).
 L'APK public retéléchargé est identique octet par octet au fichier qualifié,
 avec le SHA-256 ci-dessus.
+
+### Interface 0.21.0
+
+La PR21 conserve les dimensions et la disposition de 0.20.0. Les icônes de ligne
+restent à 32 dp, celles des onglets à 24 dp ; les tailles de texte restent
+16/13/19 dp. L'en-tête de 56 dp, les lignes de 76 dp, les onglets de 72 dp en bas
+avec leurs libellés et le pied de page conservent leur présentation précédente
+dans les deux orientations. Aucun calcul DPI automatique, ligne extensible ou
+menu latéral n'est ajouté.
+
+Les 32 icônes originales, le classement des menus et le retrait du libellé
+expérimental du GBA restent dans la PR. Le logo APK est conservé. CorvusCore,
+CorvusAPI, jeux, sauvegardes et préférences ne changent pas. Les tests antérieurs
+de navigation à coordonnées connues sont conservés ; les positions des nouvelles
+actions rapides utilisent leur correspondance explicite.
+
+Validation locale de la correction : 15 suites natives et 15 sous ASan/UBSan,
+compilation Android debug pour les deux ABI, lint et tests JVM réussis. Le contrôle
+APK confirme la base sans cœur et l'alignement 16 Ko. Sur émulateur x86_64,
+323 contrôles Android passent en portrait et 323 en paysage, avec captures des
+réglages et de leurs sous-menus. La revue indépendante ne relève aucun défaut.
+Le dessin, les zones tactiles et le défilement ont aussi été comparés aux sources
+de 0.20.0. Aucun test sur téléphone physique n'est revendiqué.

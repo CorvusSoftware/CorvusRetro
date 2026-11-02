@@ -39,7 +39,8 @@ static void finish(void *context, uint64_t request) {
     fixture *f = context; ++f->finished; f->finished_request = request;
 }
 static void choose(cr_ui *u, int row) {
-    if (u->quick && u->engine.players < 2 && row >= CR_QUICK_PLAYER) --row;
+    if (u->quick) row = cr_ui_quick_row(u, row);
+    check(row >= 0, "requested action exists in the current menu", u);
     u->focus = row; cr_ui_move(u, 0); cr_ui_confirm(u);
 }
 static void open_saves(cr_ui *u) {

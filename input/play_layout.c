@@ -34,11 +34,15 @@ cr_play_layout cr_play_layout_configured(float width, float height, int system, 
     p.controls[3] = control(p.dpad.x + cell * 2, p.dpad.y + cell, cell, cell, 8, "→");
     float a_top = p.portrait ? p.dpad.y + 24 * s : h / 2 - 56 * s;
     p.controls[4] = control(w - margin - 56 * s, a_top, 56 * s, 56 * s, 16, "A");
-    p.controls[5] = control(w - margin - 116 * s, a_top + 56 * s, 56 * s, 56 * s, 32, "B");
-    float utility_top = p.portrait ? p.dpad.y + p.dpad.h + 12 * s : footer;
-    p.controls[6] = control(p.portrait ? w / 2 + 12 * s : w - margin - 64 * s,
+    /* Use spare portrait height to open the face-button diagonal without shrinking targets. */
+    float spare = h - margin - (p.dpad.y + p.dpad.h + 12 * s + cell);
+    float spacing = p.portrait ? fminf(1, fmaxf(0, spare / (48 * s))) : 0;
+    p.controls[5] = control(w - margin - (116 + 12 * spacing) * s,
+                            a_top + (56 + 20 * spacing) * s, 56 * s, 56 * s, 32, "B");
+    float utility_top = footer;
+    p.controls[6] = control(p.portrait ? w * .68f - 32 * s : w - margin - 64 * s,
                             utility_top, 64 * s, cell, 64, "START");
-    p.controls[7] = control(p.portrait ? w / 2 - 76 * s : 68 * s,
+    p.controls[7] = control(p.portrait ? w * .32f - 32 * s : 68 * s,
                             utility_top, 64 * s, cell, 128, "SELECT");
     p.count = 8;
     if (system == 2) {
@@ -51,13 +55,17 @@ cr_play_layout cr_play_layout_configured(float width, float height, int system, 
     if (p.portrait) {
         float bottom = p.menu.y + p.menu.h;
         for (int i = 0; i < p.count; ++i)
-            bottom = fmaxf(bottom, p.controls[i].area.y + p.controls[i].area.h);
-        shift = fmaxf(-p.panel.y, fminf(shift, fmaxf(0, h - margin - bottom)));
+            if (i != 6 && i != 7)
+                bottom = fmaxf(bottom, p.controls[i].area.y + p.controls[i].area.h);
+        /* Select/Start and the visibility control stay on the accessible bottom row. */
+        float limit = p.controls[6].area.y - 8 * s;
+        shift = fmaxf(-p.panel.y, fminf(shift, fmaxf(0, limit - bottom)));
         p.panel.y += shift;
         p.panel.h -= shift;
         p.menu.y += shift;
         p.dpad.y += shift;
-        for (int i = 0; i < p.count; ++i) p.controls[i].area.y += shift;
+        for (int i = 0; i < p.count; ++i)
+            if (i != 6 && i != 7) p.controls[i].area.y += shift;
         panel = p.panel.h;
     } else {
         float top = p.dpad.y, bottom = p.dpad.y + p.dpad.h;

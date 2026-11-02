@@ -27,6 +27,7 @@ import org.json.JSONObject;
 
 /** Only synthetic account/protocol data and an original button-controlled homebrew. */
 public final class RetroAchievementsInstrumentation extends Instrumentation {
+    private static final int QUICK_SAVES = 4, QUICK_OPTIONS = 5, QUICK_CONTROLS = 6, QUICK_PLAYER = 7;
     private String phase;
     private boolean landscape;
     private int overlaySystem;
@@ -364,7 +365,8 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
         } finally { image.recycle(); }
     }
     private void selectFixtureCore(MainActivity activity) throws Exception {
-        tab(activity, 0); tap(activity, 150, 100); tap(activity, 150, 100);
+        tab(activity, 0); tap(activity, 150, 100); state(3, -1, 0, 0);
+        tap(activity, 150, 100);
         state(0, 0, 0, 0);
     }
     private void closeContent() throws Exception {
@@ -490,7 +492,7 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             tab(activity, 1); configurationRow(activity, 0); state(4, overlaySystem, 0, 0);
             check(activity.games()[0].equals(id), "new original battery fixture is the first history item");
             configurationRow(activity, 0); state(8, overlaySystem, 1, 0);
-            quickOpen(activity, overlaySystem); configurationRow(activity, 9); state(26, overlaySystem, 1, 0);
+            quickOpen(activity, overlaySystem); configurationRow(activity, QUICK_SAVES); state(26, overlaySystem, 1, 0);
             screenshot(prefix + "-saves");
             savePicker(activity, Intent.ACTION_CREATE_DOCUMENT, 1, "output.sav", false);
             byte[] previous = exportedBattery("output.sav");
@@ -514,13 +516,13 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             byte[] imported = SaveTransferTestProvider.battery();
             check(java.util.Arrays.equals(imported, batteryFile(new File(context.getFilesDir(), "saves/" + id + ".sav"))), "confirmed SRM import commits the selected game's raw battery");
             check(java.util.Arrays.equals(previous, batteryFile(new File(context.getFilesDir(), "saves/" + id + ".sav.import-backup"))), "pre-import live SRAM remains recoverable in the safety copy");
-            quickOpen(activity, overlaySystem); configurationRow(activity, 9); state(26, overlaySystem, 1, 0);
+            quickOpen(activity, overlaySystem); configurationRow(activity, QUICK_SAVES); state(26, overlaySystem, 1, 0);
             savePicker(activity, Intent.ACTION_CREATE_DOCUMENT, 1, "output.sav", false);
             check(java.util.Arrays.equals(imported, exportedBattery("output.sav")), "the recreated core actually loaded imported bytes, not only the disk file");
             screenshot(prefix + "-imported");
             configurationKey(activity, android.view.KeyEvent.KEYCODE_BACK); state(8, overlaySystem, 1, 1);
             // Returning restores the original quick-menu selection at its battery row.
-            for (int i = 0; i < 7; ++i) configurationKey(activity, android.view.KeyEvent.KEYCODE_DPAD_UP);
+            for (int i = 0; i < QUICK_SAVES - 2; ++i) configurationKey(activity, android.view.KeyEvent.KEYCODE_DPAD_UP);
             configurationRow(activity, 0); state(0, overlaySystem, 0, 0);
             configurationRow(activity, 2); state(19, overlaySystem, 0, 0);
             configurationKey(activity, android.view.KeyEvent.KEYCODE_BACK); state(0, overlaySystem, 0, 0);
@@ -763,7 +765,7 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             configurationRow(activity, 3);
             android.os.SystemClock.sleep(200); state(8, overlaySystem, 1, 1);
             configurationKey(activity, android.view.KeyEvent.KEYCODE_BACK); state(8, overlaySystem, 1, 0);
-            quickOpen(activity, overlaySystem); configurationRow(activity, 4); state(20, overlaySystem, 1, 0);
+            quickOpen(activity, overlaySystem); configurationRow(activity, QUICK_OPTIONS); state(20, overlaySystem, 1, 0);
             screenshot(prefix + "-options");
             String key = overlaySystem == 0 ? "gb.palette" : overlaySystem == 1 ? "gbc.colors" : "gba.save_type";
             String[] values = overlaySystem == 0 ? new String[] {"green", "gray", "amber"} : overlaySystem == 1 ?
@@ -784,7 +786,7 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             quickOpen(activity, overlaySystem); configurationRow(activity, 1);
             state(8, overlaySystem, 1, 0); configurationPlayers(2, 0);
             android.os.SystemClock.sleep(700);
-            quickOpen(activity, overlaySystem); configurationRow(activity, 9);
+            quickOpen(activity, overlaySystem); configurationRow(activity, QUICK_PLAYER);
             state(8, overlaySystem, 1, 1); configurationPlayers(2, 1);
             screenshot(prefix + "-player-two");
             configurationKey(activity, android.view.KeyEvent.KEYCODE_BACK); state(8, overlaySystem, 1, 0);
@@ -816,7 +818,7 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             check(getUiAutomation().setRotation(landscape ? android.app.UiAutomation.ROTATION_FREEZE_90 : android.app.UiAutomation.ROTATION_FREEZE_0), "overlay test rotation");
             waitFor(() -> { int[] area = activity.safeWindowArea(); return area != null && (area[0] > area[1]) == landscape; }, "overlay safe viewport");
             state(0, -1, 0, 0);
-            tap(activity, 150, 100);
+            tap(activity, 150, 100); state(3, -1, 0, 0);
             for (int i = 0; i < overlaySystem; ++i) sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_DOWN);
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER);
             state(0, overlaySystem, 0, 0);
@@ -825,7 +827,8 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER); state(19, overlaySystem, 0, 0);
             screenshot("overlay-" + overlaySystem + "-subsystems");
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK); state(0, overlaySystem, 0, 0);
-            tab(activity, 1); tap(activity, 150, 100); tap(activity, 150, 100);
+            tab(activity, 1); tap(activity, 150, 100); state(4, overlaySystem, 0, 0);
+            tap(activity, 150, 100);
             state(8, overlaySystem, 1, 0); android.os.SystemClock.sleep(700);
             screenshot("overlay-" + overlaySystem + "-playing");
             float[] m = overlayMetrics(activity); float w = m[0], h = m[1], s = m[2];
@@ -844,12 +847,16 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             quickOpen(activity, overlaySystem); quickRow(3); state(18, overlaySystem, 1, 0);
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_DOWN);
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER); state(8, overlaySystem, 1, 0);
-            quickOpen(activity, overlaySystem); quickRow(4); state(20, overlaySystem, 1, 0);
+            quickOpen(activity, overlaySystem); quickRow(QUICK_OPTIONS); state(20, overlaySystem, 1, 0);
             screenshot("overlay-" + overlaySystem + "-core-options");
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK); state(8, overlaySystem, 1, 1);
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK); state(8, overlaySystem, 1, 0);
-            quickOpen(activity, overlaySystem); quickRow(5); state(13, overlaySystem, 1, 0);
+            quickOpen(activity, overlaySystem); quickRow(QUICK_CONTROLS); state(13, overlaySystem, 1, 0);
             screenshot("overlay-" + overlaySystem + "-controls");
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK); state(8, overlaySystem, 1, 1);
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK); state(8, overlaySystem, 1, 0);
+            quickOpen(activity, overlaySystem); quickRow(7); state(17, overlaySystem, 1, 0);
+            screenshot("overlay-" + overlaySystem + "-achievements");
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK); state(8, overlaySystem, 1, 1);
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK); state(8, overlaySystem, 1, 0);
             quickOpen(activity, overlaySystem); quickRow(2); state(0, overlaySystem, 0, 0);
@@ -875,30 +882,31 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             tap(activity, 150, 176);
             check(activity.hasWindowFocus() && frontendState().contains("core=-1 content=0"), "content picker stays closed without a selected core");
             tab(activity, 1); screenshot("history-only");
-            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_DOWN);
-            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_CENTER);
-            state(4, -1, 0, 0);
+            tap(activity, 150, 100); state(4, -1, 0, 0);
             tap(activity, 150, 100); state(4, -1, 0, 0); screenshot("blocked-history");
             selectFixtureCore(activity);
-            tab(activity, 1); tap(activity, 150, 100); tap(activity, 150, 100);
+            tab(activity, 1); tap(activity, 150, 100); state(4, 0, 0, 0);
+            tap(activity, 150, 100);
             state(8, 0, 1, 0); screenshot("playing");
             closeContent(); screenshot("closed-core-kept");
-            tab(activity, 1); tap(activity, 150, 100); tap(activity, 150, 100);
+            tab(activity, 1); tap(activity, 150, 100); state(4, 0, 0, 0);
+            tap(activity, 150, 100);
             state(8, 0, 1, 0);
             closeContent(); tap(activity, 150, 100); state(0, -1, 0, 0);
-            tab(activity, 1); tap(activity, 150, 100); tap(activity, 150, 100);
-            state(4, -1, 0, 0);
+            tab(activity, 1); tap(activity, 150, 100); state(4, -1, 0, 0);
+            tap(activity, 150, 100); state(4, -1, 0, 0);
             for (int theme : new int[] {0, 3, 2}) {
-                tab(activity, 2); tap(activity, 150, 100); tap(activity, 150, 100);
+                tab(activity, 2); tap(activity, 150, 100); state(9, -1, 0, 0);
+                tap(activity, 150, 100); state(7, -1, 0, 0);
                 tap(activity, 150, 100 + 76 * (theme == 0 ? 1 : theme == 3 ? 2 : 0));
-                check(activity.preference("theme", -1) == theme, "native theme selection persisted");
-                tab(activity, 2); tap(activity, 150, 252);
+                waitFor(() -> activity.preference("theme", -1) == theme, "native theme selection persisted");
+                tab(activity, 2); tap(activity, 150, 252); state(11, -1, 0, 0);
                 screenshot("switch-on-" + theme);
                 tap(activity, 150, 100);
-                check(activity.preference("audio", -1) == 0, "native switch disabled audio once");
+                waitFor(() -> activity.preference("audio", -1) == 0, "native switch disabled audio once");
                 screenshot("switch-off-" + theme);
                 tap(activity, 150, 100);
-                check(activity.preference("audio", -1) == 1, "native switch enabled audio once");
+                waitFor(() -> activity.preference("audio", -1) == 1, "native switch enabled audio once");
             }
             tab(activity, 0); screenshot("main");
         } finally { runOnMainSync(activity::finish); }
@@ -926,9 +934,25 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             check(!hasColor(popupArea, 0xffb69aff), stage + " shows no preliminary crow popup");
         } finally { popupArea.recycle(); screen.recycle(); }
     }
+    private int achievementSoundStream(MainActivity activity) throws Exception {
+        java.lang.reflect.Field service=MainActivity.class.getDeclaredField("achievementSound"); service.setAccessible(true);
+        Object sound=service.get(activity);
+        java.lang.reflect.Field field=AchievementSound.class.getDeclaredField("stream"); field.setAccessible(true);
+        java.util.concurrent.atomic.AtomicInteger value=new java.util.concurrent.atomic.AtomicInteger();
+        runOnMainSync(() -> {
+            try { value.set(field.getInt(sound)); } catch (IllegalAccessException error) { throw new AssertionError(error); }
+        });
+        return value.get();
+    }
     private void popups() throws Exception {
         transport(); prepareGame();
         Context context = getTargetContext();
+        SharedPreferences soundPreferences=context.getSharedPreferences("corvus",Context.MODE_PRIVATE);
+        java.util.Map<String,?> originalSound=soundPreferences.getAll();
+        displayPreferences.put("audio",originalSound.get("audio"));
+        displayPreferences.put("audio_volume",originalSound.get("audio_volume"));
+        check(soundPreferences.edit().putBoolean("audio",true).putInt("audio_volume",100).commit(),
+                "unlock sound test uses explicit audio settings");
         File[] cachedImages = new File(context.getCacheDir(), "achievement-images").listFiles();
         if (cachedImages != null) for (File image : cachedImages) check(image.delete(), "cold image cache fixture");
         onlineFlag = new File(context.getExternalFilesDir(null), "ra-network-online");
@@ -952,11 +976,8 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
                         "fixture image ready before timed popup capture");
             android.os.SystemClock.sleep(800);
             selectFixtureCore(activity);
-            int[] area = activity.safeWindowArea();
-            float density = activity.getResources().getDisplayMetrics().density;
-            tap(activity, (area[0] - area[2] - area[4]) / density / 2,
-                    (area[1] - area[3] - area[5]) / density - 32);
-            tap(activity, 150, 100); tap(activity, 150, 100);
+            tab(activity, 1); tap(activity, 150, 100); state(4, 0, 0, 0);
+            tap(activity, 150, 100);
             state(8, 0, 1, 0);
             waitFor(() -> metadataRequested, "game identification is pending");
             noLaunchPlaceholder(activity, "waiting-metadata", null);
@@ -964,9 +985,11 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             waitFor(() -> gameImageRequested, "game image requested after identification");
             noLaunchPlaceholder(activity, "waiting-image", gameImageRelease);
             capturePopup("launch", GAME_COLOR);
+            check(achievementSoundStream(activity)==0,"native launch card does not play the unlock sound");
             android.os.SystemClock.sleep(4500);
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BUTTON_A);
             capturePopup("progress", PROGRESS_COLOR);
+            check(achievementSoundStream(activity)==0,"native progress badge stays silent");
             android.os.SystemClock.sleep(2200);
             android.graphics.Bitmap hidden = getUiAutomation().takeScreenshot();
             check(hidden != null && !hasColor(hidden, PROGRESS_COLOR), "progress indicator expires after two seconds");
@@ -980,6 +1003,7 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BUTTON_B);
             capturePopup("unlocked", UNLOCK_COLOR);
             waitFor(() -> awards == 1, "actual core memory unlocked one achievement with decoded images");
+            waitFor(() -> achievementSoundStream(activity)>0,"real native unlock reaches Android SoundPool playback");
             closeContent();
             android.graphics.Bitmap cleared = getUiAutomation().takeScreenshot();
             check(cleared != null && !hasColor(cleared, UNLOCK_COLOR), "closing content keeps the core and removes the old game's popup");

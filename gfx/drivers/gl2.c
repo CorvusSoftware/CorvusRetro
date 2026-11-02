@@ -308,6 +308,7 @@ static void draw_text(void *ctx, const char *text, float x, float baseline, floa
     }
 }
 static void icon(void *ctx, int index, float x, float y, float size, uint32_t color) {
+    if (index < 0 || index >= CR_ICON_COUNT) index = CR_ICON_INFO;
     int slot = 480 + index;
     quad(ctx, x, y, size, size, (slot % 16 * 64 + 8) / 1024.f, (slot / 16 * 64 + 8) / 2048.f,
          48.f / 1024, 48.f / 2048, color);

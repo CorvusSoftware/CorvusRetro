@@ -16,7 +16,7 @@ typedef struct {
     char controller_names[CR_CONTROLLER_PORT_COUNT][128];
     jmethodID density, safe_area, atlas, advances, glyph, advance, games, root, credits, preference,
         set_preference, pick, finish, touch, appearance, quit, refresh_catalog, install_pack,
-        installed_modules, install_pending, achievement_request, achievement_credentials,
+        installed_modules, install_pending, achievement_request, achievement_sound, achievement_credentials,
         achievement_credentials_set, edit_text, achievement_image, pick_folder, save_transfer, finish_save_transfer;
 } cr_android;
 bool cr_android_init(cr_android *, struct android_app *);

@@ -151,4 +151,5 @@ void cr_ui_text_result(cr_ui *, int, const char *, bool);
 void cr_ui_achievement_frame(cr_ui *);
 void cr_ui_update(cr_ui *, double);
 bool cr_ui_controller_key(cr_ui *, int);
+int cr_ui_quick_row(const cr_ui *, int action);
 #endif

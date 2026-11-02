@@ -74,7 +74,7 @@ static capture draw(cr_ui *u) {
     return c;
 }
 static void choose(cr_ui *u, int index) {
-    u->focus = index; cr_ui_move(u, 0); cr_ui_confirm(u);
+    u->focus = u->quick ? cr_ui_quick_row(u, index) : index; cr_ui_move(u, 0); cr_ui_confirm(u);
 }
 static void settings_root(cr_ui *u) {
     float x = u->width * 5 / 6, y = u->height - 30;
@@ -191,14 +191,14 @@ static void save_and_account_preferences(cr_ui *u, fixture *f) {
     cr_ui_back(u);
     check(u->page == CR_RA_SETTINGS && u->focus == 1, "account back restores the account row");
     settings_root(u);
-    u->page = CR_PLAY; u->quick = true; u->focus = CR_QUICK_ACHIEVEMENTS;
+    u->page = CR_PLAY; u->quick = true; u->focus = cr_ui_quick_row(u, CR_QUICK_ACHIEVEMENTS);
     cr_ui_confirm(u);
     c = draw(u);
     check(u->page == CR_ACHIEVEMENTS && strstr(c.text, "Aucun jeu identifié") &&
           !strstr(c.text, "Mot de passe") && !strstr(c.text, "Identifiant") &&
           !strstr(c.text, "Activer RetroAchievements"), "quick achievements contains game information, never account editing");
     cr_ui_back(u);
-    check(u->page == CR_PLAY && u->quick && u->focus == CR_QUICK_ACHIEVEMENTS,
+    check(u->page == CR_PLAY && u->quick && u->focus == cr_ui_quick_row(u, CR_QUICK_ACHIEVEMENTS),
           "game achievements return restores the quick-menu context");
 }
 static void controllers(cr_ui *u, fixture *f) {
@@ -244,7 +244,7 @@ static void contexts(cr_ui *u) {
           "landscape return restores selected category and nonzero scroll");
     cr_ui_size(u, 384, 700);
     settings_root(u);
-    u->page = CR_PLAY; u->quick = true; u->focus = CR_QUICK_CONTROLS;
+    u->page = CR_PLAY; u->quick = true; u->focus = cr_ui_quick_row(u, CR_QUICK_CONTROLS);
     cr_ui_move(u, 0);
     float scroll = u->quick_scroll; int tab = u->tab;
     cr_ui_confirm(u);
@@ -252,7 +252,7 @@ static void contexts(cr_ui *u) {
     choose(u, 2); choose_value(u, 0, 1, CR_OVERLAY_LAYOUT);
     check(u->overlay_size == 110, "quick-context layout adjustment changes the shared setting");
     cr_ui_back(u); cr_ui_back(u);
-    check(u->page == CR_PLAY && u->quick && u->focus == CR_QUICK_CONTROLS &&
+    check(u->page == CR_PLAY && u->quick && u->focus == cr_ui_quick_row(u, CR_QUICK_CONTROLS) &&
           fabsf(u->quick_scroll - scroll) < .001f && u->tab == tab,
           "nested layout adjustment restores the original quick row, scroll and tab");
 }

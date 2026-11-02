@@ -174,29 +174,29 @@ int main(void) {
     check(!u.quick && cr_ui_running(&u), "back resumes native loop");
     cr_ui_size(&u, 700, 300);
     cr_ui_back(&u);
-    for (int i = 0; i < CR_QUICK_ACHIEVEMENTS; i++)
+    for (int i = 0; i < cr_ui_quick_row(&u, CR_QUICK_ACHIEVEMENTS); i++)
         cr_ui_move(&u, 1);
-    check(u.focus == CR_QUICK_ACHIEVEMENTS && u.quick_scroll >= 6 * 76 - (300 - 100 - 64),
+    check(u.focus == cr_ui_quick_row(&u, CR_QUICK_ACHIEVEMENTS) && u.quick_scroll >= 6 * 76 - (300 - 100 - 64),
           "quick menu controller focus stays visible in landscape");
     cr_ui_size(&u, 384, 700);
     check(u.quick_scroll <= CR_QUICK_COUNT * 76 - (700 - 100 - 64) &&
               u.focus * 76 >= u.quick_scroll && u.focus * 76 + 76 <= u.quick_scroll + 700 - 100 - 64,
           "quick menu scroll clamps on rotation while keeping the focused row visible");
-    u.focus = CR_QUICK_STATES;
+    u.focus = cr_ui_quick_row(&u, CR_QUICK_STATES);
     cr_ui_confirm(&u);
     check(u.page == CR_SAVESTATES && !u.quick && !cr_ui_running(&u),
           "supported state actions open their own paused submenu");
     cr_ui_back(&u);
-    check(u.page == CR_PLAY && u.quick && u.focus == CR_QUICK_STATES && u.depth == 0,
+    check(u.page == CR_PLAY && u.quick && u.focus == cr_ui_quick_row(&u, CR_QUICK_STATES) && u.depth == 0,
           "state submenu back restores the quick-menu selection");
     cr_ui_size(&u, 700, 300);
-    u.focus = CR_QUICK_CORE_INFO;
+    u.focus = cr_ui_quick_row(&u, CR_QUICK_CORE_INFO);
     cr_ui_move(&u, 0);
     float quick_scroll = u.quick_scroll;
     cr_ui_confirm(&u);
     check(u.page == CR_CORE_INFO && !cr_ui_running(&u), "quick core information stays paused");
     cr_ui_back(&u);
-    check(u.quick && u.focus == CR_QUICK_CORE_INFO && u.quick_scroll == quick_scroll,
+    check(u.quick && u.focus == cr_ui_quick_row(&u, CR_QUICK_CORE_INFO) && u.quick_scroll == quick_scroll,
           "core information back restores landscape focus and scroll");
     cr_ui_touch(&u, 0, CR_TOUCH_DOWN, 350, 150);
     cr_ui_touch(&u, 0, CR_TOUCH_MOVE, 350, 220);
@@ -206,13 +206,13 @@ int main(void) {
     cr_play_layout layout = cr_play_layout_make(u.width, u.height, 2, 0, 0);
     tap(&u, layout.menu.x + layout.menu.w / 2, layout.menu.y + layout.menu.h / 2);
     check(u.quick, "landscape menu hit follows the gutter layout");
-    u.focus = CR_QUICK_MAIN;
+    u.focus = cr_ui_quick_row(&u, CR_QUICK_MAIN);
     cr_ui_confirm(&u);
     check(u.page == CR_MAIN && !u.quick && u.engine.loaded && !cr_ui_running(&u),
           "quick main-menu action preserves paused content");
     cr_ui_confirm(&u);
     check(u.page == CR_PLAY && u.quick, "main menu reopens the quick menu");
-    u.focus = CR_QUICK_RESUME;
+    u.focus = cr_ui_quick_row(&u, CR_QUICK_RESUME);
     cr_ui_confirm(&u);
     check(cr_ui_running(&u) && cr_ui_input(&u) == 0, "explicit resume releases menu input");
     // Detach the opaque input-only fixture before normal engine teardown.

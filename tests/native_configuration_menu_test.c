@@ -62,7 +62,11 @@ static bool finish(void *context, bool valid, int system, const char *core_id,
     snprintf(game->system_id, sizeof(game->system_id), "%s", system_id); game->system = system;
     ++f->accepted; return true;
 }
-static void choose(cr_ui *u, int row) { u->focus = row; cr_ui_move(u, 0); cr_ui_confirm(u); }
+static void choose(cr_ui *u, int row) {
+    u->focus = u->quick ? cr_ui_quick_row(u, row) : row;
+    check(u->focus >= 0, "requested action exists in the current menu", u);
+    cr_ui_move(u, 0); cr_ui_confirm(u);
+}
 static void select_core(cr_ui *u, int system) {
     check(u->page == CR_MAIN && !u->engine.handle, "core selection starts unloaded", u);
     choose(u, 0); check(u->page == CR_CORES, "open core selection", u); choose(u, system);
@@ -175,7 +179,7 @@ static void test_system(int system) {
     check(!rmdir(blocked), "remove option obstruction", &u); choose(&u, (int)selected);
     check(u.page == CR_CORE_OPTIONS && cr_engine_option_value(&u.engine, key) == selected && !cr_ui_running(&u),
           "choosing provider value persists and returns to paused list", &u);
-    cr_ui_back(&u); check(u.quick && u.focus == CR_QUICK_CORE_OPTIONS && !cr_ui_running(&u), "options back restores paused quick row", &u);
+    cr_ui_back(&u); check(u.quick && u.focus == cr_ui_quick_row(&u, CR_QUICK_CORE_OPTIONS) && !cr_ui_running(&u), "options back restores paused quick row", &u);
     choose(&u, CR_QUICK_MAIN); open_config(&u);
     choose(&u, 0); check(u.page == CR_SUBSYSTEM_CONTENTS, "P1 selector", &u);
     u.focus = 2; cr_ui_move(&u, 1); check(u.focus == 0, "selector lists compatible unplayed contents and excludes foreign core", &u);

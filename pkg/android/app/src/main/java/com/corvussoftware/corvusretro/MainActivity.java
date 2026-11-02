@@ -46,11 +46,17 @@ public final class MainActivity extends NativeActivity {
     private static final int[] ICONS = {R.drawable.ic_core, R.drawable.ic_corvus, R.drawable.ic_content,
             R.drawable.ic_library, R.drawable.ic_settings, R.drawable.ic_history, R.drawable.ic_info,
             R.drawable.ic_unload, R.drawable.ic_theme, R.drawable.ic_menu, R.drawable.ic_next,
-            R.drawable.ic_back, R.drawable.ic_file, R.drawable.ic_home};
+            R.drawable.ic_back, R.drawable.ic_file, R.drawable.ic_home,
+            R.drawable.ic_video, R.drawable.ic_audio, R.drawable.ic_input, R.drawable.ic_saves,
+            R.drawable.ic_achievements, R.drawable.ic_download, R.drawable.ic_restart, R.drawable.ic_play,
+            R.drawable.ic_close, R.drawable.ic_notifications, R.drawable.ic_account, R.drawable.ic_subsystem,
+            R.drawable.ic_folder, R.drawable.ic_display, R.drawable.ic_touch, R.drawable.ic_volume,
+            R.drawable.ic_backup, R.drawable.ic_restore};
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final Object importLock = new Object();
     private GameLibrary library;
     private CoreRepository coreRepository;
+    private AchievementSound achievementSound;
     private SaveTransfers saveTransfers;
     private RetroAchievementsService achievements;
     private RetroAchievementsImages achievementImages;
@@ -135,6 +141,8 @@ public final class MainActivity extends NativeActivity {
                 if (isAlive()) saveTransferResult(request, path, error, cancelled);
             }
         });
+        achievementSound = new AchievementSound(this);
+        updateAchievementSoundVolume();
         achievements = new RetroAchievementsService(this);
         achievementImages = new RetroAchievementsImages(this, MainActivity::achievementImageReady);
         textInput = new NativeTextInput(this);
@@ -198,9 +206,21 @@ public final class MainActivity extends NativeActivity {
     }
     @Override protected void onResume() {
         super.onResume();
+        achievementSound.resume();
         achievements.resumeAwards();
     }
+    @Override protected void onPause() {
+        achievementSound.pause();
+        super.onPause();
+    }
+    public void playAchievementSound(int volumePercent) { achievementSound.play(volumePercent); }
+    private void updateAchievementSoundVolume() {
+        int volume = preference("audio",1) != 0 && preference("notify_cards",1) != 0
+                ? preference("audio_volume",100) : 0;
+        achievementSound.volume(volume);
+    }
     @Override protected void onDestroy() {
+        achievementSound.close();
         if (inputManager != null) inputManager.unregisterInputDeviceListener(controllerListener);
         synchronized (importLock) {
             destroyed = true;
@@ -292,6 +312,8 @@ public final class MainActivity extends NativeActivity {
         }
         else if ("audio".equals(key) || "keep_awake".equals(key)) library.preferences.edit().putBoolean(key, value != 0).apply();
         else library.preferences.edit().putInt(key, value).apply();
+        if ("audio".equals(key) || "audio_volume".equals(key) || "notify_cards".equals(key))
+            updateAchievementSoundVolume();
     }
     public void pickContent(int system) {
         runOnUiThread(() -> {

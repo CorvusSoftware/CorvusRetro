@@ -15,7 +15,9 @@ static void check(bool ok, const char *message) {
     }
 }
 typedef struct {
-    char text[16384];
+    char text[16384], focus_label[256];
+    float selection_y;
+    unsigned label_fonts, hint_fonts;
     uint32_t highlight, a_body, a_text;
     float ax, ay, ar;
     const cr_play_layout *layout;
@@ -47,6 +49,7 @@ static void rect(void *ctx, float x, float y, float w, float h, uint32_t color) 
                   "notification does not cover a touch control");
         }
     }
+    if (x == 0 && w == 384 && h == 76) c->selection_y = y;
     if (x == 0 && y == 64 && w == 384 && h == 76) c->full_width_selection = true;
     if (x == 0 && y == 216 && w == 384 && h == 76)
         c->highlight = color;
@@ -74,6 +77,10 @@ static void text(void *ctx, const char *s, float x, float y, float size, uint32_
     (void)size;
     (void)max;
     capture *c = ctx;
+    if (x == 66 && size == 16) ++c->label_fonts;
+    if (x == 66 && size == 13) ++c->hint_fonts;
+    if (x == 66 && y == c->selection_y + 29 && size == 16)
+        snprintf(c->focus_label, sizeof(c->focus_label), "%s", s);
     if (x == 66 && y == 93) c->toggle_text_end = x + max;
     size_t n = strlen(c->text);
     snprintf(c->text + n, sizeof(c->text) - n, "%s\n", s);
@@ -157,6 +164,37 @@ static void row(cr_ui *u, int i) {
 static void tab(cr_ui *u, int i) {
     tap(u, 64 + i * 128, 660);
 }
+static void quick_order(cr_ui *u) {
+    static const struct { int action; const char *label; } expected[] = {
+        {CR_QUICK_RESUME, "Reprendre le contenu"}, {CR_QUICK_RESTART, "Redémarrer le contenu"},
+        {CR_QUICK_CLOSE, "Fermer le contenu"}, {CR_QUICK_STATES, "Sauvegardes d’état"},
+        {CR_QUICK_GAME_SAVES, "Sauvegardes du jeu"}, {CR_QUICK_CORE_OPTIONS, "Options du cœur"},
+        {CR_QUICK_CONTROLS, "Commandes"}, {CR_QUICK_PLAYER, "Joueur contrôlé"},
+        {CR_QUICK_ACHIEVEMENTS, "Succès"}, {CR_QUICK_CORE_INFO, "Informations sur le cœur"},
+        {CR_QUICK_MAIN, "Menu principal"}
+    };
+    unsigned saved_players = u->engine.players;
+    for (unsigned players = 1; players <= 2; ++players) {
+        u->engine.players = players;
+        int index = 0;
+        for (size_t i = 0; i < sizeof(expected) / sizeof(expected[0]); ++i) {
+            if (players == 1 && expected[i].action == CR_QUICK_PLAYER) continue;
+            check(cr_ui_quick_row(u, expected[i].action) == index,
+                  "stable quick actions map to the explicit presentation order");
+            u->focus = index++;
+            cr_ui_move(u, 0);
+            capture c = draw(u);
+            check(!strcmp(c.focus_label, expected[i].label),
+                  "drawn quick labels follow resume, restart, close, states, saves, options, controls, player, achievements, info, main");
+        }
+        check(index == CR_QUICK_COUNT - (players == 1), "quick menu exposes only applicable actions");
+        if (players == 1)
+            check(cr_ui_quick_row(u, CR_QUICK_PLAYER) == -1, "single-player menu omits the player-switch action");
+    }
+    u->engine.players = saved_players;
+    u->focus = 0;
+    u->quick_scroll = 0;
+}
 static bool install_pending(void *ctx) {
     return *(bool *)ctx;
 }
@@ -190,7 +228,7 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     void *state_handle = u->engine.handle;
     for (int landscape = 0; landscape < 2; ++landscape) {
         cr_ui_size(u, landscape ? 700 : 384, landscape ? 384 : 700);
-        u->page = CR_PLAY; u->quick = true; u->focus = CR_QUICK_CORE_OPTIONS;
+        u->page = CR_PLAY; u->quick = true; u->focus = cr_ui_quick_row(u, CR_QUICK_CORE_OPTIONS);
         cr_ui_move(u, 0);
         float scroll = u->quick_scroll;
         cr_ui_confirm(u);
@@ -210,7 +248,7 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
         check(u->page == CR_CORE_OPTIONS && u->focus == 0 && !cr_ui_running(u),
               "option values back restores the options row without resuming");
         cr_ui_back(u);
-        check(u->quick && u->focus == CR_QUICK_CORE_OPTIONS && u->quick_scroll == scroll &&
+        check(u->quick && u->focus == cr_ui_quick_row(u, CR_QUICK_CORE_OPTIONS) && u->quick_scroll == scroll &&
                   !cr_ui_running(u) && cr_ui_input(u) == 0,
               "core options back restores quick focus and scroll while keeping the game paused");
         cr_ui_back(u);
@@ -221,7 +259,7 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     snprintf(path, sizeof(path), "%s/states", root);
     file = fopen(path, "wb");
     check(file && fclose(file) == 0, "obstruct state storage for the quick submenu");
-    u->page = CR_PLAY; u->quick = true; u->focus = CR_QUICK_STATES;
+    u->page = CR_PLAY; u->quick = true; u->focus = cr_ui_quick_row(u, CR_QUICK_STATES);
     cr_ui_confirm(u);
     check(u->page == CR_SAVESTATES && !cr_ui_running(u), "real core exposes the state submenu");
     cr_ui_confirm(u);
@@ -231,7 +269,7 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     cr_ui_confirm(u);
     check(cr_ui_running(u) && u->engine.handle == state_handle && u->depth == 0 &&
               strstr(u->message, "État sauvegardé"), "state submenu saves through the real engine and resumes");
-    cr_ui_back(u); u->focus = CR_QUICK_STATES;
+    cr_ui_back(u); u->focus = cr_ui_quick_row(u, CR_QUICK_STATES);
     cr_ui_confirm(u); u->focus = 1;
     cr_ui_confirm(u);
     check(cr_ui_running(u) && u->engine.handle == state_handle && u->depth == 0 &&
@@ -263,7 +301,7 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     cr_ui_update(u, .01);
     check(u->notifications.count == 1 && u->notifications.progress.visible,
           "refused unload keeps the running game's notifications");
-    u->page = CR_PLAY; u->quick = true; u->focus = CR_QUICK_CLOSE;
+    u->page = CR_PLAY; u->quick = true; u->focus = cr_ui_quick_row(u, CR_QUICK_CLOSE);
     cr_ui_confirm(u);
     check(u->engine.loaded && u->engine.handle == handle && u->quick &&
               u->notifications.count == 1 && u->notifications.progress.visible,
@@ -280,7 +318,7 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     cr_ui_install_status(u, "Téléchargement en cours", false);
     check(u->installing && !cr_ui_running(u), "progress cannot release the installation barrier");
     u->quick = true;
-    u->focus = CR_QUICK_CLOSE;
+    u->focus = cr_ui_quick_row(u, CR_QUICK_CLOSE);
     cr_ui_confirm(u);
     check(u->engine.handle == handle && u->installing,
           "quick-menu close cannot mutate a game during installation");
@@ -288,7 +326,7 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     cr_ui_install_status(u, "Installation annulée", true);
     check(!u->installing && cr_ui_running(u) && u->engine.handle == handle,
           "terminal cancellation resumes the preserved game");
-    u->quick = true; u->focus = CR_QUICK_CLOSE;
+    u->quick = true; u->focus = cr_ui_quick_row(u, CR_QUICK_CLOSE);
     cr_ui_confirm(u);
     c = draw(u);
     check(u->page == CR_MAIN && u->engine.handle == handle && !u->engine.loaded &&
@@ -337,6 +375,13 @@ int main(void) {
     capture c = draw(&u);
     check(c.home_tab && c.settings_tab, "navigation uses home and settings icons");
     check(c.header_crows == 0, "menu header no longer draws the crow icon");
+    check(c.row_icons && c.label_fonts == c.row_icons && c.hint_fonts == c.row_icons,
+          "original menu icons stay32dp and labels/hints stay16/13dp");
+    u.page = CR_CORES;
+    capture cores = draw(&u);
+    check(strstr(cores.text, "Game Boy Advance") && !strstr(cores.text, "Expérimental"),
+          "GBA remains available without the experimental label");
+    u.page = CR_MAIN;
     cr_game *long_history = calloc(1200, sizeof(*long_history));
     check(long_history != NULL, "allocate long history fixture");
     for (size_t i = 0; i < 1200; ++i) {
@@ -638,13 +683,14 @@ int main(void) {
     check(!strstr(c.text, "Charger l’état") && !strstr(c.text, "Sauvegarder l’état") &&
               !strstr(c.text, "Shaders") && !strstr(c.text, "Triches"),
           "quick root contains only working menus and nests state actions");
-    u.focus = CR_QUICK_RESTART;
+    quick_order(&u);
+    u.focus = cr_ui_quick_row(&u, CR_QUICK_RESTART);
     cr_ui_confirm(&u);
     check(u.quick, "unsupported restart remains disabled without changing row IDs");
-    u.focus = CR_QUICK_STATES;
+    u.focus = cr_ui_quick_row(&u, CR_QUICK_STATES);
     cr_ui_confirm(&u);
     check(u.quick, "unsupported state operations remain disabled");
-    u.focus = CR_QUICK_CONTROLS;
+    u.focus = cr_ui_quick_row(&u, CR_QUICK_CONTROLS);
     cr_ui_move(&u, 0);
     float quick_scroll = u.quick_scroll;
     cr_ui_confirm(&u);
@@ -653,15 +699,15 @@ int main(void) {
     row(&u, 0);
     check(u.show_input && saved_show == 1, "quick commands updates the saved overlay setting");
     cr_ui_back(&u);
-    check(u.page == CR_PLAY && u.quick && u.focus == CR_QUICK_CONTROLS &&
+    check(u.page == CR_PLAY && u.quick && u.focus == cr_ui_quick_row(&u, CR_QUICK_CONTROLS) &&
               u.quick_scroll == quick_scroll && cr_ui_input(&u) == 0,
           "submenu back restores quick-menu focus and scroll without resuming the game");
-    u.focus = CR_QUICK_ACHIEVEMENTS;
+    u.focus = cr_ui_quick_row(&u, CR_QUICK_ACHIEVEMENTS);
     int quick_tab = u.tab;
     cr_ui_confirm(&u);
     check(u.page == CR_ACHIEVEMENTS && !cr_ui_running(&u), "quick achievements stays paused");
     cr_ui_back(&u);
-    check(u.quick && u.focus == CR_QUICK_ACHIEVEMENTS && u.tab == quick_tab,
+    check(u.quick && u.focus == cr_ui_quick_row(&u, CR_QUICK_ACHIEVEMENTS) && u.tab == quick_tab,
           "achievements returns to its quick row and navigation tab");
     tap(&u, 28, 28);
     check(!u.quick && cr_ui_running(&u), "quick header back resumes the game");

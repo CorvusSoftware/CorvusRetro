@@ -18,6 +18,21 @@ chargement d'un état réinitialise l'évaluation des conditions ; les succès d
 validés sur le compte restent acquis. Un ancien module sans extension mémoire
 reste jouable et affiche clairement son absence de support des succès.
 
+## Son de déblocage
+
+Un succès débloqué joue le croassement fourni par le mainteneur, intégré sans
+modification dans `res/raw/achievement_unlock.mp3` (3,03 secondes). Le lancement,
+la progression et la fin d'une collection ne rejouent pas cet effet.
+
+Le son suit l'activation des cartes de succès, le réglage audio et le volume du
+jeu, ainsi que le volume multimédia Android. Couper le son ou désactiver les
+cartes arrête également un effet en cours. Il est préchargé
+par SoundPool sans bloquer l'émulation et s'arrête quand l'application passe
+en arrière-plan. Les anciennes demandes ne sont pas rejouées à la reprise.
+
+SHA-256 du fichier fourni :
+`f00a367f0653432af12f74bfd8f9c62194910cfba475b265b0057decf81c2531`.
+
 ## Notifications
 
 Le lancement et le déblocage utilisent une même carte native en haut au centre.

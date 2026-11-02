@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- CorvusRetro - CorvusSoftware
+     Copyright (C) 2026 CorvusSoftware
+     SPDX-License-Identifier: AGPL-3.0-only -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.6" android:strokeLineCap="round"
+        android:strokeLineJoin="round" android:pathData="M4,3 H8 Q9,3 9,4 V20 Q9,21 8,21 H4 Q3,21 3,20 V4 Q3,3 4,3 Z M16,3 H20 Q21,3 21,4 V20 Q21,21 20,21 H16 Q15,21 15,20 V4 Q15,3 16,3 Z M5.5,6 H6.5 V13 H5.5 Z M17.5,6 H18.5 V13 H17.5 Z M9,10 H11 V14 H15" />
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M5,17 A1,1 0,1 0,7,17 A1,1 0,1 0,5,17 ZM17,17 A1,1 0,1 0,19,17 A1,1 0,1 0,17,17 Z" />
+</vector>

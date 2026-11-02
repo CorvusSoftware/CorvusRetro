@@ -36,6 +36,13 @@ static void layout_settings(void) {
                         cr_control b = p.controls[i];
                         check(inside(b.area,w,h), "every configured button remains usable inside viewport");
                         check(!overlaps(p.video,b.area), "configured button does not cover video");
+                        check(!overlaps(p.menu,b.area) && !overlaps(p.hide,b.area),
+                              "configured game buttons stay separate from menu and visibility");
+                        if (i >= 4) {
+                            check(!overlaps(p.dpad,b.area), "configured face and utility buttons stay outside diagonal zones");
+                            for (int j = i+1; j < p.count; ++j)
+                                check(!overlaps(b.area,p.controls[j].area), "configured game buttons do not overlap");
+                        }
                         float x = b.area.x + b.area.w / 2, y = b.area.y + b.area.h / 2;
                         check((cr_play_hit(&p,x,y) & b.mask) == b.mask,
                               "configured visual center activates its actual button");
@@ -53,6 +60,10 @@ static void layout_settings(void) {
     check(raised.dpad.y < normal.dpad.y && raised.menu.y < normal.menu.y,
           "portrait vertical setting raises controls and their centered menu");
     check(lowered.dpad.y > normal.dpad.y, "portrait vertical setting lowers controls within bounds");
+    check(raised.controls[6].area.y == normal.controls[6].area.y &&
+          lowered.controls[7].area.y == normal.controls[7].area.y &&
+          raised.hide.y == normal.hide.y && lowered.hide.y == normal.hide.y,
+          "portrait utility buttons and visibility remain anchored during primary-position adjustment");
     check(raised.panel.y < normal.panel.y && lowered.panel.y > normal.panel.y &&
           raised.video.h <= normal.video.h && lowered.video.h >= normal.video.h,
           "portrait video reservation follows actual control position");

@@ -54,5 +54,6 @@ typedef struct {
     bool (*save_transfer)(void *, uint64_t, int, const char *, const uint8_t *, size_t);
     void (*finish_save_transfer)(void *, uint64_t);
     bool (*controller_info)(void *, unsigned port, char *name, size_t capacity);
+    void (*achievement_sound)(void *, int volume_percent);
 } cr_platform;
 #endif
