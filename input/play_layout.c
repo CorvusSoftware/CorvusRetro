@@ -23,8 +23,16 @@ cr_play_layout cr_play_layout_configured(float width, float height, int system, 
     p.panel = (cr_area){0, h - panel, w, panel};
     p.menu = p.portrait ? (cr_area){(w - cell) / 2, p.panel.y + 12 * s, cell, cell}
                         : (cr_area){104 * s, 12 * s, cell, cell};
+    /* Full artwork bar on tall portrait phones; compact surfaces keep the old controls. */
+    bool artwork = p.portrait && w >= 360 && h >= 780 && panel >= 365 * s;
+    if (artwork) {
+        p.toolbar = (cr_area){margin, p.panel.y + 8 * s, w - 2 * margin, 48 * s};
+        p.menu = (cr_area){p.toolbar.x + p.toolbar.w * .75f, p.toolbar.y,
+                           p.toolbar.w * .25f, p.toolbar.h};
+    }
     p.hide = (cr_area){p.portrait ? w - margin - cell : margin, footer, cell, cell};
-    float cross_top = system == 2 || p.menu.x < margin + cell * 3 ? 68 * s : 24 * s;
+    float cross_top = artwork ? 138 * s :
+                      system == 2 || p.menu.x < margin + cell * 3 ? 68 * s : 24 * s;
     p.dpad = (cr_area){margin, p.portrait ? p.panel.y + fmaxf(cross_top, panel * .10f)
                                         : (h - cell * 3) / 2,
                        cell * 3, cell * 3};
@@ -46,7 +54,7 @@ cr_play_layout cr_play_layout_configured(float width, float height, int system, 
                             utility_top, 64 * s, cell, 128, "SELECT");
     p.count = 8;
     if (system == 2) {
-        float top = p.portrait ? p.panel.y + 12 * s : 12 * s;
+        float top = p.portrait ? p.panel.y + (artwork ? 67 : 12) * s : 12 * s;
         p.controls[p.count++] = control(margin, top, 72 * s, cell, 256, "L");
         p.controls[p.count++] = control(w - margin - 72 * s, top, 72 * s, cell, 512, "R");
     }
@@ -63,6 +71,7 @@ cr_play_layout cr_play_layout_configured(float width, float height, int system, 
         p.panel.y += shift;
         p.panel.h -= shift;
         p.menu.y += shift;
+        if (artwork) p.toolbar.y += shift;
         p.dpad.y += shift;
         for (int i = 0; i < p.count; ++i)
             if (i != 6 && i != 7) p.controls[i].area.y += shift;
