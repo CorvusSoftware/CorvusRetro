@@ -234,11 +234,20 @@ enum {
     LIBRARY_GB = -303, LIBRARY_GBC = -304, LIBRARY_GBA = -305,
     LIBRARY_GAME_BASE = -400
 };
-static bool core_cards(const cr_ui *u) {
-    return !u->quick && u->page == CR_CORES && u->width >= 320 &&
-           u->height >= 610 && u->height > u->width && cr_registry_count() <= 3;
-}
 static const char *const featured_core_ids[] = {"corvus.gba", "corvus.gbc", "corvus.gb"};
+static bool core_cards(const cr_ui *u) {
+    if (u->quick || u->page != CR_CORES || u->width < 320 ||
+        u->height < 610 || u->height <= u->width || cr_registry_count() > 3)
+        return false;
+    for (size_t i = 0; i < cr_registry_count(); ++i) {
+        const cr_core_descriptor *core = cr_registry_get((int)i);
+        bool official = false;
+        for (size_t j = 0; j < 3; ++j)
+            if (core && strcmp(core->id, featured_core_ids[j]) == 0) official = true;
+        if (!official) return false;
+    }
+    return true;
+}
 static const char *const featured_core_titles[] = {"CorvusGBA", "CorvusGBC", "CorvusGB"};
 static const char *const featured_core_systems[] = {"Game Boy Advance", "Game Boy Color", "Game Boy"};
 enum { CORE_CARD_GBA = -701, CORE_CARD_GBC = -702, CORE_CARD_GB = -703,
