@@ -2349,6 +2349,27 @@ static void art_cover(const cr_painter *p, float x, float y, float w,
                      cell + .25f, cell + .25f, shades[theme][c - 1]);
         }
 }
+static void art_handheld(const cr_painter *p, float x, float y, bool wide, bool selected) {
+    uint32_t shell = selected ? 0xffa77bff : 0xffdae0ee;
+    uint32_t details = selected ? 0xff48317d : 0xff536080;
+    if (wide) {
+        rounded(p, x, y + 10, 44, 29, 9, shell);
+        rounded(p, x + 11, y + 13, 22, 22, 3, 0xff26264d);
+        rect(p, x + 14, y + 16, 16, 16, 0xff6f7cb6);
+        rect(p, x + 5, y + 23, 5, 2, details);
+        rect(p, x + 7, y + 21, 2, 6, details);
+        p->circle(p->context, x + 38, y + 24, 2, details);
+        p->circle(p->context, x + 41, y + 28, 2, details);
+    } else {
+        rounded(p, x + 7, y + 2, 33, 48, 5, shell);
+        rounded(p, x + 11, y + 6, 25, 24, 3, 0xff222c4d);
+        rect(p, x + 14, y + 9, 19, 18, 0xff889ac3);
+        rect(p, x + 14, y + 39, 11, 3, details);
+        rect(p, x + 18, y + 35, 3, 11, details);
+        p->circle(p->context, x + 30, y + 40, 2, details);
+        p->circle(p->context, x + 35, y + 37, 2, details);
+    }
+}
 static void draw_cores(cr_ui *u, const cr_painter *p, const cr_theme *theme) {
     float w = u->width, h = u->height;
     text(p, "Gérez les cœurs (émulateurs) disponibles.", 20, 99, 13,
@@ -2362,9 +2383,7 @@ static void draw_cores(cr_ui *u, const cr_painter *p, const cr_theme *theme) {
             rounded(p, 17, y - 2, w - 34, 82, 17, theme->accent);
         rounded(p, 19, y, w - 38, 78, 15,
                 selected ? 0xff2a254f : 0xff1a2139);
-        rounded(p, 32, y + 17, 46, 45, 9, 0xff383260);
-        p->icon(p->context, CR_ICON_CORE, 41, y + 25, 28,
-                installed ? theme->accent : 0xff8e94b5);
+        art_handheld(p, 32, y + 15, i == 0, selected);
         text(p, featured_core_titles[i], 91, y + 32, 17,
              theme->text, w - 157);
         text(p, featured_core_systems[i], 91, y + 53, 12,
