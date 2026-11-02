@@ -2265,6 +2265,76 @@ static uint32_t library_art_hash(const char *id) {
         h = (h ^ *c) * 16777619u;
     return h;
 }
+
+/* Original pixel motifs rendered with the existing C11 painter.
+   No game artwork, network image or ROM asset is shipped in the frontend. */
+static void art_pine(const cr_painter *p, float x, float y, float size, uint32_t color) {
+    rect(p, x - size * .055f, y - size * .15f, size * .11f, size * .15f, 0xff17162f);
+    for (int i = 0; i < 9; ++i) {
+        float t = (float)i / 9, half = size * (.08f + t * .35f);
+        rect(p, x - half, y - size + i * size * .095f,
+             half * 2, size * .105f, color);
+    }
+}
+static void art_mountains(const cr_painter *p, float x, float y, float w,
+                          float height, uint32_t color, int seed) {
+    for (int i = 0; i < 72; ++i) {
+        float step = w / 72, a = (float)i / 72;
+        float shape = fabsf(sinf(a * (8 + seed % 3) + seed * .3f));
+        float depth = height * (.28f + .62f * shape);
+        rect(p, x + i * step, y - depth, step + 1, depth, color);
+    }
+}
+static void art_cover(const cr_painter *p, float x, float y, float w,
+                      float h, uint32_t hash) {
+    static const uint32_t skies[6][3] = {
+        {0xff1268a4, 0xff2d9fbd, 0xff70c79a},
+        {0xff30205f, 0xff6232a5, 0xff986fda},
+        {0xff367db7, 0xff79a7d2, 0xffc0d7d9},
+        {0xff082753, 0xff175297, 0xff6c6cbd},
+        {0xff6534a6, 0xffa45ddc, 0xfff3aed8},
+        {0xff151a50, 0xff33336c, 0xff6f4e99}
+    };
+    static const uint32_t shades[6][3] = {
+        {0xff0d453a,0xff30b87f,0xffc5f263},
+        {0xff493184,0xff87e5ff,0xffddfbff},
+        {0xff2a425b,0xffffc568,0xfff9e3bd},
+        {0xff181e57,0xffc73e84,0xffff8b89},
+        {0xffa345a6,0xffff99d9,0xfffdcee8},
+        {0xff111538,0xff5664a3,0xffc1b6ec}
+    };
+    static const char *const motifs[6][12] = {
+        { "............",".......11...","....111211..","...11222111.","..112222211.","...12232211.","....1222111.","...11211....","..112211....",".1122111....","112211......","111........." },
+        { ".....1......","....121.....","...12221....","..1223221...","..12323221..",".1233232321.","..12323221..","...122321...","....1221....",".....11.....","............","............" },
+        { "....1111....","...122221...","...123321...","...122221...","....1111....","...222222...","..22232222..","..22333322..","....2222....","...221122...","..221..122..","..11....11.." },
+        { "....1111....","...122221...","..12333321..","..12311321..","..12222221..","...111111...","..11222211..",".1122332211.","..122222221.","..11.11.11..",".11......11.","............" },
+        { "............","....1111....","..11222211..",".1222222221.",".1223223221.","122222222221","122222222221",".1222332221.","..12222221..","...111111...","..11....11..","............" },
+        { "....11.11...","....11111...","..11121111..","..12222221..","..12233221..","..12333321..","111223322111","122222222221","122223322221","122223322221","111111111111","............" }
+    };
+    int theme = (int)(hash % 6);
+    for (int i = 0; i < 25; ++i) {
+        float part = (float)i / 25;
+        uint32_t color = skies[theme][part < .3f ? 0 : part < .7f ? 1 : 2];
+        rect(p, x, y + i * h / 25, w, h / 25 + 1, color);
+    }
+    for (int i = 0; i < 12; ++i) {
+        float px = x + 9 + (hash / (i + 1) + 47 * i) % 127 * (w - 18) / 160;
+        float py = y + 9 + (hash / (i + 3) + 19 * i) % 68;
+        rect(p, px, py, 2 + i % 2, 2 + i % 2, 0xffdce7ff);
+    }
+    p->circle(p->context, x + w * .71f, y + h * .35f, w * .17f, skies[theme][2]);
+    art_mountains(p, x, y + h * .92f, w, h * .43f, shades[theme][0], theme);
+    art_mountains(p, x, y + h, w, h * .24f, shades[theme][1], theme + 4);
+    float cell = fminf(w / 16, h / 17);
+    float left = x + (w - 12 * cell) * .5f, top = y + h * .33f;
+    for (int row = 0; row < 12; ++row)
+        for (int col = 0; col < 12; ++col) {
+            int c = motifs[theme][row][col] - '0';
+            if (c >= 1 && c <= 3)
+                rect(p, left + col * cell, top + row * cell,
+                     cell + .25f, cell + .25f, shades[theme][c - 1]);
+        }
+}
 static void draw_cores(cr_ui *u, const cr_painter *p, const cr_theme *theme) {
     float w = u->width, h = u->height;
     text(p, "Gérez les cœurs (émulateurs) disponibles.", 20, 99, 13,
@@ -2344,36 +2414,11 @@ static void draw_library(cr_ui *u, const cr_painter *p, const cr_theme *theme) {
             const cr_game *game = &u->games[index];
             uint32_t art = library_art_hash(game->id[0] ? game->id : game->title);
             int system = library_system(game);
-            uint32_t sky = system == 2 ? 0xff284d75 : system == 1 ? 0xff51428d : 0xff527868;
-            uint32_t glow = system == 2 ? 0xff4fa9df : system == 1 ? 0xffbe79d9 : 0xff96ce7a;
+
             float x = 16 + col * (tile_w + 12);
             bool focused = u->focus == position + 1;
             rounded(p, x, y, tile_w, 196, 13, focused ? theme->accent : 0xff1d2541);
-            rounded(p, x + 3, y + 3, tile_w - 6, 154, 11, sky);
-            float moon_x = x + (50 + art % 55) * tile_w / 170;
-            p->circle(p->context, moon_x, y + 55, 30, glow);
-            for (int k = 0; k < 7; ++k) {
-                float sx = x + 12 + ((art >> (k % 8)) + 43 * k) % 145 * (tile_w - 24) / 170;
-                float sy = y + 14 + (k * 17 + (art >> (k + 4)) % 20) % 89;
-                rect(p, sx, sy, 3, 3, 0xffe9e8ff);
-            }
-            for (int k = 0; k < 16; ++k) {
-                float step = (tile_w - 6) / 16;
-                float rise = 87 + (k * 11 + (art >> (k % 12)) % 30) % 43;
-                rect(p, x + 3 + k * step, y + rise, step + 1, 154 - rise,
-                     k % 2 ? 0xff242d56 : 0xff2d335e);
-                float close = 126 + (k * 7 + (art >> (k % 16)) % 16) % 22;
-                rect(p, x + 3 + k * step, y + close, step + 1, 154 - close,
-                     k % 3 ? 0xff141c3d : 0xff20264b);
-            }
-            char initials[4] = {0};
-            int n = 0;
-            for (const char *at = game->title; *at && n < 2; ++at)
-                if ((at == game->title || at[-1] == ' ' || at[-1] == '_') &&
-                    (unsigned char)*at < 128 && isalnum((unsigned char)*at))
-                    initials[n++] = (char)toupper((unsigned char)*at);
-            if (!n) snprintf(initials, sizeof(initials), "CR");
-            center(p, initials, x + tile_w / 2, y + 102, 30, 0xfff8edff);
+            art_cover(p, x + 3, y + 3, tile_w - 6, 154, art);
             rect(p, x + 3, y + 157, tile_w - 6, 36, 0xff11182b);
             text(p, game->title, x + 11, y + 175, 12, theme->text, tile_w - 22);
             const char *label = system == 0 ? "GB" : system == 1 ? "GBC" :
