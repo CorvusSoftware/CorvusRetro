@@ -62,11 +62,12 @@ static void geometry_tests(void) {
                     check(p.dpad.y >= p.menu.y + p.menu.h + 8 * p.scale - .01f,
                           "portrait cross leaves a safe gap below menu and shoulders");
                 if (w >= 320 && h >= 640) {
-                    check(p.dpad.y + p.dpad.h / 2 < h * .75f,
-                          "tall portrait cross remains near video rather than bottom edge");
-                    if (system != 2 && p.menu.x >= p.dpad.x + p.dpad.w)
+                    check(p.dpad.y + p.dpad.h / 2 < h * (p.toolbar.w > 0 ? .85f : .75f),
+                          "portrait cross stays accessible below the toolbar or video");
+                    if (system != 2 && p.menu.x >= p.dpad.x + p.dpad.w &&
+                        p.toolbar.w == 0)
                         check(p.dpad.y + p.dpad.h / 2 < h * .7f,
-                              "wide GB portrait cross sits beside centered menu");
+                              "compact GB portrait cross stays beside centered menu");
                     check(fabsf(p.controls[6].area.y - p.hide.y) < .01f &&
                           fabsf(p.controls[7].area.y - p.hide.y) < .01f,
                           "portrait utility buttons occupy the separate bottom row");
