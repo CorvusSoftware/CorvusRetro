@@ -238,7 +238,7 @@ static bool library_grid(const cr_ui *u) {
     return !u->quick && u->page == CR_LIBRARY && u->width >= 300 && u->height > u->width;
 }
 static float library_top(const cr_ui *u) {
-    return u->library_query[0] ? 207 : 184;
+    return u->library_query[0] || u->library_editing ? 207 : 184;
 }
 static int library_system(const cr_game *game) {
     if (!strcmp(game->system_id, "nintendo.game_boy") ||
@@ -2216,7 +2216,7 @@ static void draw_library(cr_ui *u, const cr_painter *p, const cr_theme *theme) {
             u->focus == 0 ? 0xff3b3265 : 0xff202640);
     p->icon(p->context, CR_ICON_FOLDER, 28, 138, 20, theme->accent);
     text(p, "Importer un dossier", 58, 152, 13, theme->text, w - 102);
-    if (u->library_query[0]) {
+    if (u->library_query[0] || u->library_editing) {
         rounded(p, 16, 172, w - 32, 23, 9, 0xff352957);
         text(p, u->library_editing ? u->library_preview : u->library_query,
              26, 189, 11, 0xffe4d7ff, w - 56);
