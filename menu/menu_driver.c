@@ -160,7 +160,9 @@ static void quick_clamp(cr_ui *u);
 static void finish_save_transfer(cr_ui *u);
 static int target(const cr_ui *u, float x, float y);
 static bool has_back(const cr_ui *u) {
-    return u->quick || u->depth || (u->page != CR_MAIN && u->page != CR_LISTS && u->page != CR_SETTINGS);
+    return u->quick || u->depth || (u->page != CR_MAIN && u->page != CR_LISTS &&
+        u->page != CR_SETTINGS && u->page != CR_CORES && u->page != CR_LIBRARY &&
+        u->page != CR_SAVE_HUB);
 }
 static void clear_link_selection(cr_ui *u) {
     u->subsystem_id[0] = 0;
@@ -204,6 +206,16 @@ static void press_controls(cr_ui *u, unsigned mask) {
 static float body_bottom(const cr_ui *u) {
     return u->height - 100;
 }
+static bool home_cards(const cr_ui *u) {
+    return !u->quick && u->page == CR_MAIN && u->width >= 300 && u->height > u->width;
+}
+static float home_scale(const cr_ui *u) {
+    return fminf(1.f, u->width / 384.f);
+}
+enum {
+    HOME_PRIMARY = -201, HOME_LIBRARY, HOME_CORES, HOME_SAVES, HOME_CORE,
+    HOME_HISTORY, HOME_INFO, HOME_PICK, HOME_SUBSYSTEM, HOME_UNLOAD, HOME_SETTINGS
+};
 static int rows(const cr_ui *u) {
     if (u->quick) return CR_QUICK_COUNT - (u->engine.players > 1 ? 0 : 1);
     if (u->page == CR_CORE_OPTIONS) return (int)cr_engine_option_count(&u->engine);
@@ -225,6 +237,7 @@ static int rows(const cr_ui *u) {
     if (u->page == CR_GAME_BACKUPS) return u->backup_count;
     if (u->page == CR_SAVE_CONFIRM) return 2;
     if (u->page == CR_SAVESTATES) return 3;
+    if (u->page == CR_SAVE_HUB) return 2;
     if (u->page == CR_CONTENT) return 2;
     if (u->page == CR_LIBRARY) return 1 + (int)u->game_count;
     if (u->page == CR_MAIN)
@@ -349,6 +362,20 @@ static row get_row(const cr_ui *u, int index) {
                     r.checked = !strcmp(u->link_ids[u->link_slot], u->games[i].id);
                     break;
                 }
+        }
+    } else if (u->page == CR_SAVE_HUB) {
+        if (!index) {
+            fill(&r, "Sauvegardes d'état", u->engine.loaded ?
+                 "Sauvegarder ou charger la partie" : "Lancez d'abord un jeu",
+                 CR_ICON_SAVES, ACT_PAGE, CR_SAVESTATES);
+            r.disabled = !u->engine.loaded || !cr_engine_can_state(&u->engine);
+        } else {
+            fill(&r, "Sauvegardes du jeu", u->engine.loaded ?
+                 "Importer ou exporter la batterie" : "Lancez d'abord un jeu",
+                 CR_ICON_BACKUP, ACT_PAGE, CR_GAME_SAVES);
+            r.disabled = !u->engine.loaded || !u->platform.save_transfer ||
+                (!cr_engine_battery_size(&u->engine, 0) &&
+                 !cr_engine_battery_size(&u->engine, 1));
         }
     } else if (u->page == CR_GAME_SAVES) {
         if (u->engine.players > 1 && index == 0) {
@@ -578,7 +605,8 @@ static row get_row(const cr_ui *u, int index) {
     return r;
 }
 static void clamp_scroll(cr_ui *u) {
-    float content = (float)rows(u) * 76;
+    float content = home_cards(u) ? (u->engine.handle ? 695.f : 631.f) * home_scale(u) :
+                    (float)rows(u) * 76;
     if (u->page == CR_ABOUT || u->page == CR_LICENSE || u->page == CR_CORE_INFO ||
         ((u->page == CR_SUBSYSTEMS || u->page == CR_CORE_OPTIONS) && !rows(u)))
         content = fmaxf(400, u->text_height);
@@ -589,11 +617,16 @@ static void view(cr_ui *u, int p) {
     u->controller_capture = -1;
     u->page = p;
     u->tab =
-        p == CR_PLAY                     ? u->tab
-        : p == CR_LISTS || p == CR_GAMES ? 1
-        : p == CR_SETTINGS || p == CR_THEMES || p == CR_ACHIEVEMENTS || (p >= CR_NOTIFICATIONS_SETTINGS && p <= CR_RA_ACCOUNT) || (p >= CR_UI_SETTINGS && p <= CR_OVERLAY_SETTINGS)
-            ? 2
-            : 0;
+        p == CR_PLAY ? u->tab
+        : p == CR_LISTS || p == CR_GAMES || p == CR_LIBRARY || p == CR_CONTENT ? 1
+        : p == CR_SAVE_HUB || p == CR_SAVESTATES || p == CR_GAME_SAVES ||
+          p == CR_GAME_BACKUPS || p == CR_SAVE_CONFIRM ? 2
+        : p == CR_CORES || p == CR_CORE_DOWNLOADS || p == CR_CORE_INFO ||
+          p == CR_SUBSYSTEMS || p == CR_SUBSYSTEM_CONFIG || p == CR_SUBSYSTEM_CONTENTS ? 3
+        : p == CR_SETTINGS || p == CR_THEMES || p == CR_ACHIEVEMENTS ||
+          (p >= CR_NOTIFICATIONS_SETTINGS && p <= CR_RA_ACCOUNT) ||
+          (p >= CR_UI_SETTINGS && p <= CR_OVERLAY_SETTINGS) ? 4
+        : 0;
     u->scroll = 0;
     u->quick_scroll = 0;
     u->text_height = 0;
@@ -1064,6 +1097,7 @@ static bool import_save_file(cr_ui *u) {
 }
 static void activate(cr_ui *u, row r) {
     if (u->controller_capture >= 0) return;
+    if (u->page == CR_SAVE_HUB && r.disabled) return;
     if (u->save_request && (r.action == ACT_SELECT || r.action == ACT_UNLOAD ||
         r.action == ACT_GAME || r.action == ACT_PICK || r.action == ACT_FOLDER ||
         r.action == ACT_INSTALL_CORE_PACK || r.action == ACT_OPTION_VALUE ||
@@ -1397,6 +1431,10 @@ static void activate(cr_ui *u, row r) {
         u->quick = true;
         break;
     case ACT_PAGE:
+        if (r.value == CR_SAVESTATES)
+            u->auto_state_available = cr_engine_has_auto_state(&u->engine);
+        if (r.value == CR_GAME_SAVES)
+            u->save_player = 0;
         push_page(u, r.value);
         break;
     case ACT_SHOW_INPUT:
@@ -1648,6 +1686,31 @@ static void quick_clamp(cr_ui *u) {
     u->quick_scroll = fmaxf(0, fminf(u->quick_scroll,
                        rows(u) * 76 - fmaxf(1, body_bottom(u) - 64)));
 }
+static int home_target(const cr_ui *u, float x, float y) {
+    float s = home_scale(u), top = y + u->scroll;
+    float left = 16 * s, available = u->width - 32 * s;
+    if (top >= 256 * s && top < 332 * s && x >= left && x < u->width - left)
+        return HOME_PRIMARY;
+    if (top >= 370 * s && top < 458 * s && x >= left && x < u->width - left) {
+        int tile = (int)((x - left) / (available / 3));
+        return tile == 0 ? HOME_LIBRARY : tile == 1 ? HOME_CORES : HOME_SAVES;
+    }
+    if (top >= 474 * s && top < 544 * s && x >= left && x < u->width - left)
+        return HOME_CORE;
+    if (top >= 556 * s && top < 604 * s && x >= left && x < u->width - left) {
+        int tile = (int)((x - left) / (available / 3));
+        return tile == 0 ? HOME_HISTORY : tile == 1 ? HOME_INFO : HOME_PICK;
+    }
+    if (u->engine.handle && top >= 616 * s && top < 665 * s &&
+        x >= left && x < u->width - left)
+        return x < u->width / 2 ? HOME_SUBSYSTEM : HOME_UNLOAD;
+    return -1;
+}
+static void navigate_tab(cr_ui *u, int tab_index) {
+    static const int pages[] = {CR_MAIN, CR_LIBRARY, CR_SAVE_HUB, CR_CORES, CR_SETTINGS};
+    if (tab_index < 0 || tab_index >= 5) return;
+    page(u, pages[tab_index]);
+}
 static int target(const cr_ui *u, float x, float y) {
     if (x < 0 || y < 0 || x >= u->width || y >= u->height)
         return -1;
@@ -1657,11 +1720,14 @@ static int target(const cr_ui *u, float x, float y) {
                cr_area_contains(layout.hide, x, y) ? -5 : -1;
     }
     if (y < 56)
-        return x < 56 && has_back(u) ? -2 : -1;
+        return home_cards(u) && x >= u->width - 56 ? HOME_SETTINGS :
+               x < 56 && has_back(u) ? -2 : -1;
     if (y >= u->height - 72)
-        return -100 - (int)fminf(2, fmaxf(0, floorf(x / u->width * 3)));
+        return -100 - (int)fminf(4, fmaxf(0, floorf(x / u->width * 5)));
     if (y < 64 || y >= body_bottom(u))
         return -1;
+    if (home_cards(u))
+        return home_target(u, x, y);
     int i = (int)((y - 64 + (u->quick ? u->quick_scroll : u->scroll)) / 76);
     return i < rows(u) ? (u->quick ? 10000 + i : i) : -1;
 }
@@ -1716,7 +1782,7 @@ void cr_ui_touch_at(cr_ui *u, int id, int phase, float x, float y, double event_
             return;
         }
         bool scrolling = p->dragged && ((u->quick && p->target >= 10000) ||
-                         (!u->quick && p->target >= -1 && u->page != CR_PLAY));
+                         (!u->quick && (p->target >= -1 || home_cards(u)) && u->page != CR_PLAY));
         if (scrolling) {
             float shift = p->last_y - y;
             double elapsed = event_time - p->last_event;
@@ -1740,7 +1806,7 @@ void cr_ui_touch_at(cr_ui *u, int id, int phase, float x, float y, double event_
         bool click = !p->dragged && target(u, x, y) == t;
         if (p->dragged && event_time >= p->last_event &&
             event_time - p->last_event <= .12 &&
-            ((u->quick && t >= 10000) || (!u->quick && t >= -1 && u->page != CR_PLAY)))
+            ((u->quick && t >= 10000) || (!u->quick && (t >= -1 || home_cards(u)) && u->page != CR_PLAY)))
             u->scroll_velocity = p->velocity;
         p->active = false;
         p->mask = 0;
@@ -1783,8 +1849,34 @@ void cr_ui_touch_at(cr_ui *u, int id, int phase, float x, float y, double event_
             cr_ui_back(u);
             return;
         }
+        if (t <= -201) {
+            switch (t) {
+            case HOME_PRIMARY:
+                if (u->engine.loaded) page(u, CR_PLAY);
+                else page(u, u->engine.handle ? CR_CONTENT : CR_CORES);
+                break;
+            case HOME_LIBRARY: page(u, CR_LIBRARY); break;
+            case HOME_CORES: case HOME_CORE: page(u, CR_CORES); break;
+            case HOME_SAVES: page(u, CR_SAVE_HUB); break;
+            case HOME_HISTORY: page(u, CR_LISTS); break;
+            case HOME_INFO: push_page(u, CR_INFORMATION); break;
+            case HOME_PICK: page(u, u->engine.handle ? CR_CONTENT : CR_CORES); break;
+            case HOME_SUBSYSTEM:
+                if (u->engine.handle) push_page(u, CR_SUBSYSTEMS);
+                break;
+            case HOME_UNLOAD:
+                if (u->engine.handle) {
+                    row action = {0}; action.action = ACT_UNLOAD;
+                    activate(u, action);
+                }
+                break;
+            case HOME_SETTINGS: page(u, CR_SETTINGS); break;
+            default: break;
+            }
+            return;
+        }
         if (t <= -100) {
-            page(u, -t - 100);
+            navigate_tab(u, -t - 100);
             return;
         }
         if (t >= 0) {
