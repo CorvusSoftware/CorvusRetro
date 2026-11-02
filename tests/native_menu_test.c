@@ -159,10 +159,13 @@ static void tap(cr_ui *u, float x, float y) {
     cr_ui_touch(u, 0, CR_TOUCH_UP, x, y);
 }
 static void row(cr_ui *u, int i) {
-    tap(u, 160, 100 + 76 * i);
+    if (u->page == CR_MAIN && !u->quick) {
+        u->focus = i;
+        cr_ui_confirm(u);
+    } else tap(u, 160, 100 + 76 * i);
 }
 static void tab(cr_ui *u, int i) {
-    tap(u, 64 + i * 128, 660);
+    tap(u, u->width * (i + .5f) / 5, 660);
 }
 static void quick_order(cr_ui *u) {
     static const struct { int action; const char *label; } expected[] = {
@@ -222,9 +225,9 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     cr_ui_update(u, .4);
     snprintf(u->title, sizeof(u->title), "Original GBA test");
     capture c = draw(u);
-    check(strstr(c.text, "Menu rapide") && strstr(c.text, "Décharger le cœur") &&
+    check(strstr(c.text, "Continuer") && strstr(c.text, "Décharger le cœur") &&
               strstr(c.text, "\nSous-système\n") && !strstr(c.text, "Charger un cœur"),
-          "loaded content keeps one core action after the quick menu row");
+          "loaded content exposes resume and core actions in the dashboard");
     void *state_handle = u->engine.handle;
     for (int landscape = 0; landscape < 2; ++landscape) {
         cr_ui_size(u, landscape ? 700 : 384, landscape ? 384 : 700);
@@ -373,12 +376,30 @@ int main(void) {
                                 .pick_folder = pick_folder}, root);
     cr_ui_size(&u, 384, 700);
     capture c = draw(&u);
-    check(c.home_tab && c.settings_tab, "navigation uses home and settings icons");
-    check(c.header_crows == 0, "menu header no longer draws the crow icon");
-    check(c.row_icons && c.label_fonts == c.row_icons && c.hint_fonts == c.row_icons,
-          "original menu icons stay32dp and labels/hints stay16/13dp");
+    check(c.home_tab && c.settings_tab && strstr(c.text, "Bienvenue !") &&
+              strstr(c.text, "Accès rapide") && strstr(c.text, "Bibliothèque"),
+          "dashboard renders its primary panels and navigation");
+    check(c.header_crows == 1, "home header uses the CorvusRetro crow");
+    tab(&u, 2);
+    check(u.page == CR_SAVE_HUB && u.tab == 2, "saves tab opens a dedicated hub");
+    capture saves = draw(&u);
+    check(strstr(saves.text, "Lancez d'abord un jeu"), "no-game save actions explain unavailability");
+    row(&u, 0);
+    check(u.page == CR_SAVE_HUB, "disabled save action cannot open a state menu");
+    tab(&u, 3);
+    check(u.page == CR_CORES && u.tab == 3, "cores tab opens core manager");
+    tab(&u, 0);
+    tap(&u, 40, 400);
+    check(u.page == CR_LIBRARY && u.tab == 1, "home shortcut opens imported library");
+    tab(&u, 0);
+    tap(&u, 355, 30);
+    check(u.page == CR_SETTINGS && u.tab == 4, "home settings icon works");
+    tab(&u, 0);
     u.page = CR_CORES;
     capture cores = draw(&u);
+    check(cores.row_icons && cores.label_fonts == cores.row_icons &&
+              cores.hint_fonts == cores.row_icons,
+          "existing list icon and font sizing remain stable");
     check(strstr(cores.text, "Game Boy Advance") && !strstr(cores.text, "Expérimental"),
           "GBA remains available without the experimental label");
     u.page = CR_MAIN;
@@ -420,9 +441,9 @@ int main(void) {
     u.scroll = 0;
     free(long_history);
     check(strstr(c.text, "Charger un cœur") && strstr(c.text, "Informations") &&
-              !strstr(c.text, "Historique") && !strstr(c.text, "Décharger le cœur") &&
+              strstr(c.text, "Historique") && !strstr(c.text, "Décharger le cœur") &&
               !strstr(c.text, "\nSous-système\n"),
-          "main contains loading and information, history lives in playlists");
+          "dashboard preserves core, history and information actions");
     row(&u, 1);
     check(u.page == CR_CONTENT, "content entry opens import and library choices");
     c = draw(&u);
@@ -544,16 +565,19 @@ int main(void) {
           "successful unload restores the load action");
     loaded_core_lifecycle(&u, root);
     tab(&u, 1);
+    check(u.page == CR_LIBRARY && u.tab == 1, "games tab opens the game library");
+    tab(&u, 0);
+    tap(&u, 38, 568);
     c = draw(&u);
     check(u.page == CR_LISTS && strstr(c.text, "Historique") && !strstr(c.text, "Game Boy Advance") &&
               !strstr(c.text, "Game Boy Color"),
-          "playlists contain history only");
+          "history remains reachable from the dashboard");
     row(&u, 0);
     check(u.page == CR_GAMES && u.filter == -1 && u.tab == 1, "history category");
     cr_ui_back(&u);
     cr_ui_move(&u, 1);
     check(u.page == CR_LISTS && u.focus == 0, "history is the only selectable playlist");
-    tab(&u, 2);
+    tab(&u, 4);
     c = draw(&u);
     check(strstr(c.text, "Interface utilisateur") && strstr(c.text, "Vidéo") &&
               strstr(c.text, "Audio") && strstr(c.text, "Commandes") &&
@@ -604,7 +628,7 @@ int main(void) {
     cr_ui_touch_at(&u, 0, CR_TOUCH_UP, 160, 100, 61.1);
     check(u.audio && writes == before_reset, "resetting an existing default is idempotent");
     cr_ui_back(&u);
-    check(u.page == CR_SETTINGS && u.focus == 2 && u.tab == 2, "settings parent restored");
+    check(u.page == CR_SETTINGS && u.focus == 2 && u.tab == 4, "settings parent restored");
     cr_ui_touch(&u, 0, CR_TOUCH_DOWN, 160, 100);
     cr_ui_update(&u, .1);
     cr_ui_touch(&u, 0, CR_TOUCH_MOVE, 160, 150);
