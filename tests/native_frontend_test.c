@@ -67,20 +67,22 @@ int main(void) {
               cr_theme_at(1) == CR_THEME_SHIELD && cr_theme_at(2) == CR_THEME_ASUS &&
               cr_theme_at(3) == CR_THEME_CORVUS,
           "three active themes only");
-    tap(&u, 100, 100);
-    check(u.page == CR_CORES, "touch opens native core list");
+    tap(&u, 100, 500);
+    check(u.page == CR_CORES, "dashboard core card opens native core list");
     cr_ui_move(&u, 1);
     cr_ui_confirm(&u);
     check(u.page == CR_MAIN && u.engine.system == 1 && u.engine.handle,
           "controller selects real idle GBC");
-    tap(&u, 100, 100);
-    check(!u.engine.handle, "native unload releases engine");
+    u.scroll = 100;
+    tap(&u, 275, 540);
+    check(!u.engine.handle, "dashboard unload action releases engine");
     cr_ui_touch(&u, 0, CR_TOUCH_DOWN, 100, 100);
     cr_ui_touch(&u, 0, CR_TOUCH_MOVE, 100, 150);
     cr_ui_touch(&u, 0, CR_TOUCH_UP, 100, 150);
     check(u.page == CR_MAIN, "drag does not activate row");
-    tap(&u, 100, 170);
-    check(u.page == CR_CONTENT, "content page offers library and direct import");
+    u.focus = 1;
+    cr_ui_confirm(&u);
+    check(u.page == CR_CONTENT, "legacy controller path keeps content import available");
     tap(&u, 100, 100);
     check(picked == -1 && !u.importing && strstr(u.message, "Chargez un cœur"),
           "installed modules alone cannot open the content picker");
@@ -110,9 +112,10 @@ int main(void) {
     free(u.games); u.games = NULL; u.game_count = 0;
     check(cr_engine_close(&u.engine), "release incompatible core");
     u.page = CR_MAIN;
-    tap(&u, 100, 100); tap(&u, 100, 100);
-    tap(&u, 100, 170);
-    check(u.page == CR_CONTENT, "content page retains loaded core");
+    u.scroll = 0;
+    tap(&u, 100, 500); tap(&u, 100, 100);
+    tap(&u, 330, 568);
+    check(u.page == CR_CONTENT, "dashboard content shortcut retains the loaded core");
     tap(&u, 100, 100);
     check(picked == 0 && u.importing, "content picker dispatched to platform");
     cr_import cancel = {.system = -1};
