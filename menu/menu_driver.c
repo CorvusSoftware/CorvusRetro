@@ -212,6 +212,19 @@ static bool home_cards(const cr_ui *u) {
 static float home_scale(const cr_ui *u) {
     return fminf(1.f, u->width / 384.f);
 }
+static float home_focus_top(const cr_ui *u) {
+    int core_row = u->engine.loaded ? 1 : 0;
+    int content_row = core_row + 1;
+    int subsystem_row = content_row + 1;
+    int info_row = subsystem_row + (u->engine.handle ? 1 : 0);
+    float scale = home_scale(u);
+    if (u->engine.loaded && u->focus == 0) return 256 * scale;
+    if (u->focus == core_row) return 474 * scale;
+    if (u->focus == content_row) return (u->engine.loaded ? 556 : 256) * scale;
+    if (u->engine.handle && u->focus == subsystem_row) return 616 * scale;
+    if (u->focus == info_row) return 556 * scale;
+    return u->focus * 76;
+}
 enum {
     HOME_PRIMARY = -201, HOME_LIBRARY, HOME_CORES, HOME_SAVES, HOME_CORE,
     HOME_HISTORY, HOME_INFO, HOME_PICK, HOME_SUBSYSTEM, HOME_UNLOAD, HOME_SETTINGS
@@ -1641,12 +1654,13 @@ void cr_ui_move(cr_ui *u, int direction) {
             u->quick_scroll = top + 76 - view;
         quick_clamp(u);
     } else {
-        float top = u->focus * 76;
+        float top = home_cards(u) ? home_focus_top(u) : u->focus * 76;
+        float size = home_cards(u) ? 70 * home_scale(u) : 76;
         float view = fmaxf(1, body_bottom(u) - 64);
         if (top < u->scroll)
             u->scroll = top;
-        if (top + 76 > u->scroll + view)
-            u->scroll = top + 76 - view;
+        if (top + size > u->scroll + view)
+            u->scroll = top + size - view;
         clamp_scroll(u);
     }
 }
@@ -2005,7 +2019,9 @@ static void draw_home(cr_ui *u, const cr_painter *p, const cr_theme *theme) {
          0xffe2d9ff, w - 140*s);
 
     float resume = 256*s - scroll;
-    rounded(p, x, resume, w - 2*x, 76*s, 13*s, 0xff282450);
+    bool resume_focused = u->focus == (u->engine.loaded ? 0 : 1);
+    rounded(p, x, resume, w - 2*x, 76*s, 13*s,
+            resume_focused ? 0xff514186 : 0xff282450);
     rounded(p, x + 9*s, resume + 10*s, 55*s, 55*s, 9*s, 0xff4a3e90);
     p->icon(p->context, CR_ICON_CONTENT, x + 23*s, resume + 24*s, 27*s, 0xffd5c6ff);
     text(p, u->engine.loaded ? "Continuer" : "Charger un jeu",
@@ -2028,7 +2044,8 @@ static void draw_home(cr_ui *u, const cr_painter *p, const cr_theme *theme) {
         center(p, titles[i], tile_x + card_w / 2, tile_y + 71*s, 11*s, fg);
     }
     float core_y = 474*s - scroll;
-    rounded(p, x, core_y, w - 2*x, 70*s, 12*s, 0xff1b243c);
+    rounded(p, x, core_y, w - 2*x, 70*s, 12*s,
+            u->focus == (u->engine.loaded ? 1 : 0) ? 0xff414078 : 0xff1b243c);
     text(p, "Cœur actif", x + 14*s, core_y + 23*s, 12*s, muted, w - 2*x);
     p->icon(p->context, CR_ICON_CORE, x + 14*s, core_y + 36*s, 24*s, accent);
     text(p, u->engine.handle ? core_name(u->engine.system) : "Charger un cœur",
@@ -2038,12 +2055,16 @@ static void draw_home(cr_ui *u, const cr_painter *p, const cr_theme *theme) {
     const char *extras[] = {"Historique", "Informations", "Charger un jeu"};
     for (int i = 0; i < 3; ++i) {
         float tile_x = x + i * (card_w + gap), y = 556*s - scroll;
-        rounded(p, tile_x, y, card_w, 48*s, 9*s, 0xff172039);
+        bool focused = (i == 1 && u->focus == rows(u) - 1) ||
+                       (i == 2 && u->engine.loaded && u->focus == 2);
+        rounded(p, tile_x, y, card_w, 48*s, 9*s,
+                focused ? 0xff414078 : 0xff172039);
         center(p, extras[i], tile_x + card_w / 2, y + 29*s, 10*s, muted);
     }
     if (u->engine.handle) {
         float y = 616*s - scroll;
-        rounded(p, x, y, (w - 2*x - gap)/2, 49*s, 9*s, 0xff202640);
+        rounded(p, x, y, (w - 2*x - gap)/2, 49*s, 9*s,
+                u->focus == (u->engine.loaded ? 3 : 2) ? 0xff414078 : 0xff202640);
         rounded(p, x + (w - 2*x + gap)/2, y,
                 (w - 2*x - gap)/2, 49*s, 9*s, 0xff202640);
         center(p, "Sous-système", x + (w - 2*x - gap)/4, y + 29*s, 11*s, fg);
