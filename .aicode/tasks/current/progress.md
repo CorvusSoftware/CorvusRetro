@@ -1,16 +1,6 @@
-État : ACTIVE. Publication corrective 0.22.2/code30 autorisée par le mainteneur. Correction des parasites persistants après 0.22.1.
-Base main fca4f45 ; branche fix/audio-clock-and-save-io. Le dépôt distant a été revérifié et reste sur cette base.
-
-Implémenté :
-- audio_sync portable : cible amorce + demi-lot, EMA 0,5 s, correction proportionnelle bornée à +/-0,5 %. Lecture propriétaire de la file AAudio ; au plus trois trames avant chaque rendu. PCM inchangé et évaluation RA par trame.
-- Worker batterie persistant, un instantané immuable à deux joueurs maximum. Aucune API cœur sur le worker ; acquittement propriétaire après durabilité de tous les joueurs. Pause/fermeture/reset/import/restauration attendent les écritures concernées. Échec conserve cœur et générations sales.
-- Régressions native_audio_sync et native_async_battery ; test Android playback étendu à GBA avec vérification de sauvegarde pendant le jeu.
-
-Preuves :
-- 19/19 suites natives strictes et 19/19 ASan/UBSan passent.
-- 38 scénarios de dérive contrôlée : PCM exact et zéro silence ; baseline +100 ppm/600 s reproduit 1 597 trames de silence. Coûts CPU 6/10/15 ms passent ; surcharge 25 ms explicitement distinguée.
-- Batterie : 321 contrôles, fsync bloqué pendant émulation GBA, échecs/récupération, générations récentes, câble link et barrières de cycle de vie.
-- Revue indépendante finale : aucun finding concret. Android assembleDebug/assembleDebugAndroidTest/lintDebug passent. GBA API29 x86_64 : 48 contrôles portrait + 48 paysage, batterie 32 Ko/0x5a observée pendant le jeu avant menu ; notifications, HOME/reprise et fermeture passent, aucun nouveau crash. APK core-free/deux ABI/16 Ko et huit tests de publication passent.
-
-Livraison : PR #28 prête, commit fonctionnel 1375f0e et CI41596162952 réussis. Incrément version 0.22.2/code30 et À propos, puis nouvelle CI de PR avant fusion. Ensuite CI main et build signé automatiques, téléchargement/qualification du même APK et upgrade depuis0.22.1, tag inédit puis publication des octets qualifiés. Enfin actualiser README et preuves. Aucune modification des moteurs/pins ni des anciennes releases.
-Limite : pas de ROM Pokémon ni de téléphone accessible ; aucune écoute physique effectuée. Les défauts du frontend sont reproduits, pas la cause exacte des parasites du Redmi.
+État : DONE pour la livraison0.22.2 autorisée explicitement. PR #28 fusionnée, sourcef83ecd694f5cf373873a011febc910a9a658a2ad, tagv0.22.2/code30.
+CI main41597282038, signé41597582130, publication41598126420 réussis. APK public SHA2562d9cf2198f33263e0b9c132bf13d35f9f92207363b0b721d6311164f8b3cec88 identique à l'artefact signé testé ; certificat durable inchangé, deuxABI/16Ko/zérocoeur/MP3 original/absence provider test/provenance/Àpropos vérifiés.
+Upgrade signé0.22.1/code29->0.22.2/code30 API29x86_64 accepté, mêmeUID10116/dossier/première installation. ASUS/historiqueCorvus-preserved.gba conservés, région identique en pixels ; captures inspectées, aucun nouveau crash observé.
+Reçus : /workspace/setup/{release0222-state.json,signed0222-qualification.json,public0222-qualification.json,signed0222-runtime/upgrade.json}.
+Le comportement fonctionnel reste celui de1375f0e, revu indépendamment : 19 suites natives strictes+ASan/UBSan, tests JVM,38 scénarios audio,321 contrôles batterie et96Android GBA. Seuls les identifiants de version et À propos ont changé avant fusion. Pas d'écoute physique/ROMPokémon/Bluetooth/runtimeARM64 ; les parasites perçus sur le Redmi restent à confirmer.
+La branche documentaire met à jour README et preuves après publication. Vérifier sa CI exacte avant fusion ; les checks GitHub du SHA actif sont la source de vérité. Le tag et le binaire public restent inchangés.
