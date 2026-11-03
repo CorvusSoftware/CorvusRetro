@@ -575,3 +575,36 @@ Aucun nouveau crash n'a été observé. L'émulateur fonctionne avec `-no-audio`
 le programme original n'est pas une ROM Pokémon. Aucune écoute physique,
 exécution ARM64, qualification du casque filaire ou du Redmi Note 13 5G n'est
 revendiquée. Cette préparation ne modifie ni le tag ni l'APK public de v0.22.1.
+
+### Publication signée 0.22.2
+
+La [release v0.22.2](https://github.com/CorvusSoftware/CorvusRetro/releases/tag/v0.22.2)
+provient de la fusion de PR #28, commit `f83ecd694f5cf373873a011febc910a9a658a2ad`, versionCode 30.
+Son arbre est identique à la tête de PR `09e3026`, dont la CI est réussie.
+La [CI main 41597282038](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41597282038),
+le [build signé 41597582130](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41597582130)
+et la [publication 41598126420](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41598126420)
+sont réussis pour cette source exacte.
+
+L'APK public retéléchargé est identique octet pour octet à l'artefact signé testé.
+SHA-256 : `2d9cf2198f33263e0b9c132bf13d35f9f92207363b0b721d6311164f8b3cec88`.
+Le certificat durable reste `cb431e5abf3ae73ddd5c706a9c485ff6e627be2135bb2557b6191f04ac3a5211`.
+Version 0.22.2/code 30, Android 8.0+/target 35, frontends arm64-v8a/x86_64,
+alignement 16 Ko, zéro cœur embarqué, absence du provider de tests, provenance
+des sous-modules et son MP3 original ont été vérifiés. Le texte À propos natif
+contient 0.22.2 dans les deux bibliothèques. Les moteurs, l'API et les pins restent
+identiques à 0.22.1.
+
+La mise à jour signée 0.22.1/code 29 vers 0.22.2/code 30 a été installée sans
+désinstallation sur Android 10/API29 x86_64. UID 10116, dossier de données et
+première date d'installation sont conservés, ainsi que le thème ASUS et
+l'historique `Corvus-preserved.gba`. La ligne d'historique est identique en
+pixels ; les captures avant/après ont été inspectées et le téléchargeur reste
+présent sans cœur installé. Aucun nouveau crash de l'application observé.
+
+Les preuves de comportement restent celles décrites ci-dessus : 19 suites
+natives strictes et ASan/UBSan, tests JVM, 38 scénarios de dérive contrôlée,
+321 contrôles de sauvegarde et 96 contrôles Android GBA. Une écoute sur le
+Redmi Note 13 5G avec casque filaire reste à faire ; aucune ROM Pokémon,
+écoute physique, campagne Bluetooth ou exécution ARM64 n'est revendiquée.
+Le tag et les octets publics de 0.22.2 restent immuables.

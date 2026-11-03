@@ -1,29 +1,24 @@
 CorvusSoftware Quality Gate
-Status: PARTIAL
-Risk: DEEP
+Status: PASS
+Risk: STANDARD (distribution d'un correctif déjà revu)
 
 Criteria:
-- PASS : cadence pilotée par la réserve audio, PCM exact, rattrapage borné et callbacks sans blocage.
-- PASS : sauvegarde périodique hors rendu, acquittements et barrières durables conservés.
-- PASS : 19 suites strictes et 19 ASan/UBSan ; revue indépendante sans finding.
-- PASS : compilation Android debug/test et lint.
-- PASS : 96 contrôles Android GBA portrait/paysage ; APK sans cœur, deux ABI et alignement 16 Ko.
-- GATE EXTERNE : vérifier la CI du SHA actif dans la PR avant livraison ; ne pas déduire son état de cette note.
-- UNVERIFIED : disparition perçue des parasites sur Redmi Note 13 5G/casque filaire/Pokémon Émeraude.
+- PASS : autorisation de fusion/publication, CI exacte PR et main réussie.
+- PASS : APK signé durable, provenance, version 0.22.2/code 30, deux ABI/16 Ko/zéro cœur/MP3 original/À propos.
+- PASS : upgrade 29->30 conservant UID/dossier/première installation/ASUS/historique.
+- PASS : publication réussie et APK public identique aux octets qualifiés.
 
 Evidence:
-- CMake build/native et ctest : 19/19 PASS, dont 38 scénarios audio contrôlés et 321 vérifications batterie.
-- CMake build/settings-asan avec CORVUS_SANITIZE=ON et ctest : 19/19 PASS.
-- Android assembleDebug/assembleDebugAndroidTest/lintDebug : PASS. Instrumentation playback system=2 : 48 contrôles dans chaque orientation, sans nouveau crash.
-- check_core_apks.py : PASS ; frontend core-free : PASS ; test_release_workflows.py : 8/8 PASS.
+- CI 41597282038, signé 41597582130, publication 41598126420 sur f83ecd694f5cf373873a011febc910a9a658a2ad.
+- SHA-256 public : 2d9cf2198f33263e0b9c132bf13d35f9f92207363b0b721d6311164f8b3cec88 ; reçus signés, mise à jour et comparaison publique dans /workspace/setup/.
 
 Review:
-- Revue indépendante finale du contrôleur, de la boucle, du worker et des tests : aucun défaut concret relevé.
+- Changements fonctionnels de PR #28 revus indépendamment ; aucun finding restant.
+- Documentation relue contre les reçus ; contrôle de la CI documentaire avant fusion.
 
 Open risks:
-- Pas d'écoute physique ni de ROM du jeu signalé. Un cœur trop lent ou des retards système arbitraires peuvent toujours épuiser la réserve.
+- Qualification runtime sur émulateur API29 x86_64 ; aucune écoute physique/ROM Pokémon/Bluetooth/runtime ARM64.
+- Le PASS atteste la livraison. La disparition perçue des parasites du Redmi reste non vérifiée.
 
 Decision:
-- Correctif prêt pour revue du code et CI distante. PARTIAL concerne la disparition perçue des parasites sur le matériel signalé : pas de téléphone ni de ROM disponible pour cette preuve.
-
-Publication autorisée : préparer 0.22.2/code30, attendre les nouvelles CI exactes et qualifier APK signé/upgrade/publication. Le PARTIAL de l’écoute physique reste distinct de ces gates de distribution.
+- Version publiée et distribution vérifiée. Conserver tags/assets immuables et fusionner la documentation après sa CI exacte.
