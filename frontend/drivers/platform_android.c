@@ -4,6 +4,7 @@
 #include "android_backend.h"
 #include "gl2.h"
 #include "aaudio.h"
+#include "audio_sync.h"
 #include "menu_driver.h"
 #include "task_achievements.h"
 #include <android/keycodes.h>
@@ -17,6 +18,7 @@ typedef struct {
     cr_gl gl;
     cr_ui ui;
     cr_audio audio;
+    cr_audio_sync audio_sync;
     cr_controller_ports controllers;
     bool controllers_running;
     bool window, resumed, focused, was_running, audio_warning, applied_awake;
@@ -377,6 +379,8 @@ void android_main(struct android_app *app) {
         bool install_finished;
         if (cr_android_core_status(install_status, sizeof(install_status), &install_finished))
             cr_ui_install_status(&a->ui, install_status, install_finished);
+        if (!cr_engine_poll_battery_save(&a->ui.engine))
+            cr_ui_message(&a->ui, a->ui.engine.error);
         active = a->window && a->resumed;
         running = active && cr_ui_running(&a->ui);
         time = now();
@@ -417,9 +421,12 @@ void android_main(struct android_app *app) {
                 save(a);
             }
             a->deadline = time;
+            cr_audio_sync_reset(&a->audio_sync);
             a->was_running = running;
         }
-        if (running && time >= a->deadline) {
+        unsigned emulated = 0;
+        while (running && cr_ui_running(&a->ui) && time >= a->deadline &&
+               emulated < CR_AUDIO_SYNC_MAX_CATCHUP) {
             unsigned masks[2];
             cr_ui_inputs(&a->ui, masks);
             if (cr_engine_step_players(&a->ui.engine, masks)) {
@@ -446,21 +453,30 @@ void android_main(struct android_app *app) {
                 cr_controller_ports_clear(&a->controllers);
                 cr_audio_pause(&a->audio);
             }
-            a->deadline += 1.0 / a->ui.engine.fps;
-            double completed = now();
-            if (completed - a->deadline > 2.0 / a->ui.engine.fps)
-                a->deadline = completed;
+            ++emulated;
+            a->deadline += cr_audio_sync_period(&a->audio_sync, a->ui.engine.fps);
+            time = now();
+        }
+        if (running && emulated) {
+            if (time - a->deadline > 2.0 / a->ui.engine.fps)
+                a->deadline = time;
             if (time - a->battery_time > 5) {
-                save(a);
+                if (!cr_engine_request_battery_save(&a->ui.engine))
+                    cr_ui_message(&a->ui, a->ui.engine.error);
                 a->battery_time = time;
             }
         }
+        cr_audio_sync_update(&a->audio_sync, time, cr_audio_queued_frames(&a->audio),
+                             CR_AUDIO_RING_FRAMES, (unsigned)a->audio.prime_frames,
+                             a->ui.engine.rate, a->ui.engine.fps,
+                             running && cr_ui_running(&a->ui) && a->ui.audio && a->audio.playing);
 #ifndef NDEBUG
         if (a->focused != a->logged_focus || a->resumed != a->logged_resumed ||
             a->window != a->logged_window || (running && time-a->playback_log >= 1)) {
             __android_log_print(ANDROID_LOG_DEBUG,"CorvusRetro",
-                "playback resumed=%d focused=%d window=%d frames=%llu audio=%d",
-                a->resumed,a->focused,a->window,a->frames,a->audio.playing);
+                "playback resumed=%d focused=%d window=%d frames=%llu audio=%d queued=%u adjust_ppm=%d batch=%u",
+                a->resumed,a->focused,a->window,a->frames,a->audio.playing,
+                cr_audio_queued_frames(&a->audio),(int)(a->audio_sync.correction * 1000000),emulated);
             a->logged_focus=a->focused; a->logged_resumed=a->resumed;
             a->logged_window=a->window; a->playback_log=time;
         }

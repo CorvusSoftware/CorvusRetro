@@ -26,6 +26,8 @@ bool cr_audio_start(cr_audio *, int);
 void cr_audio_pause(cr_audio *);
 void cr_audio_set_volume(cr_audio *, int percent);
 void cr_audio_write(cr_audio *, const int16_t *, size_t);
+/* Owner-thread snapshot; the callback exclusively owns the read cursor. */
+unsigned cr_audio_queued_frames(const cr_audio *);
 void cr_audio_close(cr_audio *);
 void cr_audio_destroy(cr_audio *);
 #endif

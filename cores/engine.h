@@ -20,6 +20,7 @@ typedef struct cr_engine {
     corvus_options_api options;
     corvus_subsystem_api subsystems;
     struct cr_engine_options *saved_options;
+    struct cr_battery_worker *battery_worker;
     unsigned players;
     int system;
     bool loaded;
@@ -63,6 +64,9 @@ bool cr_engine_load_auto_state(cr_engine *engine);
 /* Filesystem query for opening the state menu, never the draw loop. */
 bool cr_engine_has_auto_state(cr_engine *engine);
 bool cr_engine_save_battery(cr_engine *engine);
+/* Owner-thread calls. Request/poll never wait for storage or acknowledge early. */
+bool cr_engine_request_battery_save(cr_engine *engine);
+bool cr_engine_poll_battery_save(cr_engine *engine);
 /* Fresh owner-thread snapshots; caller owns the bytes. No dirty acknowledgement. */
 size_t cr_engine_battery_size(const cr_engine *engine, unsigned player);
 bool cr_engine_export_battery(cr_engine *engine, unsigned player, uint8_t **bytes, size_t *size);

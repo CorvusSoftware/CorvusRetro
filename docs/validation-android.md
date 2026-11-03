@@ -533,3 +533,45 @@ Le test PCM ne remplace pas une écoute sur téléphone ; aucune ROM Pokémon,
 écoute physique, qualification Bluetooth ou exécution ARM64 n'est revendiquée.
 Le tag et les octets de v0.22.1 restent immuables ; cette documentation ne
 modifie pas le binaire publié.
+
+## Dérive audio et sauvegarde périodique hors rendu
+
+Le correctif suivant conserve les moteurs et le PCM, ajuste légèrement les
+échéances d'émulation à partir de la file audio et déporte les écritures batterie
+périodiques sur un travailleur. Les détails et limites numériques sont décrits
+dans [la référence audio](av-retroarch-reference.md#dérive-des-horloges-et-écritures-pendant-le-jeu).
+
+Validation hôte : 19 suites natives strictes et 19 suites ASan/UBSan passent,
+ainsi que le frontend sans cœur et les huit tests de publication. La nouvelle
+régression audio couvre 38 scénarios contrôlés de dérive prolongée et quatre
+coûts CPU ; celle de batterie comprend 321 contrôles avec véritable cœur GBA,
+blocage de `fsync`, erreurs disque, générations récentes, restauration, reset,
+importation, fermeture et deux joueurs. La revue indépendante du contrôleur,
+de la boucle, du worker et de ces tests n'a relevé aucun défaut concret.
+
+La compilation debug et de son instrumentation, ainsi que le lint Android,
+passent. Le contrôle de l'APK confirme un frontend pour arm64-v8a et x86_64,
+l'alignement 16 Ko, une signature debug et aucun cœur embarqué.
+APK debug testé : SHA-256
+`b973c0afb49d3c904f769c457ec815db0eba55327413dac8f440a0a58ae2d635`.
+APK de tests : SHA-256
+`5dbb961f8fe9fecfb049d2f41bb840784719e42fd7530bd0f27916c4b7770cf0`.
+
+L'instrumentation `RetroAchievementsInstrumentation`, phase `playback`, accepte
+maintenant `-e system 0`, `1` ou `2`. Sur Android10/API29 x86_64 logiciel,
+`-e system 2` passe 48 contrôles en portrait et 48 en paysage :
+
+- Le programme ARM original dessine une image et écrit `0x5a` en SRAM. Son
+  fichier de sauvegarde est effacé avant lancement ; un fichier de 32 Ko
+  contenant cet octet apparaît pendant le jeu, avant toute pause ou menu.
+- Le volet de notifications laisse avancer les trames avec AAudio actif.
+- Menu rapide, HOME, retour à l'activité et fermeture passent ; HOME suspend
+  effectivement l'émulation et le retour rétablit EGL et AAudio.
+- Les marqueurs debug montrent au plus trois trames par rendu et une correction
+  bornée à 5 000 ppm. Ils attestent l'exécution du nouveau pilotage, sans prouver
+  une sortie sonore continue sur un téléphone.
+
+Aucun nouveau crash n'a été observé. L'émulateur fonctionne avec `-no-audio` et
+le programme original n'est pas une ROM Pokémon. Aucune écoute physique,
+exécution ARM64, qualification du casque filaire ou du Redmi Note 13 5G n'est
+revendiquée. Cette préparation ne modifie ni le tag ni l'APK public de v0.22.1.

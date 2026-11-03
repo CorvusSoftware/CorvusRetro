@@ -42,8 +42,8 @@ surface conserve la pause audio et la sauvegarde batterie.
 
 Après un échec EGL, CorvusRetro réessaie de créer le contexte et la surface toutes
 les 500 ms lorsque la fenêtre existe et que l'activité est reprise. Il conserve
-le cœur et efface les entrées. La cadence est recalée après une trame lente pour
-éviter une rafale de rattrapage après une interruption.
+le cœur et efface les entrées. Le rattrapage reste limité à trois trames émulées
+avant chaque rendu, puis une accumulation excessive de retard recale l'échéance.
 
 Le système Android peut encore atténuer ou couper l'audio selon sa politique,
 notamment pour un appel. L'application ne demande pas de modifier le mode
@@ -91,3 +91,44 @@ Ce contrôle ne prouve pas la qualité perçue sur le téléphone du mainteneur.
 La ROM Pokémon Émeraude n'était pas disponible et aucune écoute physique ou
 campagne Bluetooth n'a été réalisée. Il prouve la suppression d'une cause
 mesurée de silences parasites dans le frontend, avec un PCM inchangé.
+
+## Dérive des horloges et écritures pendant le jeu
+
+L'amorce de 0.22.1 absorbe la différence de présentation GBA/60 Hz, mais une
+horloge audio légèrement plus rapide peut encore vider progressivement la file.
+Le test à +100 ppm reproduit 1 597 trames stéréo de silence sur 600 s avec la
+cadence fixe précédente. Le compteur matériel de sous-alimentation ne détecte
+pas forcément ce silence ajouté par le callback logiciel.
+
+Le frontend ajuste maintenant les échéances d'émulation à partir de l'occupation
+lissée de la file audio. La cible est l'amorce plus un demi-lot PCM, plafonnée à
+75 % de la capacité. Un filtre de 0,5 s évite de suivre chaque bloc matériel ;
+la correction proportionnelle reste bornée à +/-0,5 %. Chaque trame garde les
+cycles déclarés par le cœur, ses entrées et son évaluation RetroAchievements.
+La cadence réelle peut donc varier légèrement pour suivre l'horloge audio,
+sans modifier les échantillons ni rééchantillonner le PCM. Une pause ou un
+changement de cadence ou de fréquence audio réinitialise le contrôleur.
+
+Les sauvegardes batterie périodiques, toutes les cinq secondes lorsque le jeu
+avance, écrivent désormais sur un travailleur dédié. Le frontend copie au plus
+deux batteries, puis continue à émuler pendant l'écriture atomique et les `fsync`.
+Un seul instantané est en vol ; un acquittement est transmis au cœur uniquement
+sur le thread propriétaire et après durabilité de tous les joueurs. Une génération
+plus récente reste sale. Fermeture, pause, remplacement, importation et
+restauration attendent les écritures concernées ; un échec de sauvegarde empêche
+toujours une fermeture ou un remplacement destructif. Les formats et chemins
+des sauvegardes ne changent pas.
+
+Les régressions hôtes utilisent le pilote AAudio réel avec des callbacks simulés :
+38 scénarios contrôlés sur 600 ou 3 600 s, affichages 60/90/120 Hz et blocs
+64/128/192/256/512 trames. Le PCM stéréo reste exact, sans silence ajouté ni
+débordement pour ces scénarios. Des coûts CPU de 6, 10 et 15 ms par trame passent
+aussi avec des swaps d'affichage bloquants simulés. Une émulation à 25 ms par
+trame dépasse le temps disponible et produit du silence, comme attendu.
+Les tests de sauvegarde bloquent volontairement `fsync` pendant que le cœur GBA
+continue à avancer, puis couvrent échecs, nouvelles générations et câble link.
+
+Ces tests isolent deux sources possibles de parasites du frontend. Ils ne
+reproduisent pas une écoute de Pokémon Émeraude sur le Redmi Note 13 5G et son
+casque filaire. Des retards Android ou un cœur trop lent peuvent encore épuiser
+la réserve audio ; aucun résultat d'écoute physique n'est revendiqué.

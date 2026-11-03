@@ -847,8 +847,11 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
         process.waitFor(); return state;
     }
     private void playback() throws Exception {
-        prepareOverlayGame(0);
+        check(overlaySystem >= 0 && overlaySystem < 3, "supported playback console");
+        String id = prepareOverlayGame(overlaySystem);
         Context context = getTargetContext();
+        File battery = new File(context.getFilesDir(), "saves/" + id + ".sav");
+        if (overlaySystem == 2) check(!battery.exists() || battery.delete(), "fresh original GBA battery fixture");
         SharedPreferences preferences = context.getSharedPreferences("corvus", Context.MODE_PRIVATE);
         displayPreferences.put("audio", preferences.getAll().get("audio"));
         check(preferences.edit().putInt("achievements_enabled", 0).putString("theme", "corvus")
@@ -861,11 +864,19 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             state(0, -1, 0, 0);
             waitFor(() -> playbackState()[1] == 1, "native focus is ready before first input");
             configurationRow(activity, 0); state(3, -1, 0, 0);
-            configurationRow(activity, 0); state(0, 0, 0, 0);
-            tab(activity, 1); tap(activity, 150, 100); state(4, 0, 0, 0);
-            tap(activity, 150, 100); state(8, 0, 1, 0);
+            configurationRow(activity, overlaySystem); state(0, overlaySystem, 0, 0);
+            tab(activity, 1); tap(activity, 150, 100); state(4, overlaySystem, 0, 0);
+            tap(activity, 150, 100); state(8, overlaySystem, 1, 0);
             waitFor(() -> { long[] current = playbackState(); return current[0] == 1 && current[1] == 1 && current[2] == 1 && current[4] == 1; },
                     "real AAudio stream starts while the original game emulates");
+            if (overlaySystem == 2) {
+                waitFor(() -> battery.isFile() && battery.length() == 32 * 1024,
+                        "periodic GBA battery becomes durable while gameplay continues");
+                try (InputStream input = new java.io.FileInputStream(battery)) {
+                    check(input.read() == 0x5a, "periodic worker preserves the original GBA SRAM byte");
+                }
+                state(8, overlaySystem, 1, 0);
+            }
             screenshot("playback-" + (landscape ? "landscape" : "portrait") + "-controls");
             systemCommand("cmd statusbar expand-notifications");
             waitFor(() -> { long[] current = playbackState(); return current[0] == 1 && current[1] == 0 && current[2] == 1 && current[4] == 1; },
@@ -878,8 +889,8 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             screenshot("playback-notification-shade");
             systemCommand("cmd statusbar collapse");
             waitFor(activity::hasWindowFocus, "game regains input focus after shade closes");
-            state(8, 0, 1, 0);
-            quickOpen(activity, 0); configurationKey(activity, android.view.KeyEvent.KEYCODE_BACK); state(8, 0, 1, 0);
+            state(8, overlaySystem, 1, 0);
+            quickOpen(activity, overlaySystem); configurationKey(activity, android.view.KeyEvent.KEYCODE_BACK); state(8, overlaySystem, 1, 0);
             systemCommand("input keyevent KEYCODE_HOME");
             waitFor(() -> playbackState()[0] == 0, "real Android HOME lifecycle pauses emulation");
             long paused = playbackState()[3];
@@ -888,8 +899,8 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             systemCommand("am start -W -n com.corvussoftware.corvusretro/.MainActivity");
             waitFor(() -> { long[] current = playbackState(); return current[0] == 1 && current[1] == 1 && current[2] == 1 && current[3] > paused && current[4] == 1; },
                     "returning to Android activity restores EGL, game frames and AAudio");
-            state(8, 0, 1, 0); screenshot("playback-resumed");
-            quickOpen(activity, 0); configurationRow(activity, 2); state(0, 0, 0, 0);
+            state(8, overlaySystem, 1, 0); screenshot("playback-resumed");
+            quickOpen(activity, overlaySystem); configurationRow(activity, 2); state(0, overlaySystem, 0, 0);
         } finally {
             systemCommand("cmd statusbar collapse");
             runOnMainSync(activity::finish);

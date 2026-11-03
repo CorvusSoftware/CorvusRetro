@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <math.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,6 +53,9 @@ static void on_audio(void *userdata, const int16_t *samples, size_t stereo_frame
 #define MAX_ROM (32u * 1024u * 1024u)
 #define MAX_BATTERY (1024u * 1024u)
 #define MAX_STATE (16u * 1024u * 1024u)
+
+static bool finish_battery_save(cr_engine *engine, bool wait);
+static void destroy_battery_worker(cr_engine *engine);
 
 static bool fail(cr_engine *engine, const char *message) {
     snprintf(engine->error, sizeof(engine->error), "%s", message ? message : "Erreur du moteur");
@@ -145,6 +149,7 @@ static bool read_file(cr_engine *engine, const char *path, size_t limit, bool op
                       uint8_t **bytes, size_t *size) {
     *bytes = NULL;
     *size = 0;
+    if (!finish_battery_save(engine, true)) return false;
     if (!recover_import(engine)) return false;
     char backup[4096];
     struct stat status;
@@ -621,6 +626,7 @@ static void validate_configuration(cr_engine *engine) {
 }
 
 static void release_handle(cr_engine *engine) {
+    destroy_battery_worker(engine);
     if (engine->handle && engine->api.destroy)
         engine->api.destroy(engine->handle);
     if (engine->module)
@@ -822,6 +828,144 @@ static bool battery_path(cr_engine *engine, uint32_t slot, char path[4096]) {
     int n = snprintf(path, 4096, "%s/saves/%s-link-p2.sav", engine->root, engine->second_id);
     return (n > 0 && n < 4096) || fail(engine, "Chemin de sauvegarde trop long");
 }
+struct cr_battery_snapshot {
+    uint8_t *bytes[2];
+    size_t sizes[2];
+    uint64_t generations[2];
+    unsigned count;
+    bool slots, ok;
+    char root[4096], id[96], second_id[96], error[256];
+};
+struct cr_battery_worker {
+    pthread_t thread;
+    pthread_mutex_t mutex;
+    pthread_cond_t wake;
+    struct cr_battery_snapshot *job;
+    bool writing, complete, stop;
+};
+static void free_battery_snapshot(struct cr_battery_snapshot *snapshot) {
+    for (unsigned i = 0; i < 2; ++i) free(snapshot->bytes[i]);
+}
+static bool capture_battery(cr_engine *engine, struct cr_battery_snapshot *snapshot) {
+    snapshot->slots = engine->subsystems.battery_size != NULL;
+    snapshot->count = engine->players > 1 ? 2 : 1;
+    if (engine->players > 1 && !snapshot->slots)
+        return fail(engine, "Sauvegardes des joueurs indisponibles");
+    if (!snapshot->slots && !engine->api.battery_size) return true;
+    memcpy(snapshot->root, engine->root, sizeof(snapshot->root));
+    memcpy(snapshot->id, engine->id, sizeof(snapshot->id));
+    memcpy(snapshot->second_id, engine->second_id, sizeof(snapshot->second_id));
+    for (unsigned i = 0; i < snapshot->count; ++i) {
+        int dirty = snapshot->slots ? engine->subsystems.battery_dirty(engine->handle, i)
+                                   : engine->api.battery_dirty(engine->handle);
+        if (!dirty) continue;
+        size_t size = snapshot->slots ? engine->subsystems.battery_size(engine->handle, i)
+                                     : engine->api.battery_size(engine->handle);
+        if (!size) continue;
+        if (size > MAX_BATTERY) return fail(engine, "Sauvegarde batterie trop volumineuse");
+        snapshot->bytes[i] = malloc(size);
+        if (!snapshot->bytes[i]) return fail(engine, "Mémoire insuffisante");
+        snapshot->sizes[i] = size;
+        int copied = snapshot->slots ? engine->subsystems.battery_copy(engine->handle, i,
+                snapshot->bytes[i], size, &snapshot->generations[i])
+            : engine->api.battery_copy(engine->handle, snapshot->bytes[i], size,
+                &snapshot->generations[i]);
+        if (!copied) return sdk_error(engine);
+    }
+    return true;
+}
+static void write_battery_snapshot(struct cr_battery_snapshot *snapshot) {
+    /* This private context has no core handle or callbacks and belongs to the writer. */
+    cr_engine writer = {0};
+    memcpy(writer.root, snapshot->root, sizeof(writer.root));
+    memcpy(writer.id, snapshot->id, sizeof(writer.id));
+    memcpy(writer.second_id, snapshot->second_id, sizeof(writer.second_id));
+    snapshot->ok = (!snapshot->bytes[0] && !snapshot->bytes[1]) || recover_import(&writer);
+    for (unsigned i = 0; snapshot->ok && i < snapshot->count; ++i) {
+        char path[4096];
+        if (snapshot->bytes[i])
+            snapshot->ok = battery_path(&writer, i, path) &&
+                write_file(&writer, path, snapshot->bytes[i], snapshot->sizes[i]);
+    }
+    memcpy(snapshot->error, writer.error, sizeof(snapshot->error));
+}
+static bool acknowledge_battery_snapshot(cr_engine *engine, const struct cr_battery_snapshot *snapshot) {
+    if (!snapshot->ok) return fail(engine, snapshot->error);
+    /* Newer generations remain dirty when an older durable snapshot is acknowledged. */
+    for (unsigned i = 0; i < snapshot->count; ++i) {
+        if (!snapshot->bytes[i]) continue;
+        int acknowledged = snapshot->slots ? engine->subsystems.battery_acknowledge(
+                engine->handle, i, snapshot->generations[i])
+            : engine->api.battery_acknowledge(engine->handle, snapshot->generations[i]);
+        if (!acknowledged) return sdk_error(engine);
+    }
+    return true;
+}
+static void *battery_writer(void *context) {
+    struct cr_battery_worker *worker = context;
+    pthread_mutex_lock(&worker->mutex);
+    for (;;) {
+        while (!worker->writing && !worker->stop) pthread_cond_wait(&worker->wake, &worker->mutex);
+        if (worker->stop) break;
+        struct cr_battery_snapshot *snapshot = worker->job;
+        pthread_mutex_unlock(&worker->mutex);
+        write_battery_snapshot(snapshot);
+        pthread_mutex_lock(&worker->mutex);
+        worker->writing = false;
+        worker->complete = true;
+        pthread_cond_broadcast(&worker->wake);
+    }
+    pthread_mutex_unlock(&worker->mutex);
+    return NULL;
+}
+static bool finish_battery_save(cr_engine *engine, bool wait) {
+    struct cr_battery_worker *worker = engine->battery_worker;
+    if (!worker) return true;
+    if (wait) pthread_mutex_lock(&worker->mutex);
+    else if (pthread_mutex_trylock(&worker->mutex) != 0) return true;
+    while (wait && worker->writing) pthread_cond_wait(&worker->wake, &worker->mutex);
+    struct cr_battery_snapshot *snapshot = NULL;
+    if (worker->complete) {
+        snapshot = worker->job;
+        worker->job = NULL;
+        worker->complete = false;
+    }
+    pthread_mutex_unlock(&worker->mutex);
+    if (!snapshot) return true;
+    bool ok = acknowledge_battery_snapshot(engine, snapshot);
+    free_battery_snapshot(snapshot);
+    free(snapshot);
+    return ok;
+}
+static struct cr_battery_worker *create_battery_worker(struct cr_battery_snapshot *snapshot) {
+    struct cr_battery_worker *worker = calloc(1, sizeof(*worker));
+    if (!worker) return NULL;
+    if (pthread_mutex_init(&worker->mutex, NULL) != 0) { free(worker); return NULL; }
+    if (pthread_cond_init(&worker->wake, NULL) != 0) {
+        pthread_mutex_destroy(&worker->mutex); free(worker); return NULL;
+    }
+    worker->job = snapshot;
+    worker->writing = true;
+    if (pthread_create(&worker->thread, NULL, battery_writer, worker) != 0) {
+        pthread_cond_destroy(&worker->wake); pthread_mutex_destroy(&worker->mutex);
+        free(worker); return NULL;
+    }
+    return worker;
+}
+static void destroy_battery_worker(cr_engine *engine) {
+    struct cr_battery_worker *worker = engine->battery_worker;
+    if (!worker) return;
+    (void)finish_battery_save(engine, true);
+    pthread_mutex_lock(&worker->mutex);
+    worker->stop = true;
+    pthread_cond_signal(&worker->wake);
+    pthread_mutex_unlock(&worker->mutex);
+    pthread_join(worker->thread, NULL);
+    pthread_cond_destroy(&worker->wake);
+    pthread_mutex_destroy(&worker->mutex);
+    free(worker);
+    engine->battery_worker = NULL;
+}
 struct mapped_game { corvus_game game; uint8_t *battery; };
 static bool map_rom(cr_engine *engine, struct mapped_game *mapped, const char *path) {
     mapped->game.struct_size = sizeof(mapped->game);
@@ -971,47 +1115,56 @@ bool cr_engine_step_players(cr_engine *engine, const unsigned masks[2]) {
     return true;
 }
 bool cr_engine_save_battery(cr_engine *engine) {
+    /* Lifecycle operations retry a failed periodic write using the latest core bytes. */
+    (void)finish_battery_save(engine, true);
     if (!recover_import(engine)) return false;
     if (!engine->handle || !engine->loaded) { success(engine); return true; }
-    bool slots = engine->subsystems.battery_size != NULL;
-    if (engine->players > 1 && !slots)
-        return fail(engine, "Sauvegardes des joueurs indisponibles");
-    if (!slots && !engine->api.battery_size) { success(engine); return true; }
-    uint8_t *bytes[2] = {NULL, NULL};
-    size_t sizes[2] = {0, 0};
-    uint64_t generations[2] = {0, 0};
-    unsigned count = engine->players > 1 ? 2 : 1;
-    bool ok = true;
-    for (unsigned i = 0; ok && i < count; ++i) {
-        int dirty = slots ? engine->subsystems.battery_dirty(engine->handle, i)
-                          : engine->api.battery_dirty(engine->handle);
-        if (!dirty) continue;
-        size_t size = slots ? engine->subsystems.battery_size(engine->handle, i)
-                            : engine->api.battery_size(engine->handle);
-        if (!size) continue;
-        if (size > MAX_BATTERY) { ok = fail(engine, "Sauvegarde batterie trop volumineuse"); break; }
-        bytes[i] = malloc(size);
-        if (!bytes[i]) { ok = fail(engine, "Mémoire insuffisante"); break; }
-        sizes[i] = size;
-        int copied = slots ? engine->subsystems.battery_copy(engine->handle, i, bytes[i], size,
-                                                            &generations[i])
-                           : engine->api.battery_copy(engine->handle, bytes[i], size, &generations[i]);
-        if (!copied) ok = sdk_error(engine);
+    struct cr_battery_snapshot snapshot = {0};
+    bool ok = capture_battery(engine, &snapshot);
+    if (ok) {
+        write_battery_snapshot(&snapshot);
+        ok = acknowledge_battery_snapshot(engine, &snapshot);
     }
-    for (unsigned i = 0; ok && i < count; ++i) {
-        char path[4096];
-        if (bytes[i]) ok = battery_path(engine, i, path) && write_file(engine, path, bytes[i], sizes[i]);
-    }
-    /* No generation is acknowledged until every dirty slot is durable. */
-    for (unsigned i = 0; ok && i < count; ++i) {
-        if (!bytes[i]) continue;
-        int acknowledged = slots ? engine->subsystems.battery_acknowledge(engine->handle, i, generations[i])
-                                 : engine->api.battery_acknowledge(engine->handle, generations[i]);
-        if (!acknowledged) ok = sdk_error(engine);
-    }
-    for (unsigned i = 0; i < 2; ++i) free(bytes[i]);
+    free_battery_snapshot(&snapshot);
     if (ok) success(engine);
     return ok;
+}
+bool cr_engine_poll_battery_save(cr_engine *engine) {
+    return finish_battery_save(engine, false);
+}
+bool cr_engine_request_battery_save(cr_engine *engine) {
+    if (!finish_battery_save(engine, false)) return false;
+    if (!engine->handle || !engine->loaded) return true;
+    struct cr_battery_worker *worker = engine->battery_worker;
+    if (worker) {
+        if (pthread_mutex_trylock(&worker->mutex) != 0) return true;
+        bool busy = worker->writing || worker->complete;
+        pthread_mutex_unlock(&worker->mutex);
+        if (busy) return true;
+    }
+    struct cr_battery_snapshot *snapshot = calloc(1, sizeof(*snapshot));
+    if (!snapshot) return fail(engine, "Mémoire insuffisante");
+    bool ok = capture_battery(engine, snapshot);
+    if (!ok || (!snapshot->bytes[0] && !snapshot->bytes[1])) {
+        free_battery_snapshot(snapshot); free(snapshot); return ok;
+    }
+    if (!worker) {
+        worker = create_battery_worker(snapshot);
+        if (!worker) {
+            free_battery_snapshot(snapshot); free(snapshot);
+            return fail(engine, "Écriture de sauvegarde différée indisponible");
+        }
+        engine->battery_worker = worker;
+        return true;
+    }
+    if (pthread_mutex_trylock(&worker->mutex) != 0) {
+        free_battery_snapshot(snapshot); free(snapshot); return true;
+    }
+    worker->job = snapshot;
+    worker->writing = true;
+    pthread_cond_signal(&worker->wake);
+    pthread_mutex_unlock(&worker->mutex);
+    return true;
 }
 size_t cr_engine_battery_size(const cr_engine *engine, unsigned player) {
     if (!engine || !engine->handle || !engine->loaded || player >= engine->players) return 0;
@@ -1325,6 +1478,7 @@ static bool commit_import(cr_engine *e, unsigned player, uint8_t *bytes[2], size
     return ok || fail(e, "Importation annulée : écriture impossible");
 }
 bool cr_engine_import_battery(cr_engine *engine, unsigned player, const uint8_t *bytes, size_t size) {
+    if (!finish_battery_save(engine, true)) return false;
     size_t expected = cr_engine_battery_size(engine, player);
     if (!expected || !bytes || size != expected)
         return fail(engine, "Taille incompatible avec la sauvegarde batterie du jeu");
