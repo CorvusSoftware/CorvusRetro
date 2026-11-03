@@ -25,3 +25,5 @@ Open risks:
 
 Decision:
 - Correctif prêt pour revue du code et CI distante. PARTIAL concerne la disparition perçue des parasites sur le matériel signalé : pas de téléphone ni de ROM disponible pour cette preuve.
+
+Publication autorisée : préparer 0.22.2/code30, attendre les nouvelles CI exactes et qualifier APK signé/upgrade/publication. Le PARTIAL de l’écoute physique reste distinct de ces gates de distribution.
