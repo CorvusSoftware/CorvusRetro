@@ -11,6 +11,7 @@ typedef struct {
     int system;
     char core_id[96], system_id[96];
     int64_t played;
+    char cover[256];
 } cr_game;
 typedef struct {
     char id[96], title[512], path[4096], error[512];
@@ -19,6 +20,8 @@ typedef struct {
 #define CR_MAX_CORE_PACKS 32
 typedef struct {
     char id[96], name[128], version[64], core_id[96], abi[24];
+    char description[256], system_name[128];
+    uint64_t size;
 } cr_core_pack;
 typedef struct {
     cr_core_pack packs[CR_MAX_CORE_PACKS];
@@ -57,5 +60,7 @@ typedef struct {
     void (*achievement_sound)(void *, int volume_percent);
     bool (*can_remove_core)(void *, const char *core_id);
     void (*remove_core)(void *, const char *core_id);
+    void (*game_image)(void *, const char *game_id, const char *url);
+    void (*share_state)(void *, const char *name, const uint8_t *, size_t);
 } cr_platform;
 #endif

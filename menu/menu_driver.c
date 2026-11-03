@@ -6,6 +6,9 @@
 #include "play_layout.h"
 #include "overlay.h"
 #include "core_registry.h"
+#include "interface_draw.h"
+#include "interface_layout.h"
+#include "state_store.h"
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -16,6 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 static const char *core_name(int index) {
     const cr_core_descriptor *core = cr_registry_get(index);
@@ -77,13 +81,19 @@ enum {
     ACT_BIND_RESET,
     ACT_LOAD_AUTO_STATE,
     ACT_BACKUP_MENU,
-    ACT_EXPORT_BACKUP
+    ACT_EXPORT_BACKUP,
+    ACT_CORE_DETAILS,
+    ACT_STATE_GAME,
+    ACT_STATE_CREATE,
+    ACT_STATE_ACTIONS,
+    ACT_STATE_LOAD,
+    ACT_STATE_RENAME,
+    ACT_STATE_DUPLICATE,
+    ACT_STATE_SHARE,
+    ACT_STATE_DELETE_CONFIRM,
+    ACT_STATE_DELETE
 };
-typedef struct {
-    char label[512], hint[256];
-    int icon, action, value;
-    bool toggle, checked, disabled;
-} row;
+typedef cr_menu_row row;
 enum { SET_VOLUME, SET_INTEGER, SET_FILTER, SET_OPACITY, SET_SIZE, SET_POSITION,
        SET_CARDS, SET_PROGRESS, SET_BACKUPS, SET_AUTO_STATE, SET_COUNT };
 typedef struct {
@@ -132,8 +142,9 @@ static void apply_setting(cr_ui *u, int id, int value) {
 }
 static const char *binding_labels[10] = {"Haut", "Bas", "Gauche", "Droite", "A", "B", "Start", "Select", "L", "R"};
 static const int quick_order[CR_QUICK_COUNT] = {
-    CR_QUICK_RESUME, CR_QUICK_RESTART, CR_QUICK_CLOSE, CR_QUICK_STATES,
-    CR_QUICK_GAME_SAVES, CR_QUICK_CORE_OPTIONS, CR_QUICK_CONTROLS, CR_QUICK_PLAYER,
+    CR_QUICK_RESUME, CR_QUICK_LOAD_STATE, CR_QUICK_SAVE_STATE, CR_QUICK_RESTART,
+    CR_QUICK_CORE_OPTIONS, CR_QUICK_CLOSE, CR_QUICK_STATES,
+    CR_QUICK_GAME_SAVES, CR_QUICK_CONTROLS, CR_QUICK_PLAYER,
     CR_QUICK_ACHIEVEMENTS, CR_QUICK_CORE_INFO, CR_QUICK_MAIN
 };
 int cr_ui_quick_row(const cr_ui *u, int action) {
@@ -163,7 +174,8 @@ static void quick_clamp(cr_ui *u);
 static void finish_save_transfer(cr_ui *u);
 static int target(const cr_ui *u, float x, float y);
 static bool has_back(const cr_ui *u) {
-    return u->quick || u->depth || (u->page != CR_MAIN && u->page != CR_LISTS && u->page != CR_SETTINGS);
+    return u->quick || u->depth || (u->page != CR_MAIN && u->page != CR_LIBRARY &&
+           u->page != CR_SAVES_LIBRARY && u->page != CR_CORES && u->page != CR_SETTINGS);
 }
 static void clear_link_selection(cr_ui *u) {
     u->subsystem_id[0] = 0;
@@ -205,7 +217,59 @@ static void press_controls(cr_ui *u, unsigned mask) {
             u->control_feedback[i] = 1;
 }
 static float body_bottom(const cr_ui *u) {
-    return u->height - 100;
+    return cr_interface_bottom(u);
+}
+static int game_console(const cr_game *g) {
+    static const char *ids[] = {"nintendo.game_boy", "nintendo.game_boy_color", "nintendo.game_boy_advance"};
+    static const char *cores[] = {"corvus.gb", "corvus.gbc", "corvus.gba"};
+    for (int i = 0; i < 3; ++i)
+        if (!strcmp(g->system_id, ids[i]) || (!g->system_id[0] && !strcmp(g->core_id, cores[i]))) return i;
+    return -1;
+}
+static int game_index(const cr_ui *u, const char *id) {
+    for (size_t i = 0; i < u->game_count; ++i)
+        if (!strcmp(u->games[i].id, id)) return (int)i;
+    return -1;
+}
+static uint32_t folded_character(const char **at) {
+    const unsigned char *s = (const unsigned char *)*at;
+    uint32_t c = *s++;
+    unsigned count = c >= 0xf0 ? 3 : c >= 0xe0 ? 2 : c >= 0xc0 ? 1 : 0;
+    if (count) {
+        c &= (1u << (6 - count)) - 1;
+        for (unsigned i = 0; i < count && (*s & 0xc0) == 0x80; ++i) c = (c << 6) | (*s++ & 63);
+    }
+    *at = (const char *)s;
+    return (c >= 'A' && c <= 'Z') || (c >= 0xc0 && c <= 0xde && c != 0xd7) ? c + 32 : c;
+}
+static bool matches_query(const char *title, const char *query) {
+    if (!query[0]) return true;
+    for (const char *start = title; *start; folded_character(&start)) {
+        const char *a = start, *b = query;
+        bool equal = true;
+        while (*a && *b) if (folded_character(&a) != folded_character(&b)) { equal = false; break; }
+        if (equal && !*b) return true;
+    }
+    return false;
+}
+static int library_game(const cr_ui *u, int row_index) {
+    for (size_t i = 0; i < u->game_count; ++i)
+        if ((u->library_filter < 0 || game_console(&u->games[i]) == u->library_filter) &&
+            matches_query(u->games[i].title, u->library_query) && !row_index--) return (int)i;
+    return -1;
+}
+static int library_count(const cr_ui *u) {
+    int count = 0;
+    for (size_t i = 0; i < u->game_count; ++i)
+        if ((u->library_filter < 0 || game_console(&u->games[i]) == u->library_filter) &&
+            matches_query(u->games[i].title, u->library_query)) ++count;
+    return count;
+}
+static int detail_pack(const cr_ui *u) {
+    for (size_t i = 0; i < u->core_catalog.count; ++i)
+        if ((u->detail_pack_id[0] && !strcmp(u->core_catalog.packs[i].id, u->detail_pack_id)) ||
+            (!u->detail_pack_id[0] && !strcmp(u->core_catalog.packs[i].core_id, u->detail_core_id))) return (int)i;
+    return -1;
 }
 static int removable_core_at(const cr_ui *u, int row) {
     if (!u->platform.can_remove_core || !u->platform.remove_core) return -1;
@@ -247,9 +311,17 @@ static int rows(const cr_ui *u) {
     if (u->page == CR_SAVE_CONFIRM) return 2;
     if (u->page == CR_SAVESTATES) return 3;
     if (u->page == CR_CONTENT) return 2;
-    if (u->page == CR_LIBRARY) return 1 + (int)u->game_count;
-    if (u->page == CR_MAIN)
-        return 3 + (u->engine.loaded ? 1 : 0) + (u->engine.handle ? 1 : 0);
+    if (u->page == CR_LIBRARY) return 1 + library_count(u);
+    if (u->page == CR_MAIN) return 5 + (u->engine.handle != NULL);
+    if (u->page == CR_SAVES_LIBRARY) return 1 + (int)u->game_count;
+    if (u->page == CR_STATE_LIST) return 1 + (int)u->saved_state_count +
+        (u->engine.loaded && !strcmp(u->engine.id, u->states_game_id) ? 2 : 0);
+    if (u->page == CR_STATE_ACTIONS) return 5;
+    if (u->page == CR_STATE_DELETE_CONFIRM) return 2;
+    if (u->page == CR_CORE_DETAILS) return 4;
+    if (u->page == CR_LIBRARY_ACTIONS) return 4;
+    if (u->page == CR_GAME_ACTIONS) return 3;
+    if (u->page == CR_SYSTEM_SETTINGS) return 4;
     if (u->page == CR_LISTS)
         return 1;
     if (u->page == CR_CORES)
@@ -258,7 +330,7 @@ static int rows(const cr_ui *u) {
     if (u->page == CR_REMOVE_CORE_CONFIRM) return 2;
     if (u->page == CR_CORE_DOWNLOADS)
         return 1 + (int)u->core_catalog.count;
-    if (u->page == CR_SETTINGS) return 6;
+    if (u->page == CR_SETTINGS) return 7;
     if (u->page == CR_SETTING_VALUES) {
         const setting_spec *spec = &settings[u->editing_setting];
         return 1 + (spec->maximum - spec->minimum) / spec->step;
@@ -289,11 +361,27 @@ static int rows(const cr_ui *u) {
 }
 static void fill(row *r, const char *label, const char *hint, int icon, int action, int value) {
     memset(r, 0, sizeof(*r));
+    r->console = -1;
     snprintf(r->label, sizeof(r->label), "%s", label);
     snprintf(r->hint, sizeof(r->hint), "%.*s", (int)sizeof(r->hint) - 1, hint ? hint : "");
     r->icon = icon;
     r->action = action;
     r->value = value;
+}
+static void game_row(row *r, const cr_ui *u, int index, int action) {
+    if (index < 0 || (size_t)index >= u->game_count) return;
+    const cr_game *g = &u->games[index];
+    static const char *systems[] = {"Game Boy", "Game Boy Color", "Game Boy Advance"};
+    int console = game_console(g);
+    fill(r, g->title, console >= 0 ? systems[console] : g->system_id,
+         CR_ICON_CONTENT, action, index);
+    r->console = console;
+    if (g->cover[0]) snprintf(r->image, sizeof(r->image), "cover:%s", g->id);
+    if (action == ACT_GAME) {
+        r->disabled = !u->engine.handle || g->system != u->engine.system;
+        if (r->disabled) snprintf(r->hint, sizeof(r->hint), "%s", !u->engine.handle ?
+            "Chargez un cœur pour jouer" : "Chargez le cœur associé à ce jeu");
+    }
 }
 static row get_row(const cr_ui *u, int index) {
     row r;
@@ -303,26 +391,32 @@ static row get_row(const cr_ui *u, int index) {
         static const char *labels[CR_QUICK_COUNT] = {
             "Reprendre le contenu", "Redémarrer le contenu", "Fermer le contenu",
             "Sauvegardes d’état", "Options du cœur", "Commandes", "Succès", "Informations sur le cœur",
-            "Menu principal", "Joueur contrôlé", "Sauvegardes du jeu"
+            "Accueil", "Joueur contrôlé", "Sauvegardes du jeu", "Charger un état", "Sauvegarder un état"
         };
         static const char *hints[CR_QUICK_COUNT] = {
             "Retourner au jeu", "Relancer le contenu actuel", "Garder le cœur chargé",
             "Sauvegarder ou charger l’état du jeu", "Réglages proposés par le cœur", "Surimpression tactile",
             "Compte et succès du jeu", "Version et fonctions disponibles", "Retourner aux menus",
-            "Choisir le joueur du tactile et du clavier", "Importer ou exporter la mémoire batterie (.sav / .srm)"
+            "Choisir le joueur du tactile et du clavier", "Importer ou exporter la mémoire batterie (.sav / .srm)",
+            "Choisir une sauvegarde de ce jeu", "Créer une nouvelle sauvegarde nommée"
         };
         static const int icons[CR_QUICK_COUNT] = {
             CR_ICON_PLAY, CR_ICON_RESTART, CR_ICON_CLOSE, CR_ICON_SAVES,
             CR_ICON_CORE, CR_ICON_INPUT, CR_ICON_ACHIEVEMENTS, CR_ICON_INFO,
-            CR_ICON_HOME, CR_ICON_INPUT, CR_ICON_SAVES
+            CR_ICON_HOME, CR_ICON_INPUT, CR_ICON_SAVES, CR_ICON_RESTORE, CR_ICON_SAVES
         };
         fill(&r, labels[index], hints[index], icons[index], ACT_QUICK_ACTION, index);
         r.disabled = (index == CR_QUICK_RESTART && !cr_engine_can_reset(&u->engine)) ||
-                     (index == CR_QUICK_STATES && !cr_engine_can_state(&u->engine)) ||
+                     ((index == CR_QUICK_STATES || index == CR_QUICK_LOAD_STATE || index == CR_QUICK_SAVE_STATE) &&
+                      !cr_engine_can_state(&u->engine)) ||
                      (index == CR_QUICK_GAME_SAVES && (!u->platform.save_transfer ||
                       (!cr_engine_battery_size(&u->engine, 0) && !cr_engine_battery_size(&u->engine, 1))));
         if (index == CR_QUICK_PLAYER)
             snprintf(r.hint, sizeof(r.hint), "Joueur %u - toucher pour changer", u->input_player + 1);
+        if (index == CR_QUICK_RESUME) snprintf(r.label, sizeof(r.label), "Reprendre");
+        if (index == CR_QUICK_RESTART) snprintf(r.label, sizeof(r.label), "Redémarrer");
+        if (index == CR_QUICK_CORE_OPTIONS) snprintf(r.label, sizeof(r.label), "Options du jeu");
+        if (index == CR_QUICK_CLOSE) { snprintf(r.label, sizeof(r.label), "Quitter le jeu"); r.destructive = true; }
     } else if (u->page == CR_CORE_OPTIONS) {
         corvus_core_option option;
         if (cr_engine_option(&u->engine, (size_t)index, &option)) {
@@ -404,25 +498,30 @@ static row get_row(const cr_ui *u, int index) {
              CR_ICON_FILE, index == 2 ? ACT_LOAD_AUTO_STATE : (index ? ACT_LOAD_STATE : ACT_SAVE_STATE), 0);
         if (index == 2) r.disabled = !u->auto_state_available;
     } else if (u->page == CR_MAIN) {
-        int n = 0;
-        if (u->engine.loaded) {
-            if (index == n++)
-                fill(&r, "Menu rapide", u->title, CR_ICON_MENU, ACT_QUICK, 0);
-        }
-        if (index == n++)
+        if (!index) {
+            int recent = -1;
+            for (size_t i = 0; i < u->game_count; ++i)
+                if (u->games[i].played && (recent < 0 || u->games[i].played > u->games[recent].played)) recent = (int)i;
+            if (u->engine.loaded) fill(&r, "Continuer", u->title, CR_ICON_PLAY, ACT_QUICK, 0);
+            else if (recent >= 0) {
+                game_row(&r, u, recent, ACT_GAME);
+                snprintf(r.hint, sizeof(r.hint), "%.220s", u->games[recent].title);
+                snprintf(r.label, sizeof(r.label), "Continuer");
+            } else fill(&r, u->engine.handle ? "Importer un jeu" : "Installer un cœur",
+                        u->engine.handle ? "Construisez votre bibliothèque" : "Choisissez votre première console",
+                        u->engine.handle ? CR_ICON_CONTENT : CR_ICON_DOWNLOAD,
+                        u->engine.handle ? ACT_PICK : ACT_OPEN_DOWNLOADER, 0);
+        } else if (index < 4) {
+            static const char *labels[] = {"Bibliothèque", "Cœurs", "Saves"};
+            static const int icons[] = {CR_ICON_INPUT, CR_ICON_CORE, CR_ICON_FOLDER};
+            static const int pages[] = {CR_LIBRARY, CR_CORES, CR_SAVES_LIBRARY};
+            fill(&r, labels[index - 1], "", icons[index - 1], ACT_PAGE, pages[index - 1]);
+        } else if (index == 4) {
             fill(&r, u->engine.handle ? "Décharger le cœur" : "Charger un cœur",
-                 u->engine.handle ? core_name(u->engine.system) : "Aucun cœur",
-                 u->engine.handle ? CR_ICON_UNLOAD : CR_ICON_CORE,
-                 u->engine.handle ? ACT_UNLOAD : ACT_CORES, 0);
-        if (index == n++)
-            fill(&r, "Charger du contenu", "Importer un jeu ou ouvrir la bibliothèque",
-                 CR_ICON_CONTENT, ACT_PAGE, CR_CONTENT);
-        if (u->engine.handle && index == n++)
-            fill(&r, "Sous-système", "Sous-systèmes du cœur chargé",
-                 CR_ICON_SUBSYSTEM, ACT_PAGE, CR_SUBSYSTEMS);
-        if (index == n)
-            fill(&r, "Informations", "Application, cœur et licences", CR_ICON_INFO, ACT_PAGE,
-                 CR_INFORMATION);
+                 u->engine.handle ? core_name(u->engine.system) : "Aucun cœur actif",
+                 CR_ICON_CORE, u->engine.handle ? ACT_UNLOAD : ACT_CORES, 0);
+            r.console = cr_registry_legacy_system(u->engine.system);
+        } else fill(&r, "Sous-système", "Configurations du cœur actif", CR_ICON_SUBSYSTEM, ACT_PAGE, CR_SUBSYSTEMS);
     } else if (u->page == CR_LISTS) {
         fill(&r, "Historique", "Contenus récemment ouverts", CR_ICON_HISTORY, ACT_HISTORY, 0);
     } else if (u->page == CR_CONTENT) {
@@ -435,16 +534,68 @@ static row get_row(const cr_ui *u, int index) {
                  CR_ICON_LIST, ACT_LIBRARY, 0);
     } else if (u->page == CR_LIBRARY) {
         if (!index) {
-            fill(&r, "Importer un dossier", u->import_folder ? "Importation du dossier en cours..." :
-                 (u->engine.handle ? "Importer les jeux compatibles avec le cœur chargé" :
-                                    "Chargez un cœur pour importer un dossier"),
-                 CR_ICON_FOLDER, ACT_FOLDER, 0);
-            r.disabled = !u->engine.handle || u->importing;
-        } else if ((size_t)(index - 1) < u->game_count) {
-            const cr_game *game = &u->games[index - 1];
-            fill(&r, game->title, game->system >= 0 ? core_name(game->system) :
-                 "Cœur non installé", CR_ICON_FILE, ACT_GAME, index - 1);
-            r.disabled = !u->engine.handle || game->system != u->engine.system;
+            fill(&r, "Importer et organiser", "Jeux, dossiers et historique", CR_ICON_FOLDER, ACT_PAGE, CR_LIBRARY_ACTIONS);
+        } else game_row(&r, u, library_game(u, index - 1), ACT_GAME);
+    } else if (u->page == CR_LIBRARY_ACTIONS) {
+        if (!index) { fill(&r, "Importer un jeu", u->engine.handle ? "Ouvrir un fichier compatible" : "Chargez un cœur pour importer", CR_ICON_CONTENT, ACT_PICK, 0); r.disabled = !u->engine.handle || u->importing; }
+        else if (index == 1) { fill(&r, "Importer un dossier", u->engine.handle ? "Ajouter plusieurs jeux" : "Chargez un cœur pour importer", CR_ICON_FOLDER, ACT_FOLDER, 0); r.disabled = !u->engine.handle || u->importing; }
+        else if (index == 2) fill(&r, "Historique", "Retrouver les dernières parties", CR_ICON_HISTORY, ACT_HISTORY, 0);
+        else fill(&r, u->library_list ? "Afficher en grille" : "Afficher en liste", "Présentation de la bibliothèque", CR_ICON_LIST, ACT_LIBRARY, 1);
+    } else if (u->page == CR_GAME_ACTIONS) {
+        int game = game_index(u, u->states_game_id);
+        if (game >= 0) {
+            if (!index) game_row(&r, u, game, ACT_GAME);
+            else if (index == 1) {
+                fill(&r, "États de sauvegarde", u->games[game].title, CR_ICON_SAVES, ACT_STATE_GAME, game);
+            } else {
+                int core = cr_registry_find(u->games[game].core_id);
+                fill(&r, core >= 0 ? "Charger le cœur associé" : "Installer le cœur associé",
+                     u->games[game].core_id, CR_ICON_CORE, core >= 0 ? ACT_SELECT : ACT_OPEN_DOWNLOADER, core);
+            }
+        }
+    } else if (u->page == CR_SAVES_LIBRARY) {
+        if (!index) {
+            fill(&r, "Partie en cours", u->engine.loaded ? u->title : "Lancez un jeu pour créer un état", CR_ICON_SAVES, ACT_STATE_GAME, -1);
+            r.disabled = !u->engine.loaded;
+        } else game_row(&r, u, index - 1, ACT_STATE_GAME);
+    } else if (u->page == CR_STATE_LIST) {
+        if (!index) {
+            fill(&r, "Nouvelle sauvegarde", "Enregistrer la position actuelle", CR_ICON_SAVES, ACT_STATE_CREATE, 0);
+            r.disabled = !u->engine.loaded || strcmp(u->engine.id, u->states_game_id) || !cr_engine_can_state(&u->engine);
+            if (r.disabled) snprintf(r.hint, sizeof(r.hint), "Lancez ce jeu avec un cœur compatible");
+        } else if ((size_t)(index - 1) < u->saved_state_count) {
+            const cr_state_entry *state = &u->saved_states[index - 1];
+            char stamp[80]; time_t time = (time_t)(state->created_ms / 1000); struct tm local;
+            if (localtime_r(&time, &local)) strftime(stamp, sizeof(stamp), "%d/%m/%Y · %H:%M", &local);
+            else snprintf(stamp, sizeof(stamp), "État %u", state->slot);
+            fill(&r, state->name, stamp, CR_ICON_SAVES, ACT_STATE_ACTIONS, index - 1);
+            snprintf(r.image, sizeof(r.image), "%s", state->preview_key);
+        } else if ((size_t)index == u->saved_state_count + 1) {
+            fill(&r, "État manuel et automatique", "Retrouver les sauvegardes classiques", CR_ICON_RESTORE,
+                 ACT_PAGE, CR_SAVESTATES);
+            r.disabled = !cr_engine_can_state(&u->engine);
+        } else {
+            fill(&r, "Mémoire batterie (.sav / .srm)", "Importer, exporter et gérer les copies", CR_ICON_BACKUP,
+                 ACT_PAGE, CR_GAME_SAVES);
+            r.disabled = !u->platform.save_transfer || (!cr_engine_battery_size(&u->engine, 0) &&
+                                                      !cr_engine_battery_size(&u->engine, 1));
+        }
+    } else if (u->page == CR_STATE_ACTIONS || u->page == CR_STATE_DELETE_CONFIRM) {
+        bool available = u->selected_state >= 0 && (size_t)u->selected_state < u->saved_state_count;
+        if (u->page == CR_STATE_DELETE_CONFIRM) {
+            fill(&r, index ? "Annuler" : "Supprimer cet état", index ? "Conserver la sauvegarde" : "Cette action est définitive",
+                 index ? CR_ICON_BACK : CR_ICON_CLOSE, index ? ACT_CORE_REMOVE_CANCEL : ACT_STATE_DELETE, 0);
+            r.destructive = !index; r.disabled = !available;
+        } else {
+            static const char *labels[] = {"Charger", "Renommer", "Dupliquer", "Partager", "Supprimer"};
+            static const int actions[] = {ACT_STATE_LOAD, ACT_STATE_RENAME, ACT_STATE_DUPLICATE, ACT_STATE_SHARE, ACT_STATE_DELETE_CONFIRM};
+            static const int icons[] = {CR_ICON_PLAY, CR_ICON_FILE, CR_ICON_BACKUP, CR_ICON_FOLDER, CR_ICON_CLOSE};
+            fill(&r, labels[index], "", icons[index], actions[index], 0);
+            r.disabled = !available || (index == 3 && !u->platform.share_state);
+            if (!index && available) r.disabled = !u->engine.handle ||
+                u->engine.system != cr_registry_find(u->saved_states[u->selected_state].core_id);
+            if (!index && r.disabled) snprintf(r.hint, sizeof(r.hint), "Chargez le cœur associé à cet état");
+            r.destructive = index == 4;
         }
     } else if (u->page == CR_REMOVE_CORES) {
         int slot = removable_core_at(u,index);
@@ -465,7 +616,30 @@ static row get_row(const cr_ui *u, int index) {
             int slot = cr_registry_index_at((size_t)index);
             fill(&r, core_name(slot), system_name(slot), CR_ICON_CORE, ACT_SELECT, slot);
             r.checked = u->engine.handle && u->engine.system == slot;
+            r.console = cr_registry_legacy_system(slot);
         }
+    } else if (u->page == CR_CORE_DETAILS) {
+        int pack_index = detail_pack(u), core_index = cr_registry_find(u->detail_core_id);
+        const cr_core_descriptor *core = cr_registry_get(core_index);
+        bool loaded = core && u->engine.handle && u->engine.system == core_index;
+        if (!index) {
+            fill(&r, core ? (loaded ? "Décharger le cœur" : "Charger le cœur") : "Installer",
+                 u->installing ? "Installation en cours..." : (core ? "Disponible sur cet appareil" : "Télécharger le module vérifié"),
+                 core ? CR_ICON_CORE : CR_ICON_DOWNLOAD,
+                 core ? (loaded ? ACT_UNLOAD : ACT_SELECT) : ACT_INSTALL_CORE_PACK,
+                 core ? core_index : pack_index);
+            r.disabled = u->installing || (!core && pack_index < 0);
+        } else if (index == 1) {
+            fill(&r, core ? "Réinstaller" : "Actualiser", u->catalog_loading ? "Recherche en cours..." :
+                 (u->core_catalog.error[0] ? u->core_catalog.error : "Catalogue des développeurs"),
+                 CR_ICON_RESTART, core && pack_index >= 0 ? ACT_INSTALL_CORE_PACK : ACT_REFRESH_CATALOG, pack_index);
+            r.disabled = u->installing || u->catalog_loading;
+        } else if (index == 2) {
+            fill(&r, "Désinstaller", "Jeux et sauvegardes conservés", CR_ICON_CLOSE, ACT_CORE_REMOVE_CONFIRM, core_index);
+            r.disabled = !core || !u->platform.can_remove_core || !u->platform.remove_core ||
+                !u->platform.can_remove_core(u->platform.context, core->id) || u->installing;
+            r.destructive = true;
+        } else fill(&r, "Bibliothèque", "Retrouver vos jeux importés", CR_ICON_LIST, ACT_LIBRARY, 0);
     } else if (u->page == CR_CORE_DOWNLOADS) {
         if (index == 0) {
             fill(&r, "Actualiser le catalogue",
@@ -481,14 +655,23 @@ static row get_row(const cr_ui *u, int index) {
             char hint[160];
             snprintf(hint, sizeof(hint), "Version %.56s - %.20s%s",
                      pack->version, pack->abi, state);
-            fill(&r, pack->name, hint, CR_ICON_CORE, ACT_INSTALL_CORE_PACK, index - 1);
+            fill(&r, pack->name, hint, CR_ICON_CORE, ACT_CORE_DETAILS, -index);
+            r.console = !strcmp(pack->core_id, "corvus.gb") ? 0 : !strcmp(pack->core_id, "corvus.gbc") ? 1 :
+                        !strcmp(pack->core_id, "corvus.gba") ? 2 : -1;
+            r.checked = installed != NULL;
         }
     } else if (u->page == CR_SETTINGS) {
-        const char *labels[] = {"Interface utilisateur", "Vidéo", "Audio", "Commandes", "Sauvegardes", "RetroAchievements"};
-        const char *hints[] = {"Thèmes et notifications", "Présentation de l'image", "Son et volume du jeu",
-                              "Tactile et manettes", "Copies et états automatiques", "Activation et compte"};
-        const int pages[] = {CR_UI_SETTINGS, CR_VIDEO_SETTINGS, CR_AUDIO_SETTINGS, CR_OSD_SETTINGS, CR_SAVE_SETTINGS, CR_RA_SETTINGS};
-        const int icons[] = {CR_ICON_DISPLAY, CR_ICON_VIDEO, CR_ICON_AUDIO, CR_ICON_INPUT, CR_ICON_SAVES, CR_ICON_ACHIEVEMENTS};
+        const char *labels[] = {"Affichage", "Commandes", "Audio", "Système", "Sauvegardes", "RetroAchievements", "À propos"};
+        const char *hints[] = {"Écran, filtrage et proportions", "Tactile, manettes et affectation", "Son et volume du jeu",
+                              "Interface, thèmes et fichiers", "Copies et états automatiques", "Activation et compte", "Version, crédits et licences"};
+        const int pages[] = {CR_VIDEO_SETTINGS, CR_OSD_SETTINGS, CR_AUDIO_SETTINGS, CR_SYSTEM_SETTINGS, CR_SAVE_SETTINGS, CR_RA_SETTINGS, CR_INFORMATION};
+        const int icons[] = {CR_ICON_DISPLAY, CR_ICON_INPUT, CR_ICON_AUDIO, CR_ICON_SETTINGS, CR_ICON_SAVES, CR_ICON_ACHIEVEMENTS, CR_ICON_INFO};
+        fill(&r, labels[index], hints[index], icons[index], ACT_PAGE, pages[index]);
+    } else if (u->page == CR_SYSTEM_SETTINGS) {
+        static const char *labels[] = {"Interface", "Sauvegardes", "Informations", "Importer du contenu"};
+        static const char *hints[] = {"Thèmes et notifications", "Copies et états automatiques", "Application, cœur et licences", "Jeux et dossiers"};
+        static const int pages[] = {CR_UI_SETTINGS, CR_SAVE_SETTINGS, CR_INFORMATION, CR_CONTENT};
+        static const int icons[] = {CR_ICON_THEME, CR_ICON_SAVES, CR_ICON_INFO, CR_ICON_FOLDER};
         fill(&r, labels[index], hints[index], icons[index], ACT_PAGE, pages[index]);
     } else if (u->page == CR_RA_SETTINGS) {
         fill(&r, index ? "Compte" : "Activer RetroAchievements", index ? "Connexion et état du compte" :
@@ -615,22 +798,28 @@ static row get_row(const cr_ui *u, int index) {
     return r;
 }
 static void clamp_scroll(cr_ui *u) {
-    float content = (float)rows(u) * 76;
+    float content = cr_interface_content_height(u, rows(u));
     if (u->page == CR_ABOUT || u->page == CR_LICENSE || u->page == CR_CORE_INFO ||
         ((u->page == CR_SUBSYSTEMS || u->page == CR_CORE_OPTIONS) && !rows(u)))
         content = fmaxf(400, u->text_height);
-    float max = fmaxf(0, content - fmaxf(1, body_bottom(u) - 64));
+    float max = fmaxf(0, content - fmaxf(1, body_bottom(u) - cr_interface_content_top(u)));
     u->scroll = fminf(max, fmaxf(0, u->scroll));
 }
 static void view(cr_ui *u, int p) {
+    if (u->ui_editing || u->ra_editing) {
+        u->ui_editing = u->ra_editing = 0;
+        memset(u->ra_preview, 0, sizeof(u->ra_preview));
+        if (u->platform.edit_text) u->platform.edit_text(u->platform.context, 0, "", false);
+    }
     u->controller_capture = -1;
     u->page = p;
-    u->tab =
-        p == CR_PLAY                     ? u->tab
-        : p == CR_LISTS || p == CR_GAMES ? 1
-        : p == CR_SETTINGS || p == CR_THEMES || p == CR_ACHIEVEMENTS || (p >= CR_NOTIFICATIONS_SETTINGS && p <= CR_RA_ACCOUNT) || (p >= CR_UI_SETTINGS && p <= CR_OVERLAY_SETTINGS)
-            ? 2
-            : 0;
+    if (p == CR_MAIN) u->tab = 0;
+    else if (p == CR_LIBRARY || p == CR_LIBRARY_ACTIONS || p == CR_GAME_ACTIONS || p == CR_CONTENT || p == CR_GAMES || p == CR_LISTS) u->tab = 1;
+    else if (p == CR_SAVES_LIBRARY || p == CR_STATE_LIST || p == CR_STATE_ACTIONS || p == CR_STATE_DELETE_CONFIRM) u->tab = 2;
+    else if (p == CR_CORES || p == CR_CORE_DOWNLOADS || p == CR_CORE_DETAILS || p == CR_REMOVE_CORES || p == CR_REMOVE_CORE_CONFIRM) u->tab = 3;
+    else if (p == CR_SETTINGS || p == CR_SYSTEM_SETTINGS || p == CR_THEMES || p == CR_INFORMATION ||
+             p == CR_ABOUT || p == CR_LICENSE || (p >= CR_UI_SETTINGS && p <= CR_OVERLAY_SETTINGS) ||
+             (p >= CR_NOTIFICATIONS_SETTINGS && p <= CR_RA_ACCOUNT)) u->tab = 4;
     u->scroll = 0;
     u->quick_scroll = 0;
     u->text_height = 0;
@@ -667,6 +856,42 @@ static bool pop_page(cr_ui *u) {
     if (u->quick) quick_clamp(u);
     else clamp_scroll(u);
     return true;
+}
+static void refresh_saved_states(cr_ui *u) {
+    u->saved_state_count = 0;
+    u->selected_state = -1;
+    if (!cr_game_id_valid(u->states_game_id)) return;
+    if (!u->saved_states) u->saved_states = calloc(CR_STATE_STORE_LIMIT, sizeof(*u->saved_states));
+    if (!u->saved_states) { cr_ui_message(u, "Mémoire insuffisante"); return; }
+    char error[256] = {0};
+    u->saved_state_count = cr_state_store_list(u->engine.root, u->states_game_id,
+        u->saved_states, CR_STATE_STORE_LIMIT, error, sizeof(error));
+    if (error[0]) cr_ui_message(u, error);
+}
+static void open_state_list(cr_ui *u, const char *game_id) {
+    if (!cr_game_id_valid(game_id)) return;
+    memmove(u->states_game_id, game_id, strlen(game_id) + 1);
+    refresh_saved_states(u);
+    push_page(u, CR_STATE_LIST);
+}
+static void open_core_details(cr_ui *u, int index) {
+    u->detail_core_id[0] = u->detail_pack_id[0] = 0;
+    if (index >= 0) {
+        const cr_core_descriptor *core = cr_registry_get(index);
+        if (!core) return;
+        snprintf(u->detail_core_id, sizeof(u->detail_core_id), "%s", core->id);
+    } else {
+        size_t pack_index = (size_t)(-index - 1);
+        if (pack_index >= u->core_catalog.count) return;
+        const cr_core_pack *pack = &u->core_catalog.packs[pack_index];
+        snprintf(u->detail_core_id, sizeof(u->detail_core_id), "%s", pack->core_id);
+        snprintf(u->detail_pack_id, sizeof(u->detail_pack_id), "%s", pack->id);
+    }
+    push_page(u, CR_CORE_DETAILS);
+    if (!u->core_catalog.count && !u->catalog_loading && u->platform.refresh_core_catalog) {
+        u->catalog_loading = true;
+        u->platform.refresh_core_catalog(u->platform.context);
+    }
 }
 void cr_ui_message(cr_ui *u, const char *s) {
     snprintf(u->message, sizeof(u->message), "%s", s ? s : "");
@@ -710,6 +935,11 @@ static void achievement_notification(void *context, const cr_cheevos_notificatio
     char detail[256];
     switch (event->type) {
     case CR_CHEEVOS_GAME_READY:
+        if (u->engine.loaded && event->image_url[0] && u->platform.game_image) {
+            u->platform.game_image(u->platform.context, u->engine.id, event->image_url);
+            int game = game_index(u, u->engine.id);
+            if (game >= 0) snprintf(u->games[game].cover, sizeof(u->games[game].cover), "%.255s", event->image_url);
+        }
         if (!u->notify_cards) break;
         snprintf(detail, sizeof(detail), "%u/%u succès - Mode normal", event->unlocked, event->total);
         cr_notifications_push(&u->notifications, CR_NOTIFICATION_GAME, 0,
@@ -779,6 +1009,27 @@ void cr_ui_achievement_frame(cr_ui *u) {
     if (u->ra_enabled && u->engine.players <= 1) cr_cheevos_frame(u->achievements);
 }
 void cr_ui_text_result(cr_ui *u, int field, const char *text, bool accepted) {
+    if (u->ui_editing == 3 && (field == 3 || field == -3)) {
+        snprintf(u->library_query, sizeof(u->library_query), "%.127s", field == 3 && !accepted ? u->library_original_query : text);
+        u->scroll = 0; u->focus = library_count(u) ? 1 : 0;
+        if (field == 3) u->ui_editing = 0;
+        return;
+    }
+    if (u->ui_editing == 4 && (field == 4 || field == -4)) {
+        snprintf(u->state_rename, sizeof(u->state_rename), "%.95s", text);
+        if (field == 4) {
+            u->ui_editing = 0;
+            if (accepted && u->selected_state >= 0 && (size_t)u->selected_state < u->saved_state_count) {
+                char error[256] = {0};
+                bool ok = cr_state_store_rename(u->engine.root, &u->saved_states[u->selected_state],
+                                                u->state_rename, error, sizeof(error));
+                pop_page(u);
+                refresh_saved_states(u);
+                cr_ui_message(u, ok ? "État renommé" : error);
+            }
+        }
+        return;
+    }
     if (field < 0 && -field == u->ra_editing) {
         snprintf(u->ra_preview, sizeof(u->ra_preview), "%s", text);
         return;
@@ -796,6 +1047,8 @@ void cr_ui_init(cr_ui *u, cr_platform p, const char *root) {
     u->width = 384;
     u->height = 700;
     u->filter = -1;
+    u->library_filter = -1;
+    u->selected_state = -1;
     u->theme = CR_THEME_CORVUS;
     u->menu_pointer = u->feedback_target = -1;
     u->show_input = true;
@@ -847,8 +1100,10 @@ void cr_ui_destroy(cr_ui *u) {
     cr_engine_destroy(&u->engine);
     free(u->games);
     free(u->license);
+    free(u->saved_states);
     u->games = NULL;
     u->license = NULL;
+    u->saved_states = NULL;
 }
 void cr_ui_size(cr_ui *u, float w, float h) {
     u->width = fmaxf(1, w);
@@ -943,6 +1198,90 @@ static bool result(cr_ui *u, bool ok) {
     if (!ok)
         cr_ui_message(u, u->engine.error);
     return ok;
+}
+static bool state_busy(cr_ui *u) {
+    if (!u->importing && !u->save_request && !u->installing) return false;
+    cr_ui_message(u, "Terminez l'opération en cours avant de gérer les états");
+    return true;
+}
+static void create_named_state(cr_ui *u) {
+    if (state_busy(u) || !u->engine.loaded || !cr_engine_can_state(&u->engine)) return;
+    snprintf(u->states_game_id, sizeof(u->states_game_id), "%s", u->engine.id);
+    refresh_saved_states(u);
+    bool used[CR_STATE_STORE_LIMIT + 1] = {false};
+    for (size_t i = 0; i < u->saved_state_count; ++i)
+        if (u->saved_states[i].slot <= CR_STATE_STORE_LIMIT) used[u->saved_states[i].slot] = true;
+    unsigned number = 1;
+    while (number <= CR_STATE_STORE_LIMIT && used[number]) ++number;
+    char name[96]; snprintf(name, sizeof(name), "État %u", number);
+    cr_state_entry created;
+    if (!result(u, cr_state_store_create(&u->engine, name, &created))) {
+        refresh_saved_states(u);
+        cr_ui_message(u, u->engine.error);
+        return;
+    }
+    if (u->page != CR_STATE_LIST) push_page(u, CR_STATE_LIST);
+    refresh_saved_states(u);
+    for (size_t i = 0; i < u->saved_state_count; ++i)
+        if (u->saved_states[i].slot == created.slot) u->focus = (int)i + 1;
+    cr_ui_move(u, 0);
+    cr_ui_message(u, "État sauvegardé");
+}
+static bool selected_state_entry(const cr_ui *u, cr_state_entry *entry) {
+    if (u->selected_state < 0 || (size_t)u->selected_state >= u->saved_state_count) return false;
+    *entry = u->saved_states[u->selected_state];
+    return true;
+}
+static void load_named_state(cr_ui *u, const cr_state_entry *entry) {
+    if (state_busy(u)) return;
+    int core = cr_registry_find(entry->core_id);
+    if (!u->engine.handle || u->engine.system != core) {
+        cr_ui_message(u, "Chargez le cœur associé à cet état"); return;
+    }
+    int game = game_index(u, entry->game_id), second = game_index(u, entry->second_id);
+    if (game < 0 || (entry->players == 2 && second < 0)) {
+        cr_ui_message(u, "Le contenu associé à cet état est introuvable"); return;
+    }
+    char title[512];
+    if (entry->players == 2) snprintf(title, sizeof(title), "%.230s + %.230s", u->games[game].title, u->games[second].title);
+    else snprintf(title, sizeof(title), "%s", u->games[game].title);
+    bool same = u->engine.loaded && !strcmp(u->engine.id, entry->game_id) &&
+        u->engine.players == entry->players && !strcmp(u->engine.second_id, entry->second_id) &&
+        !strcmp(u->engine.subsystem_id, entry->subsystem_id);
+    corvus_core_info current = {.struct_size = sizeof(current)};
+    const cr_core_descriptor *next = cr_registry_get(core);
+    if (!cr_engine_core_info(&u->engine, &current) ||
+        strcmp(entry->core_version, same ? current.version : next ? next->version : "")) {
+        cr_ui_message(u, "Cet état exige la version du cœur avec laquelle il a été créé"); return;
+    }
+    uint8_t *verified = NULL; size_t verified_size = 0; char error[256] = {0};
+    bool valid = cr_state_store_read(u->engine.root, entry, &verified, &verified_size, error, sizeof(error));
+    free(verified);
+    if (!valid) { cr_ui_message(u, error); return; }
+    if (!same) {
+        char paths[2][4256];
+        snprintf(paths[0], sizeof(paths[0]), "%s/roms/%s.rom", u->engine.root, entry->game_id);
+        snprintf(paths[1], sizeof(paths[1]), "%s/roms/%s.rom", u->engine.root, entry->second_id);
+        bool opened;
+        if (entry->players == 2) {
+            const char *ids[] = {entry->game_id, entry->second_id}, *files[] = {paths[0], paths[1]};
+            opened = cr_engine_open_subsystem(&u->engine, core, entry->subsystem_id, ids, files);
+        } else opened = cr_engine_open(&u->engine, core, entry->game_id, paths[0]);
+        if (!result(u, opened)) return;
+        ++u->core_revision;
+        u->input_player = 0;
+        cr_notifications_clear(&u->notifications);
+        achievement_sync(u, false);
+        snprintf(u->title, sizeof(u->title), "%s", title);
+    }
+    if (!result(u, cr_state_store_load(&u->engine, entry))) return;
+    cr_cheevos_reset(u->achievements);
+    achievement_sync(u, true);
+    u->notifications_loaded = true;
+    page(u, CR_PLAY);
+    if (u->platform.touch) u->platform.touch(u->platform.context, entry->game_id);
+    cr_ui_reload(u);
+    cr_ui_message(u, "État chargé");
 }
 static void open_game(cr_ui *u, int system, const char *id, const char *title, const char *path) {
     if (!u->engine.handle) {
@@ -1127,7 +1466,73 @@ static void activate(cr_ui *u, row r) {
         cr_ui_message(u, "Téléchargement du cœur en cours");
         return;
     }
+    if (r.disabled && r.action != ACT_GAME) {
+        if (r.hint[0]) cr_ui_message(u, r.hint);
+        return;
+    }
     switch (r.action) {
+    case ACT_CORE_DETAILS:
+        open_core_details(u, r.value);
+        break;
+    case ACT_STATE_GAME:
+        if (r.value < 0) { if (u->engine.loaded) open_state_list(u, u->engine.id); }
+        else if ((size_t)r.value < u->game_count) open_state_list(u, u->games[r.value].id);
+        break;
+    case ACT_STATE_CREATE:
+        create_named_state(u);
+        break;
+    case ACT_STATE_ACTIONS:
+        if (r.value >= 0 && (size_t)r.value < u->saved_state_count) {
+            u->selected_state = r.value;
+            push_page(u, CR_STATE_ACTIONS);
+        }
+        break;
+    case ACT_STATE_LOAD: {
+        cr_state_entry entry;
+        if (selected_state_entry(u, &entry)) load_named_state(u, &entry);
+        break;
+    }
+    case ACT_STATE_RENAME: {
+        cr_state_entry entry;
+        if (u->platform.edit_text && selected_state_entry(u, &entry)) {
+            snprintf(u->state_rename, sizeof(u->state_rename), "%s", entry.name);
+            u->ui_editing = 4;
+            u->platform.edit_text(u->platform.context, 4, u->state_rename, false);
+        }
+        break;
+    }
+    case ACT_STATE_DUPLICATE: {
+        cr_state_entry entry, created; char error[256] = {0};
+        if (selected_state_entry(u, &entry)) {
+            bool ok = cr_state_store_duplicate(u->engine.root, &entry, &created, error, sizeof(error));
+            pop_page(u); refresh_saved_states(u);
+            cr_ui_message(u, ok ? "État dupliqué" : error);
+        }
+        break;
+    }
+    case ACT_STATE_SHARE: {
+        cr_state_entry entry; char error[256] = {0}; uint8_t *bytes = NULL; size_t size = 0;
+        if (u->platform.share_state && selected_state_entry(u, &entry)) {
+            if (cr_state_store_read(u->engine.root, &entry, &bytes, &size, error, sizeof(error))) {
+                u->platform.share_state(u->platform.context, entry.name, bytes, size);
+                cr_ui_message(u, "Ouverture du partage...");
+            } else cr_ui_message(u, error);
+        }
+        free(bytes);
+        break;
+    }
+    case ACT_STATE_DELETE_CONFIRM:
+        push_page(u, CR_STATE_DELETE_CONFIRM);
+        break;
+    case ACT_STATE_DELETE: {
+        cr_state_entry entry; char error[256] = {0};
+        if (selected_state_entry(u, &entry)) {
+            bool ok = cr_state_store_delete(u->engine.root, &entry, error, sizeof(error));
+            pop_page(u); pop_page(u); refresh_saved_states(u);
+            cr_ui_message(u, ok ? "État supprimé" : error);
+        }
+        break;
+    }
     case ACT_CORE_REMOVE_CANCEL:
         pop_page(u); break;
     case ACT_CORE_REMOVE_CONFIRM: {
@@ -1373,7 +1778,10 @@ static void activate(cr_ui *u, row r) {
         }
         break;
     case ACT_LIBRARY:
-        push_page(u, CR_LIBRARY);
+        if (r.value == 1 && u->page == CR_LIBRARY_ACTIONS) {
+            u->library_list = !u->library_list;
+            pop_page(u); u->scroll = 0; u->focus = library_count(u) ? 1 : 0;
+        } else push_page(u, CR_LIBRARY);
         break;
     case ACT_FOLDER:
         if (!u->engine.handle) {
@@ -1464,6 +1872,8 @@ static void activate(cr_ui *u, row r) {
         u->quick = true;
         break;
     case ACT_PAGE:
+        if (r.value == CR_SAVESTATES) u->auto_state_available = cr_engine_has_auto_state(&u->engine);
+        if (r.value == CR_GAME_SAVES) u->save_player = 0;
         push_page(u, r.value);
         break;
     case ACT_SHOW_INPUT:
@@ -1545,7 +1955,9 @@ void cr_ui_import(cr_ui *u, const cr_import *item) {
 static void quick_action(cr_ui *u, int action) {
     if (action < 0 || action >= CR_QUICK_COUNT ||
         (action == CR_QUICK_RESTART && !cr_engine_can_reset(&u->engine)) ||
-        (action == CR_QUICK_STATES && !cr_engine_can_state(&u->engine))) return;
+        ((action == CR_QUICK_STATES || action == CR_QUICK_LOAD_STATE || action == CR_QUICK_SAVE_STATE) &&
+         !cr_engine_can_state(&u->engine))) return;
+    if ((action == CR_QUICK_LOAD_STATE || action == CR_QUICK_SAVE_STATE) && state_busy(u)) return;
     if (u->save_request && (action == CR_QUICK_RESTART || action == CR_QUICK_CLOSE ||
                            action == CR_QUICK_STATES || action == CR_QUICK_GAME_SAVES)) {
         cr_ui_message(u, "Transfert de sauvegarde en cours"); return;
@@ -1556,6 +1968,12 @@ static void quick_action(cr_ui *u, int action) {
         return;
     }
     switch (action) {
+    case CR_QUICK_LOAD_STATE:
+        open_state_list(u, u->engine.id);
+        break;
+    case CR_QUICK_SAVE_STATE:
+        create_named_state(u);
+        break;
     case CR_QUICK_RESUME:
         page(u, CR_PLAY);
         break;
@@ -1596,6 +2014,14 @@ static void quick_action(cr_ui *u, int action) {
     cr_ui_clear_input(u);
 }
 void cr_ui_back(cr_ui *u) {
+    if (u->page == CR_LIBRARY && u->library_search) {
+        u->ui_editing = 0;
+        if (u->platform.edit_text) u->platform.edit_text(u->platform.context, 0, "", false);
+        u->library_search = false;
+        u->library_query[0] = 0;
+        u->scroll = 0; u->focus = library_count(u) ? 1 : 0;
+        return;
+    }
     if (u->controller_capture >= 0) {
         u->controller_capture = -1;
         cr_ui_clear_input(u); cr_ui_message(u, "Affectation annulée"); return;
@@ -1661,23 +2087,12 @@ void cr_ui_move(cr_ui *u, int direction) {
     if (count <= 0)
         return;
     u->focus = (u->focus + direction + count) % count;
-    if (u->quick) {
-        float top = u->focus * 76;
-        float view = fmaxf(1, body_bottom(u) - 64);
-        if (top < u->quick_scroll)
-            u->quick_scroll = top;
-        if (top + 76 > u->quick_scroll + view)
-            u->quick_scroll = top + 76 - view;
-        quick_clamp(u);
-    } else {
-        float top = u->focus * 76;
-        float view = fmaxf(1, body_bottom(u) - 64);
-        if (top < u->scroll)
-            u->scroll = top;
-        if (top + 76 > u->scroll + view)
-            u->scroll = top + 76 - view;
-        clamp_scroll(u);
-    }
+    cr_menu_rect bounds = cr_interface_row_bounds(u, u->focus);
+    float top = cr_interface_content_top(u), bottom = body_bottom(u);
+    float *scroll = u->quick ? &u->quick_scroll : &u->scroll;
+    if (bounds.y < top) *scroll += bounds.y - top;
+    else if (bounds.y + bounds.h > bottom) *scroll += bounds.y + bounds.h - bottom;
+    if (u->quick) quick_clamp(u); else clamp_scroll(u);
 }
 void cr_ui_key(cr_ui *u, unsigned mask, bool down) {
     if (down) {
@@ -1713,7 +2128,7 @@ static unsigned button_at(const cr_ui *u, float x, float y) {
 }
 static void quick_clamp(cr_ui *u) {
     u->quick_scroll = fmaxf(0, fminf(u->quick_scroll,
-                       rows(u) * 76 - fmaxf(1, body_bottom(u) - 64)));
+        cr_interface_content_height(u, rows(u)) - fmaxf(1, body_bottom(u) - cr_interface_content_top(u))));
 }
 static int target(const cr_ui *u, float x, float y) {
     if (x < 0 || y < 0 || x >= u->width || y >= u->height)
@@ -1723,14 +2138,7 @@ static int target(const cr_ui *u, float x, float y) {
         return cr_area_contains(layout.menu, x, y) ? -3 :
                cr_area_contains(layout.hide, x, y) ? -5 : -1;
     }
-    if (y < 56)
-        return x < 56 && has_back(u) ? -2 : -1;
-    if (y >= u->height - 72)
-        return -100 - (int)fminf(2, fmaxf(0, floorf(x / u->width * 3)));
-    if (y < 64 || y >= body_bottom(u))
-        return -1;
-    int i = (int)((y - 64 + (u->quick ? u->quick_scroll : u->scroll)) / 76);
-    return i < rows(u) ? (u->quick ? 10000 + i : i) : -1;
+    return cr_interface_target(u, x, y, rows(u), has_back(u));
 }
 void cr_ui_touch(cr_ui *u, int id, int phase, float x, float y) {
     cr_ui_touch_at(u, id, phase, x, y, u->time);
@@ -1850,8 +2258,40 @@ void cr_ui_touch_at(cr_ui *u, int id, int phase, float x, float y, double event_
             cr_ui_back(u);
             return;
         }
-        if (t <= -100) {
-            page(u, -t - 100);
+        if (t <= -5000) {
+            int index = -t - 5000;
+            if (index >= rows(u)) return;
+            row item = get_row(u, index);
+            if (u->page == CR_CORES && item.action == ACT_SELECT) open_core_details(u, item.value);
+            else if (u->page == CR_LIBRARY && item.action == ACT_GAME && item.value >= 0 && (size_t)item.value < u->game_count) {
+                snprintf(u->states_game_id, sizeof(u->states_game_id), "%s", u->games[item.value].id);
+                push_page(u, CR_GAME_ACTIONS);
+            } else if (item.action == ACT_STATE_ACTIONS || item.action == ACT_STATE_GAME) activate(u, item);
+            return;
+        }
+        if (t == -200 && u->page == CR_LIBRARY) {
+            u->library_search = true;
+            if (u->ui_editing != 3) snprintf(u->library_original_query, sizeof(u->library_original_query), "%s", u->library_query);
+            u->ui_editing = 3;
+            if (u->platform.edit_text) u->platform.edit_text(u->platform.context, 3, u->library_query, false);
+            return;
+        }
+        if (t == -201 && u->page == CR_LIBRARY) { push_page(u, CR_LIBRARY_ACTIONS); return; }
+        if (t == -202 && u->page == CR_LIBRARY) {
+            u->ui_editing = 0;
+            if (u->platform.edit_text) u->platform.edit_text(u->platform.context, 0, "", false);
+            u->library_query[0] = 0; u->library_search = false; u->scroll = 0;
+            return;
+        }
+        if (t <= -210 && t >= -213 && u->page == CR_LIBRARY) {
+            u->library_filter = -t - 211; u->scroll = 0; u->focus = library_count(u) ? 1 : 0;
+            return;
+        }
+        if (t == -300) { push_page(u, CR_SETTINGS); return; }
+        if (t <= -100 && t >= -104) {
+            static const int pages[] = {CR_MAIN, CR_LIBRARY, CR_SAVES_LIBRARY, CR_CORES, CR_SETTINGS};
+            cr_ui_reload(u);
+            page(u, pages[-t - 100]);
             return;
         }
         if (t >= 0) {
@@ -1861,20 +2301,9 @@ void cr_ui_touch_at(cr_ui *u, int id, int phase, float x, float y, double event_
     }
 }
 
-static uint32_t alpha_color(uint32_t color, float alpha) {
-    return (color & 0xffffff) | ((uint32_t)lroundf(fmaxf(0, fminf(1, alpha)) * 255) << 24);
-}
 static void rect(const cr_painter *p, float x, float y, float w, float h, uint32_t c) {
     if (w > 0 && h > 0)
         p->rect(p->context, x, y, w, h, c);
-}
-static void toggle(const cr_painter *p, const cr_theme *theme, float x, float y, bool checked) {
-    uint32_t track = checked ? theme->accent : theme->divider;
-    p->circle(p->context, x + 14, y + 14, 14, track);
-    rect(p, x + 14, y, 20, 28, track);
-    p->circle(p->context, x + 34, y + 14, 14, track);
-    p->circle(p->context, x + (checked ? 34 : 14), y + 14, 10,
-              checked ? 0xffffffff : theme->muted);
 }
 static void text(const cr_painter *p, const char *s, float x, float y, float size, uint32_t c,
                  float max) {
@@ -1882,9 +2311,6 @@ static void text(const cr_painter *p, const char *s, float x, float y, float siz
 }
 static float width(const cr_painter *p, const char *s, float size) {
     return p->measure(p->context, s, size);
-}
-static void center(const cr_painter *p, const char *s, float x, float y, float size, uint32_t c) {
-    text(p, s, x - width(p, s, size) / 2, y, size, c, 10000);
 }
 static float paragraphs(const cr_painter *p, const char *s, float x, float top, float w, float line,
                         uint32_t color, float scroll, float bottom) {
@@ -1929,11 +2355,44 @@ static float paragraphs(const cr_painter *p, const char *s, float x, float top, 
         text(p, buffer, x, y, 14, color, w);
     return y + scroll - top + line;
 }
+static row get_visual_row(const cr_ui *u, int index) {
+    if (index >= 0) return get_row(u, index);
+    row r; fill(&r, "", "", CR_ICON_CONTENT, ACT_NONE, 0);
+    if (u->page == CR_CORE_DETAILS) {
+        int pack_index = detail_pack(u), core_index = cr_registry_find(u->detail_core_id);
+        const cr_core_descriptor *core = cr_registry_get(core_index);
+        const cr_core_pack *pack = pack_index >= 0 ? &u->core_catalog.packs[pack_index] : NULL;
+        snprintf(r.label, sizeof(r.label), "%s", core ? core->name : pack ? pack->name : "Cœur indisponible");
+        const char *system = core ? core->system_name : pack ? pack->system_name : "";
+        const char *version = core ? core->version : pack ? pack->version : "?";
+        if (pack && pack->size) snprintf(r.hint, sizeof(r.hint), "%.95s\nVersion %.55s · %.1f Mo\n%.60s",
+            system, version, pack->size / 1048576.0, pack->description);
+        else snprintf(r.hint, sizeof(r.hint), "%.110s\nVersion %.55s", system, version);
+        r.checked = core != NULL;
+        r.console = !strcmp(u->detail_core_id, "corvus.gb") ? 0 : !strcmp(u->detail_core_id, "corvus.gbc") ? 1 :
+                    !strcmp(u->detail_core_id, "corvus.gba") ? 2 : -1;
+    } else if (u->page == CR_STATE_ACTIONS || u->page == CR_STATE_DELETE_CONFIRM) {
+        cr_state_entry entry;
+        r.value = 1 + (int)u->saved_state_count +
+            (u->engine.loaded && !strcmp(u->engine.id, u->states_game_id) ? 2 : 0);
+        if (selected_state_entry(u, &entry)) {
+            snprintf(r.label, sizeof(r.label), "%s", u->ui_editing == 4 ? u->state_rename : entry.name);
+            time_t stamp = (time_t)(entry.created_ms / 1000); struct tm local;
+            if (localtime_r(&stamp, &local)) strftime(r.hint, sizeof(r.hint), "%d/%m/%Y · %H:%M", &local);
+            snprintf(r.image, sizeof(r.image), "%s", entry.preview_key);
+        }
+    } else if (u->page == CR_STATE_LIST || u->page == CR_GAME_ACTIONS) {
+        int game = game_index(u, u->states_game_id);
+        if (game >= 0) game_row(&r, u, game, ACT_NONE);
+        else snprintf(r.label, sizeof(r.label), "Sauvegardes");
+        if (u->page == CR_STATE_LIST) snprintf(r.hint, sizeof(r.hint), "%zu état%s enregistré%s", u->saved_state_count,
+            u->saved_state_count > 1 ? "s" : "", u->saved_state_count > 1 ? "s" : "");
+    }
+    return r;
+}
 void cr_ui_draw(cr_ui *u, const cr_painter *p) {
     const cr_theme *theme = cr_theme_get(u->theme);
-    uint32_t bg = theme->background, header = theme->header, nav = theme->navigation;
-    uint32_t fg = theme->text, muted = theme->muted, accent = theme->accent;
-    uint32_t line = theme->divider, focus = theme->focus;
+    uint32_t bg = theme->background, fg = theme->text;
     float w = u->width, h = u->height;
     rect(p, 0, 0, w, h, bg);
     if (u->page == CR_PLAY && !u->quick) {
@@ -1960,6 +2419,14 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         case CR_SETTINGS:
             title = "Réglages";
             break;
+        case CR_SAVES_LIBRARY: title = "Saves"; break;
+        case CR_STATE_LIST: title = "Saves"; break;
+        case CR_STATE_ACTIONS: title = "État de sauvegarde"; break;
+        case CR_STATE_DELETE_CONFIRM: title = "Supprimer l'état ?"; break;
+        case CR_CORE_DETAILS: title = "Installer un cœur"; break;
+        case CR_LIBRARY_ACTIONS: title = "Bibliothèque"; break;
+        case CR_GAME_ACTIONS: title = "Options du jeu"; break;
+        case CR_SYSTEM_SETTINGS: title = "Système"; break;
         case CR_REMOVE_CORES:
             title = "Cœurs téléchargés";
             break;
@@ -1967,7 +2434,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
             title = "Supprimer le cœur ?";
             break;
         case CR_CORES:
-            title = "Charger un cœur";
+            title = "Cœurs";
             break;
         case CR_GAME_SAVES:
             title = "Sauvegardes du jeu";
@@ -2028,7 +2495,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
             title = "Interface utilisateur";
             break;
         case CR_VIDEO_SETTINGS:
-            title = "Vidéo";
+            title = "Affichage";
             break;
         case CR_AUDIO_SETTINGS:
             title = "Audio";
@@ -2072,56 +2539,22 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         default:
             break;
         }
-        if (p->clip)
-            p->clip(p->context, 0, 56, w, fmaxf(1, body_bottom(u) - 56));
+        if (u->quick && u->engine.loaded) {
+            cr_play_layout layout = play_layout(u);
+            rect(p, 0, 0, w, h, 0xff000000);
+            if (p->game) p->game(p->context, u->engine.pixels, u->engine.width, u->engine.height,
+                layout.video.x, layout.video.y, layout.video.w, layout.video.h);
+        }
         int count = rows(u);
-        float scroll = u->quick ? u->quick_scroll : u->scroll;
-        int first = (int)fmaxf(0, floorf((scroll - 84) / 76));
-        int end = (int)fminf(count, floorf((scroll + body_bottom(u) - 64) / 76) + 1);
-        for (int i = first; i < end; i++) {
-            float y = 64 + i * 76 - scroll;
-            if (y + 76 < 56 || y > body_bottom(u))
-                continue;
-            row r = get_row(u, i);
-            if (i == u->focus)
-                rect(p, 0, y, w, 76, focus);
-            else if (u->feedback_target == (u->quick ? 10000 + i : i) && u->feedback_alpha > 0)
-                rect(p, 0, y, w, 76, alpha_color(focus, u->feedback_alpha));
-            p->icon(p->context, r.icon, 20, y + 22, 32, r.disabled ? muted : theme->icon);
-            float text_width = w - (r.toggle ? 150 : 110);
-            text(p, r.label, 66, y + 29, 16, r.disabled ? muted : fg, text_width);
-            text(p, r.hint, 66, y + 53, 13, muted, text_width);
-            if (r.toggle) {
-                toggle(p, theme, w - 72, y + 24, r.checked);
-            } else if (r.checked)
-                text(p, "✓", w - 36, y + 41, 20, accent, 28);
-            else if (r.action != ACT_NONE)
-                p->icon(p->context, CR_ICON_NEXT, w - 36, y + 29, 18, muted);
-            rect(p, 66, y + 75, w - 66, 1, line);
-        }
-        if (u->page == CR_CORE_DOWNLOADS && u->core_catalog.count == 0) {
-            text(p, u->catalog_loading ? "Recherche des cœurs officiels..." :
-                    "Aucun cœur disponible pour cette version.",
-                 20, 236, 14, fg, w - 40);
-        }
-        if (u->page == CR_LIBRARY && count == 1) {
-            text(p, "Aucun jeu dans la bibliothèque.",
-                 20, 246, 14, fg, w - 40);
-        }
-        if (u->page == CR_GAMES && !count) {
-            text(p,
-                 u->filter < 0 ? "Aucun contenu dans l’historique."
-                               : "Aucun contenu dans cette liste.",
-                 20, 106, 15, fg, w - 40);
-            text(p, "Utilisez Charger du contenu.", 20, 137, 13, muted, w - 40);
-        }
+        cr_interface_draw(u, p, title, has_back(u), count, get_visual_row);
+        if (p->clip) p->clip(p->context, 0, 56, w, fmaxf(1, body_bottom(u) - 56));
         if (u->page == CR_ABOUT)
             u->text_height = paragraphs(
                 p,
                 "CorvusRetro 0.22.2\n\nFrontend original en C, rendu OpenGL ES et audio "
                 "AAudio.\n\nCorvusSoftware\nCœurs officiels CorvusCore 0.15.0 : Game Boy, Game "
-                "Boy Color, Game Boy Advance.\n\nNavigation inspirée de "
-                "MaterialUI. Thèmes CorvusRetro, ASUS et NVIDIA Shield.\n\nCopyright (C) 2026 "
+                "Boy Color, Game Boy Advance.\n\nInterface CorvusRetro. "
+                "Thèmes CorvusRetro, ASUS et NVIDIA Shield.\n\nCopyright (C) 2026 "
                 "CorvusSoftware\nSPDX-License-Identifier: AGPL-3.0-only",
                 20, 92, w - 40, 24, fg, u->scroll, body_bottom(u));
         if ((u->page == CR_SUBSYSTEMS || u->page == CR_CORE_OPTIONS) && !count) {
@@ -2160,36 +2593,6 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
                                         w - 40, 23, fg, u->scroll, body_bottom(u));
         if (p->clip)
             p->clip(p->context, 0, 0, w, h);
-        // Cover scrolled content before drawing the fixed header and navigation.
-        rect(p, 0, 0, w, 56, header);
-        if (has_back(u) && u->feedback_target == -2 && u->feedback_alpha > 0)
-            p->circle(p->context, 28, 28, 22, alpha_color(focus, u->feedback_alpha));
-        if (has_back(u))
-            p->icon(p->context, CR_ICON_BACK, 12, 16, 24, theme->header_text);
-        text(p, title, has_back(u) ? 56 : 20, 35, 19, theme->header_text, w - 100);
-        rect(p, 0, body_bottom(u), w, 100, bg);
-        char footer[256];
-        if (u->engine.handle) {
-            corvus_core_info info = {.struct_size = sizeof(info)};
-            bool known = cr_engine_core_info(&u->engine, &info);
-            snprintf(footer, sizeof(footer), "Cœur chargé : %s · %s", known ? info.name : "?",
-                     known ? info.version : "?");
-        } else
-            snprintf(footer, sizeof(footer), "Aucun cœur");
-        text(p, footer, 20, h - 84, 11, muted, w - 40);
-        rect(p, 0, h - 72, w, 72, nav);
-        rect(p, 0, h - 72, w, 1, line);
-        const char *labels[] = {"Menu principal", "Listes de lecture", "Réglages"};
-        int icons[] = {CR_ICON_HOME, CR_ICON_LIST, CR_ICON_SETTINGS};
-        int selected = u->tab;
-        for (int i = 0; i < 3; i++) {
-            float x = w * (i + .5f) / 3;
-            uint32_t c = i == selected ? theme->navigation_active : theme->navigation_passive;
-            if (u->feedback_target == -100 - i && u->feedback_alpha > 0)
-                rect(p, i * w / 3, h - 72, w / 3, 72, alpha_color(focus, u->feedback_alpha));
-            p->icon(p->context, icons[i], x - 12, h - 61, 24, c);
-            center(p, labels[i], x, h - 17, 10, c);
-        }
     }
     if (u->message_time > 0 && u->message[0]) {
         float y = u->page == CR_PLAY ? h - 108 : h - 142;

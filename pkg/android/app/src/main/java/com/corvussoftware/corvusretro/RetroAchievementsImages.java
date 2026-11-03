@@ -30,7 +30,7 @@ import javax.net.ssl.HttpsURLConnection;
 
 /** Public badge and game art only. Rendering never waits for image IO or decoding. */
 final class RetroAchievementsImages {
-    private static final int MAX_BYTES = 512 * 1024, MAX_SIDE = 1024, TILE = 96;
+    private static final int MAX_BYTES = 512 * 1024, MAX_SIDE = 1024;
     private static final int MEMORY_IMAGES = 32, STATES = 64, DISK_IMAGES = 64;
     private static final long RETRY_MS = 60000;
     private static final Pattern OFFICIAL = Pattern.compile(
@@ -40,6 +40,7 @@ final class RetroAchievementsImages {
             TimeUnit.SECONDS, new ArrayBlockingQueue<>(16), new ThreadPoolExecutor.AbortPolicy());
     private final Context context;
     private final Runnable ready;
+    private final int tile, memoryImages;
     private final Object lock = new Object();
     private final LinkedHashMap<String, Entry> entries = new LinkedHashMap<>(16, .75f, true);
     private volatile boolean closed;
@@ -52,8 +53,14 @@ final class RetroAchievementsImages {
     }
 
     RetroAchievementsImages(Context context, Runnable ready) {
+        this(context,ready,96);
+    }
+    RetroAchievementsImages(Context context, Runnable ready, int tile) {
+        if (tile != 96 && tile != 512) throw new IllegalArgumentException("image tile size");
         this.context = context;
         this.ready = ready;
+        this.tile = tile;
+        this.memoryImages = tile == 96 ? MEMORY_IMAGES : 12;
     }
 
     static boolean allowed(String url) { return url != null && OFFICIAL.matcher(url).matches(); }
@@ -101,7 +108,7 @@ final class RetroAchievementsImages {
         return bytes.toByteArray();
     }
 
-    private static Bitmap decode(byte[] data) throws IOException {
+    private Bitmap decode(byte[] data) throws IOException {
         byte[] png = {(byte) 137, 80, 78, 71, 13, 10, 26, 10};
         if (data.length < png.length || !Arrays.equals(Arrays.copyOf(data, png.length), png))
             throw new IOException("not PNG");
@@ -121,9 +128,9 @@ final class RetroAchievementsImages {
             if (source == null) throw new IOException("image conversion");
         }
         int side = Math.max(source.getWidth(), source.getHeight());
-        if (side <= TILE) return source;
-        int width = Math.max(1, source.getWidth() * TILE / side);
-        int height = Math.max(1, source.getHeight() * TILE / side);
+        if (side <= tile) return source;
+        int width = Math.max(1, source.getWidth() * tile / side);
+        int height = Math.max(1, source.getHeight() * tile / side);
         Bitmap tile = Bitmap.createScaledBitmap(source, width, height, true);
         if (tile != source) source.recycle();
         return tile;
@@ -202,7 +209,7 @@ final class RetroAchievementsImages {
                 int count = 0;
                 for (Entry value : entries.values()) if (value.bitmap != null) count++;
                 for (Entry value : entries.values()) {
-                    if (count <= MEMORY_IMAGES) break;
+                    if (count <= memoryImages) break;
                     if (value != entry && value.bitmap != null) { value.bitmap = null; value.retryAt = 0; count--; }
                 }
                 published = true;

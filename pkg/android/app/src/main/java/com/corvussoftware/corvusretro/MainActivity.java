@@ -60,6 +60,8 @@ public final class MainActivity extends NativeActivity {
     private SaveTransfers saveTransfers;
     private RetroAchievementsService achievements;
     private RetroAchievementsImages achievementImages;
+    private FrontendImages frontendImages;
+    private StateShares stateShares;
     private NativeTextInput textInput;
     private GameLibrary.Pending pending;
     private volatile boolean destroyed;
@@ -92,7 +94,14 @@ public final class MainActivity extends NativeActivity {
     private static native void imported(String id, String title, int system, String path, String error);
     static native void achievementResponse(long id, int status, byte[] body);
     static native void achievementImageReady();
-    static native void textInputResult(int field, String text, boolean accepted);
+    private static volatile long textInputTicket;
+    private static native void textInputResultNative(int field, String text, boolean accepted, long ticket);
+    static void textInputResult(int field, String text, boolean accepted) {
+        textInputResultNative(field, text, accepted, textInputTicket);
+    }
+    static void textInputResult(int field, String text, boolean accepted, long ticket) {
+        textInputResultNative(field, text, accepted, ticket);
+    }
     static native void coreCatalogUpdated(String[] packages, String error);
     static native void coreModulesUpdated(String[] paths);
     static native void coreInstallStatus(String message, boolean finished);
@@ -145,6 +154,8 @@ public final class MainActivity extends NativeActivity {
         updateAchievementSoundVolume();
         achievements = new RetroAchievementsService(this);
         achievementImages = new RetroAchievementsImages(this, MainActivity::achievementImageReady);
+        frontendImages = new FrontendImages(this, library, MainActivity::achievementImageReady);
+        stateShares = new StateShares(this);
         textInput = new NativeTextInput(this);
         inputManager = getSystemService(InputManager.class);
         if (inputManager != null) {
@@ -231,6 +242,8 @@ public final class MainActivity extends NativeActivity {
         saveTransfers.close();
         achievements.close();
         achievementImages.close();
+        frontendImages.close();
+        stateShares.close();
         io.shutdown();
         super.onDestroy();
     }
@@ -269,24 +282,51 @@ public final class MainActivity extends NativeActivity {
         }
         return modules.toArray(new String[0]);
     }
-    public Bitmap achievementImage(String url) { return achievementImages.get(url); }
+    public Bitmap achievementImage(String url) {
+        return RetroAchievementsImages.allowed(url) ? achievementImages.get(url) : frontendImages.get(url);
+    }
+    public void gameImage(String id, String url) {
+        if (destroyed || id == null || url == null || !RetroAchievementsImages.allowed(url)) return;
+        try {
+            io.execute(() -> {
+                if (destroyed) return;
+                try {
+                    library.cover(id,url);
+                    frontendImages.invalidate("cover:" + id);
+                    if (!destroyed) achievementImageReady();
+                } catch (IOException unavailable) {
+                    // Artwork is optional; the original console card stays available.
+                }
+            });
+        } catch (java.util.concurrent.RejectedExecutionException closed) {
+            // Activity teardown owns cancellation of optional metadata work.
+        }
+    }
+    public void shareState(String name, byte[] snapshot) { stateShares.share(name,snapshot); }
     public void achievementRequest(long id, String url, String post) { achievements.request(id, url, post); }
     public String[] achievementCredentials() { return achievements.credentials(); }
     public void achievementCredentialsSet(String user, String token) { achievements.saveCredentials(user, token); }
-    public void textInput(int field, String initial, boolean secret) { textInput.open(field, initial, secret); }
+    public void textInput(int field, String initial, boolean secret) {
+        textInput(field, initial, secret, textInputTicket);
+    }
+    public void textInput(int field, String initial, boolean secret, long ticket) {
+        textInputTicket = ticket;
+        textInput.open(field, initial, secret, ticket);
+    }
     public float density() { return getResources().getDisplayMetrics().density; }
     public String filesRoot() { return getFilesDir().getAbsolutePath(); }
     public String[] games() {
         List<GameLibrary.Game> games = library.games();
-        String[] records = new String[games.size() * 6];
+        String[] records = new String[games.size() * 7];
         for (int i = 0; i < games.size(); i++) {
             GameLibrary.Game game = games.get(i);
-            records[i * 6] = game.id;
-            records[i * 6 + 1] = game.title;
-            records[i * 6 + 2] = Integer.toString(game.system);
-            records[i * 6 + 3] = Long.toString(game.played);
-            records[i * 6 + 4] = game.coreId;
-            records[i * 6 + 5] = game.systemId;
+            records[i * 7] = game.id;
+            records[i * 7 + 1] = game.title;
+            records[i * 7 + 2] = Integer.toString(game.system);
+            records[i * 7 + 3] = Long.toString(game.played);
+            records[i * 7 + 4] = game.coreId;
+            records[i * 7 + 5] = game.systemId;
+            records[i * 7 + 6] = game.cover;
         }
         return records;
     }

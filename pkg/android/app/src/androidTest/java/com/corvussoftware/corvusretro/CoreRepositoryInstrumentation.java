@@ -165,7 +165,7 @@ public final class CoreRepositoryInstrumentation extends Instrumentation {
                         "frozen public catalog provenance matches its expected publisher");
             for (String abi : new String[] {"arm64-v8a", "x86_64"}) {
                 CoreRepository.Catalog catalog = CoreRepository.parseCatalog(payload, abi);
-                check(catalog.cores.size() == 3 && catalog.records.length == 15,
+                check(catalog.cores.size() == 3 && catalog.records.length == 24,
                         files[fixture] + " yields three cores and fifteen JNI fields for " + abi);
                 for (String id : new String[] {"corvus.gb", "corvus.gbc", "corvus.gba"}) {
                     check(catalog.cores.containsKey(id) && abi.equals(catalog.cores.get(id).abi),

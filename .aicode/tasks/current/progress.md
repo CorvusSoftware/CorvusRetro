@@ -1,6 +1,14 @@
-État : DONE pour la livraison0.22.2 autorisée explicitement. PR #28 fusionnée, sourcef83ecd694f5cf373873a011febc910a9a658a2ad, tagv0.22.2/code30.
-CI main41597282038, signé41597582130, publication41598126420 réussis. APK public SHA2562d9cf2198f33263e0b9c132bf13d35f9f92207363b0b721d6311164f8b3cec88 identique à l'artefact signé testé ; certificat durable inchangé, deuxABI/16Ko/zérocoeur/MP3 original/absence provider test/provenance/Àpropos vérifiés.
-Upgrade signé0.22.1/code29->0.22.2/code30 API29x86_64 accepté, mêmeUID10116/dossier/première installation. ASUS/historiqueCorvus-preserved.gba conservés, région identique en pixels ; captures inspectées, aucun nouveau crash observé.
-Reçus : /workspace/setup/{release0222-state.json,signed0222-qualification.json,public0222-qualification.json,signed0222-runtime/upgrade.json}.
-Le comportement fonctionnel reste celui de1375f0e, revu indépendamment : 19 suites natives strictes+ASan/UBSan, tests JVM,38 scénarios audio,321 contrôles batterie et96Android GBA. Seuls les identifiants de version et À propos ont changé avant fusion. Pas d'écoute physique/ROMPokémon/Bluetooth/runtimeARM64 ; les parasites perçus sur le Redmi restent à confirmer.
-La branche documentaire met à jour README et preuves après publication. Vérifier sa CI exacte avant fusion ; les checks GitHub du SHA actif sont la source de vérité. Le tag et le binaire public restent inchangés.
+État : ACTIVE, vérification Android de la refonte. Branche feature/mobile-interface-redesign, base main69952eb.
+
+Périmètre accepté : maquette1..10 et menu rapide12 ; écran11, commandes de jeu et audio conservés. Navigation5onglets, bibliothèque/recherche/filtres, cœurs/détails,32 états nommés/aperçus/actions/partage et réglages sont implémentés. Anciens manuels/auto/.sav/.srm/sous-systèmes/options/RA restent accessibles. Aucun moteur/API/pin modifié.
+
+Preuves actuelles : 21/21 suites natives strictes et21/21 ASan/UBSan ; native_interface108 contrôles, state_store135 ; Java25 tests ; rendererprobe3451 contrôles strict/ASan. FrontendServicesInstrumentation31 contrôles Android réels PASS. Frontend core-free et8 tests de publication PASS ; compilation debug/tests etlint PASS.
+
+Revue indépendante :3P2 corrigés puis recheck sans finding. Prévalidation état avant changement de partie, tickets IME C/JNI par génération, refresh après erreur finale IO. Un test Android a ensuite trouvé l'oubli ui_editing3/4 dans la garde d'entrée NativeActivity : clés et axes corrigés. APK reconstruit et nouveau runner figé.
+
+APK actuel ee15f9cf49893132af016b67637f279d5ddd0f65f8f3f360f321028a6b8a2442 ; testAPK1079beeb30101d0bdac603a73fd63bedbacd34b7ee7f7dfdf2985ca2092069b5. Source runnerSHA256d2250b573eef82638fae9d2a641726910285caa6ec8aed2eb452bc4bd8589dc5.
+
+Runtime CorvusUI TCP5563 actif. AVD /workspace/toolchains/avd ; PythonADB PYTHONPATH=/workspace/toolchains/python-adb. Premier ANR SystemUI du boot inspecté, Wait pressé et focus app restauré ; aucune protection Android désactivée. Ne pas toucher profil signé5561.
+Le parcours portrait est en cours via /workspace/setup/interface-redesign/run-ui.py --install --orientation portrait, log portrait-current.log, processPID54046/session40255 (vérifier s'il survit à une autre interruption). Le pilote extrait captures/logs/reçus dans runtime/ui-portrait-<timestamp> puis écrit runtime/latest-portrait.txt. Après succès, exécuter paysage avec le même APK sans --install et inspecter les captures. Les anciens essais rouges sont conservés comme preuves de reproduction.
+
+Prochaines étapes : terminer portrait/paysage et preuve Entrée/IME_DONE/stale ticket ; corriger tout vrai échec, inspecter captures, documenter les résultats puis PR et CI exacte. Source et docs peuvent être publiées en brouillon pendant les tests ; pas de fusion ni nouvelle version autorisée dans cette tâche. Les agents de l'étape précédente ne sont plus actifs après reconnexion ; fichiers et reçus sont préservés.

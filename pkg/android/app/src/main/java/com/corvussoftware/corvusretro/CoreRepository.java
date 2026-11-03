@@ -38,7 +38,7 @@ final class CoreRepository {
     private volatile Map<String, Core> cores = new HashMap<>();
 
     static final class Core {
-        final String id, name, version, abi, sha256, url, library;
+        final String id, name, version, abi, sha256, url, library, description;
         final long size;
         Core(JSONObject json) throws JSONException, IOException {
             this(json, "corvuscore.json");
@@ -49,7 +49,7 @@ final class CoreRepository {
             if (json.length() != 10) throw new IOException("Champs de catalogue invalides");
             id = symbol(string(json, "id"));
             name = text(string(json, "name"));
-            text(string(json, "description"));
+            description = text(string(json, "description"));
             version = string(json, "version");
             if (!version.matches("[A-Za-z0-9.\\-]{1,64}"))
                 throw new IOException("Version de cœur invalide");
@@ -110,6 +110,14 @@ final class CoreRepository {
             return value;
         }
         String libraryName() { return library; }
+        String systemName() {
+            switch (id) {
+                case "corvus.gb": return "Game Boy";
+                case "corvus.gbc": return "Game Boy Color";
+                case "corvus.gba": return "Game Boy Advance";
+                default: return name;
+            }
+        }
     }
 
     CoreRepository(MainActivity activity, ExecutorService executor) {
@@ -165,7 +173,7 @@ final class CoreRepository {
         if (array.length() > MAX_CORES) throw new IOException("Trop de cœurs");
         Map<String, Core> next = new HashMap<>();
         Set<String> identities = new HashSet<>();
-        String[] names = new String[array.length() * 5];
+        String[] names = new String[array.length() * 8];
         int entries = 0;
         for (int i = 0; i < array.length(); i++) {
             Core core = new Core(array.getJSONObject(i), provider);
@@ -173,14 +181,17 @@ final class CoreRepository {
                 throw new IOException("Cœur dupliqué");
             if (!core.abi.equals(deviceAbi)) continue;
             next.put(core.id, core);
-            names[entries * 5] = core.id;
-            names[entries * 5 + 1] = core.name;
-            names[entries * 5 + 2] = core.version;
-            names[entries * 5 + 3] = core.id;
-            names[entries * 5 + 4] = core.abi;
+            names[entries * 8] = core.id;
+            names[entries * 8 + 1] = core.name;
+            names[entries * 8 + 2] = core.version;
+            names[entries * 8 + 3] = core.id;
+            names[entries * 8 + 4] = core.abi;
+            names[entries * 8 + 5] = core.description;
+            names[entries * 8 + 6] = core.systemName();
+            names[entries * 8 + 7] = Long.toString(core.size);
             entries++;
         }
-        return new Catalog(next, Arrays.copyOf(names, entries * 5), "");
+        return new Catalog(next, Arrays.copyOf(names, entries * 8), "");
     }
 
     private static String readCatalog(String url) throws IOException {

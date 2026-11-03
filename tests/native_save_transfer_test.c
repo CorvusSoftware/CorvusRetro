@@ -97,7 +97,7 @@ int main(void) {
         check(u.save_request && f.operation == CR_SAVE_EXPORT_SAV && f.size == 8192 &&
               f.snapshot[2] == 0x51 && !cr_ui_running(&u), "export freezes current unsaved live SRAM", &u);
         uint64_t request = f.request; void *active = u.engine.handle;
-        u.page = CR_MAIN; choose(&u, 1);
+        u.page = CR_MAIN; choose(&u, 4);
         check(u.engine.handle == active && u.save_request == request, "pending picker blocks core unloading", &u);
         u.page = CR_PLAY; u.quick = true; choose(&u, CR_QUICK_CLOSE);
         check(u.engine.handle == active && u.engine.loaded && u.save_request == request,

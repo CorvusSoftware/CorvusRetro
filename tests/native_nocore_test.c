@@ -32,7 +32,7 @@ int main(void) {
     check(ui.page == CR_MAIN && !ui.engine.handle && !ui.engine.loaded,
           "base APK frontend starts without an active core");
 
-    cr_ui_confirm(&ui);
+    ui.focus = 4; cr_ui_confirm(&ui);
     check(ui.page == CR_CORES, "load core opens the core screen");
     cr_ui_confirm(&ui);
     check(ui.page == CR_CORE_DOWNLOADS && reloads == 1,
@@ -44,21 +44,18 @@ int main(void) {
     cr_ui_back(&ui);
     cr_ui_back(&ui);
     check(ui.page == CR_MAIN, "back navigation works without installed cores");
-    cr_ui_move(&ui, 1);
-    cr_ui_confirm(&ui);
-    check(ui.page == CR_CONTENT, "content navigation remains available with zero cores");
-    cr_ui_confirm(&ui);
-    check(ui.page == CR_CONTENT && !ui.importing && !ui.engine.handle &&
-              strstr(ui.message, "Chargez un cœur"),
-          "core-free file import requires explicitly loading a core first");
-    cr_ui_move(&ui, 1);
-    cr_ui_confirm(&ui);
-    check(ui.page == CR_LIBRARY, "library is accessible without installed cores");
-    cr_ui_confirm(&ui);
-    check(ui.page == CR_LIBRARY && !ui.import_folder && !ui.importing &&
-              strstr(ui.message, "Chargez un cœur"),
+    ui.focus = 1; cr_ui_confirm(&ui);
+    check(ui.page == CR_LIBRARY, "library navigation remains available with zero cores");
+    ui.focus = 0; cr_ui_confirm(&ui);
+    check(ui.page == CR_LIBRARY_ACTIONS, "import actions are reachable from the empty library");
+    ui.focus = 0; cr_ui_confirm(&ui);
+    check(ui.page == CR_LIBRARY_ACTIONS && !ui.importing && !ui.engine.handle,
+          "core-free file import cannot start without explicitly loading a core");
+    ui.focus = 1; cr_ui_confirm(&ui);
+    check(ui.page == CR_LIBRARY_ACTIONS && !ui.import_folder && !ui.importing && !ui.engine.handle,
           "folder import refuses unavailable core without starting a picker");
     cr_ui_back(&ui);
+    check(ui.page == CR_LIBRARY, "import menu back restores the empty library");
     cr_ui_back(&ui);
     check(ui.page == CR_MAIN, "library back navigation restores main menu");
 

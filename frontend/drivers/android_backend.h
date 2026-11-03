@@ -17,7 +17,7 @@ typedef struct {
     jmethodID density, safe_area, atlas, advances, glyph, advance, games, root, credits, preference,
         set_preference, pick, finish, touch, appearance, quit, refresh_catalog, install_pack,
         installed_modules, install_pending, achievement_request, achievement_sound, can_remove_core, remove_core, achievement_credentials,
-        achievement_credentials_set, edit_text, achievement_image, pick_folder, save_transfer, finish_save_transfer;
+        achievement_credentials_set, edit_text, achievement_image, pick_folder, save_transfer, finish_save_transfer, game_image, share_state;
 } cr_android;
 bool cr_android_init(cr_android *, struct android_app *);
 void cr_android_destroy(cr_android *);

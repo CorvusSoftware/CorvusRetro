@@ -762,7 +762,7 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             configurationKey(activity, android.view.KeyEvent.KEYCODE_DPAD_DOWN);
             configurationRow(activity, 0); state(23, overlaySystem, 0, 0);
             String[] games = activity.games(); int row = 1, selectedRow = -1;
-            for (int i = 0; i < games.length; i += 6) {
+            for (int i = 0; i < games.length; i += 7) {
                 if (!coreId.equals(games[i + 4])) continue;
                 if (id.equals(games[i])) selectedRow = row;
                 row++;
@@ -951,7 +951,7 @@ public final class RetroAchievementsInstrumentation extends Instrumentation {
             String batteryHash = CoreStore.hash(battery);
             boolean inHistory = false;
             String[] games = activity.games();
-            for (int i = 0; i < games.length; i += 6) if (id.equals(games[i])) inHistory = true;
+            for (int i = 0; i < games.length; i += 7) if (id.equals(games[i])) inHistory = true;
             check(inHistory, "deleted core's game remains in history");
             screenshot("core-removal-complete");
             check(id.equals(prepareOverlayGame(2)), "reinstall uses the same stable content identity");

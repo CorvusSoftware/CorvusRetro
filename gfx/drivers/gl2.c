@@ -370,7 +370,7 @@ static cr_gl_image *image_texture(cr_gl *g, const char *url) {
     AndroidBitmapInfo info;
     if (error || !bitmap || AndroidBitmap_getInfo(p->env, bitmap, &info) != ANDROID_BITMAP_RESULT_SUCCESS ||
         info.format != ANDROID_BITMAP_FORMAT_RGBA_8888 || !info.width || !info.height ||
-        info.width > 96 || info.height > 96 || info.stride != info.width * 4) {
+        info.width > 512 || info.height > 512 || info.stride != info.width * 4) {
         if (bitmap) (*p->env)->DeleteLocalRef(p->env, bitmap);
         return NULL;
     }
