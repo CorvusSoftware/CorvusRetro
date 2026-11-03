@@ -1,25 +1,27 @@
 CorvusSoftware Quality Gate
-Status: PASS
-Risk: STANDARD
+Status: PARTIAL
+Risk: DEEP
 
 Criteria:
-- PASS : fusion autorisée et CI exacte PR/main verte.
-- PASS : buildsigné, provenance, certificatdurable, version0.22.1/code29 et paquetdeuxABI/16Ko/zérocoeur/MP3original.
-- PASS : upgrade28->29 avec UID/dossier/premièreinstallation/ASUS/historique conservés.
-- PASS : publication et octets publics identiques à l'artefact qualifié.
+- PASS : cadence pilotée par la réserve audio, PCM exact, rattrapage borné et callbacks sans blocage.
+- PASS : sauvegarde périodique hors rendu, acquittements et barrières durables conservés.
+- PASS : 19 suites strictes et 19 ASan/UBSan ; revue indépendante sans finding.
+- PASS : compilation Android debug/test et lint.
+- PASS : 96 contrôles Android GBA portrait/paysage ; APK sans cœur, deux ABI et alignement 16 Ko.
+- GATE EXTERNE : vérifier la CI du SHA actif dans la PR avant livraison ; ne pas déduire son état de cette note.
+- UNVERIFIED : disparition perçue des parasites sur Redmi Note 13 5G/casque filaire/Pokémon Émeraude.
 
 Evidence:
-- CI41543067388, signé41543475863, publication41544028480 sur sourceea05c867eddc6258999724435023212a0390e2d9.
-- PublicSHA256c7ca0e7e00646d37ba6a743ce460c942d181033d5d94de90fda1fd994ec93c0e.
-- Reçus signés, update et comparaison publique dans /workspace/setup/.
+- CMake build/native et ctest : 19/19 PASS, dont 38 scénarios audio contrôlés et 321 vérifications batterie.
+- CMake build/settings-asan avec CORVUS_SANITIZE=ON et ctest : 19/19 PASS.
+- Android assembleDebug/assembleDebugAndroidTest/lintDebug : PASS. Instrumentation playback system=2 : 48 contrôles dans chaque orientation, sans nouveau crash.
+- check_core_apks.py : PASS ; frontend core-free : PASS ; test_release_workflows.py : 8/8 PASS.
 
 Review:
-- Changementsfonctionnels revus indépendamment dans PR #26 ; aucun finding restant.
-- Documentation relue contre les reçus et résultats distants.
+- Revue indépendante finale du contrôleur, de la boucle, du worker et des tests : aucun défaut concret relevé.
 
 Open risks:
-- ÉmulateurAPI29x86_64 uniquement ; aucune écoutephysique/ROMPokémon/Bluetooth/runtimeARM64.
-- L'amorce corrigée ne constitue pas un asservissement deshorloges longuesdurées.
+- Pas d'écoute physique ni de ROM du jeu signalé. Un cœur trop lent ou des retards système arbitraires peuvent toujours épuiser la réserve.
 
 Decision:
-- Livraison publiée et vérifiée. Fusionner la documentation après sa CI exacte ; conserver tag/assets immuables.
+- Correctif prêt pour revue du code et CI distante. PARTIAL concerne la disparition perçue des parasites sur le matériel signalé : pas de téléphone ni de ROM disponible pour cette preuve.

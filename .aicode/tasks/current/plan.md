@@ -1,6 +1,9 @@
-Objectif : fusionner PR #26 et sortir0.22.1/code29, demande utilisateur explicite. Budget STANDARD.
-1. PR #26 fusionnée aprèsCIexacte verte ; sourceea05c867eddc6258999724435023212a0390e2d9.
-2. CI main41543067388 et buildsigné41543475863 réussis ; provenance/signature durable/paquet vérifiés.
-3. Upgrade28->29 sans désinstallation ; UID/données/ASUS/historique conservés et captures inspectées.
-4. Tagv0.22.1 et publication41544028480 réussis ; APK public retéléchargé identique aux octets qualifiés.
-5. README/mémoire/validation actualisés en documentation séparée, à fusionner après sa CI exacte sans modifier le tag ou le binaire.
+Objectif : réduire les parasites persistants après 0.22.1 sur GBA, signalés sur Pokémon Émeraude, Redmi Note 13 5G et casque filaire.
+Budget : DEEP. Base main fca4f45. Branche fix/audio-clock-and-save-io.
+
+1. Isoler les défauts testables sans ROM propriétaire : dérive audio +100 ppm sur 600 s et pauses fsync dépassant la réserve PCM. Aucune cause spécifique au téléphone n'est confirmée.
+2. Ajuster la cadence réelle par l'occupation audio lissée, avec correction bornée à +/-0,5 %, PCM exact et au plus trois trames émulées par rendu. Préserver entrées et RetroAchievements pour chaque trame.
+3. Déporter les sauvegardes périodiques sur un travailleur : copie et acquittement sur le propriétaire, un instantané borné, writer atomique existant, barrières pour les transitions critiques.
+4. Vérifier dérives, coûts CPU, sauvegardes bloquées/échouées, générations et cycle de vie en strict et ASan/UBSan. Compiler Android, exercer GBA pendant le jeu et les transitions système, obtenir une revue indépendante et la CI du commit exact.
+
+Préserver PCM, volume, VSync, cycles par trame, formats/identités des sauvegardes, moteurs, ABI et pins. Pas de nouvelle version publiée dans cette tâche ; PR destinée à revue. Une écoute sur le téléphone reste une validation distincte.

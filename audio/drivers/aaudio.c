@@ -155,6 +155,12 @@ bool cr_audio_start(cr_audio *a, int rate) {
     return true;
 }
 void cr_audio_pause(cr_audio *a) { cr_audio_close(a); }
+unsigned cr_audio_queued_frames(const cr_audio *a) {
+    if (!a->playing || !a->stream || stream_failed(a)) return 0;
+    unsigned read = atomic_load_explicit(&a->read_frame, memory_order_acquire);
+    unsigned write = atomic_load_explicit(&a->write_frame, memory_order_relaxed);
+    return write - read;
+}
 void cr_audio_set_volume(cr_audio *a, int percent) {
     int value = percent < 0 ? 0 : percent > 100 ? 100 : percent;
     atomic_store_explicit(&a->volume, value, memory_order_relaxed);
