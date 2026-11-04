@@ -30,18 +30,18 @@ Le menu rapide est un panneau sur la dernière image du jeu et suspend l'émulat
 Il propose, dans cet ordre :
 
 1. Reprendre le contenu.
-2. Charger un état nommé.
-3. Sauvegarder un état nommé avec aperçu.
-4. Redémarrer le contenu.
-5. Options du jeu, les réglages du cœur ou un état vide si aucun n'est disponible.
-6. Quitter le jeu en conservant le cœur chargé.
-7. Sauvegardes d'état, avec état manuel et chargement du dernier état automatique disponible.
-8. [Sauvegardes du jeu](save-files.md), pour importer ou exporter la batterie `.sav` ou `.srm`.
-9. Commandes, pour l'affichage de la surimpression.
-10. Joueur des commandes tactiles et du clavier, pendant une session à deux joueurs.
-11. Succès RetroAchievements.
-12. Informations sur le cœur.
-13. Menu principal.
+2. Redémarrer le contenu.
+3. Charger un état nommé.
+4. Sauvegarder un état nommé avec aperçu.
+5. États classiques : sauvegarde manuelle et dernier état automatique disponible.
+6. [Sauvegardes .sav / .srm](save-files.md), pour importer ou exporter la mémoire batterie.
+7. Options du cœur, ou un état vide si aucun réglage n'est proposé.
+8. Commandes, pour l'affichage de la surimpression.
+9. Joueur des commandes tactiles et du clavier, seulement à deux joueurs.
+10. Succès RetroAchievements.
+11. Informations sur le cœur.
+12. Accueil.
+13. Quitter le jeu, en dernier, en conservant le cœur chargé.
 
 Le panneau défile pour donner accès aux outils complémentaires. La collection
 d'états et leurs actions sont décrites dans [l'interface mobile](interface-redesign.md).

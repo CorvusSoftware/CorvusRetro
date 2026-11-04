@@ -670,7 +670,6 @@ void cr_ui_touch_at(cr_ui *u, int id, int phase, float x, float y, double event_
             u->library_filter = -t - 211; u->scroll = 0; u->focus = cr_menu_library_count(u) ? 1 : 0;
             return;
         }
-        if (t == -300) { cr_menu_push_page(u, CR_SETTINGS); return; }
         if (t <= -100 && t >= -104) {
             static const int pages[] = {CR_MAIN, CR_LIBRARY, CR_SAVES_LIBRARY, CR_CORES, CR_SETTINGS};
             cr_ui_reload(u);
@@ -900,7 +899,7 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         if (u->page == CR_ABOUT)
             u->text_height = paragraphs(
                 p,
-                "CorvusRetro 0.23.0\n\nFrontend original en C, rendu OpenGL ES et audio "
+                "CorvusRetro 0.23.1\n\nFrontend original en C, rendu OpenGL ES et audio "
                 "AAudio.\n\nCorvusSoftware\nCœurs officiels CorvusCore 0.15.0 : Game Boy, Game "
                 "Boy Color, Game Boy Advance.\n\nInterface CorvusRetro. "
                 "Thèmes CorvusRetro, ASUS et NVIDIA Shield.\n\nCopyright (C) 2026 "

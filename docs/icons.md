@@ -3,8 +3,11 @@
 Le jeu comprend 48 pictogrammes originaux de CorvusSoftware. Les ressources
 référencées dans `MainActivity.ICONS`, sous `res/drawable`, utilisent une grille 24 x 24,
 un contour de 1,75 unité, des extrémités arrondies et des fonds transparents
-légers. Le corbeau frontal identifie CorvusRetro et apparaît aussi dans la puce
-des cœurs. Le lanceur conserve le logo fourni par le mainteneur.
+légers. Le corbeau frontal reprend le modèle de l'[organisation CorvusSoftware](https://github.com/CorvusSoftware)
+et apparaît aussi dans la puce des cœurs : front anguleux, yeux triangulaires,
+plumes latérales et long bec. Les petits pictogrammes sont des déclinaisons
+vectorielles. Le lanceur utilise le fichier PNG officiel de l'avatar, intact,
+[récupéré sur GitHub](https://avatars.githubusercontent.com/u/346545957?v=4).
 
 Le même dessin prend les couleurs du thème natif : violet et lavande pour
 CorvusRetro, noir/blanc pour ASUS, vert pour NVIDIA Shield. Les proportions des

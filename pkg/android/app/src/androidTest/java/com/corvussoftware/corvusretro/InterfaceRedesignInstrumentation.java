@@ -49,7 +49,7 @@ public final class InterfaceRedesignInstrumentation extends Instrumentation {
     private final Map<String, Object> oldPreferences = new HashMap<>();
     private volatile int archiveRequests;
     private int checks;
-    private boolean landscape;
+    private boolean landscape, quickOnly;
     private File fixtures;
     private String oldGames;
     private float originalWidth, originalHeight;
@@ -114,14 +114,16 @@ public final class InterfaceRedesignInstrumentation extends Instrumentation {
         tap(width() * (index + .5f) / 5, height() - 30); page(expectedPage);
     }
     private void key(int key) { sendKeyDownUpSync(key); SystemClock.sleep(100); }
-    private void choose(int index) throws Exception {
+    private void focus(int index) throws Exception {
         int focus = number("focus");
         check(focus >= 0 && focus < 4096, "native focus is observable before keyboard selection");
         int difference = index - focus;
         for (int n = 0; n < Math.abs(difference); ++n)
             key(difference < 0 ? KeyEvent.KEYCODE_DPAD_UP : KeyEvent.KEYCODE_DPAD_DOWN);
         waitFor(() -> number("focus") == index, "native keyboard focus reaches row " + index);
-        key(KeyEvent.KEYCODE_DPAD_CENTER);
+    }
+    private void choose(int index) throws Exception {
+        focus(index);key(KeyEvent.KEYCODE_DPAD_CENTER);
     }
     private void back(int expected) throws Exception { key(KeyEvent.KEYCODE_BACK); page(expected); }
     private void firstLibraryCard() throws Exception {
@@ -288,7 +290,7 @@ public final class InterfaceRedesignInstrumentation extends Instrumentation {
                 android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT));
         waitFor(()->activity.safeWindowArea()!=null && (width()>height())==landscape,"safe requested orientation");
         originalWidth=width();originalHeight=height();
-        state(0,-1,0,0);shot("01-home");
+        state(0,-1,0,0);tap(width()-24,28);state(0,-1,0,0);shot("01-home");
         tab(1,25);shot("02-library-grid");
         tap(width()-74,28);editing(3,0);
         sendStringSync("Interface");editing(3,9);key(KeyEvent.KEYCODE_ENTER);editing(0,9);normalViewport();shot("03-library-search");
@@ -308,7 +310,16 @@ public final class InterfaceRedesignInstrumentation extends Instrumentation {
         float chip=(width()-56)/4;tap(16+3*(chip+8)+chip/2,79);
         firstLibraryCard();state(8,2,1,0);waitFor(this::greenPreview,"original ARM game renders actual green framebuffer");shot("11-preserved-game");
         key(KeyEvent.KEYCODE_BACK);state(8,2,1,1);shot("12-quick-menu");
-        choose(2);page(40);waitFor(()->entries().length>=1,"native new state is committed");shot("07-state-list");
+        if(quickOnly) {
+            choose(3);page(40);waitFor(()->entries().length>=1,"quick save creates an actual named state");
+            shot("quick-created-state");back(8);state(8,2,1,1);
+            choose(2);page(40);choose(1);page(41);choose(0);state(8,2,1,0);
+            waitFor(this::greenPreview,"reordered quick load restores actual game pixels");
+            key(KeyEvent.KEYCODE_BACK);state(8,2,1,1);choose(6);page(20);shot("quick-core-options");
+            back(8);state(8,2,1,1);focus(11);shot("quick-menu-bottom");choose(11);state(0,2,0,0);
+            tab(4,2);shot("09-settings");return;
+        }
+        choose(3);page(40);waitFor(()->entries().length>=1,"native new state is committed");shot("07-state-list");
         choose(1);page(41);waitFor(this::greenPreview,"state action preview displays original game pixels");shot("08-state-actions");
         choose(1);editing(4,-1);long oldRename=ticket();
         key(KeyEvent.KEYCODE_BACK);editing(0,-1);page(41);choose(1);editing(4,-1);long newRename=ticket();
@@ -323,12 +334,12 @@ public final class InterfaceRedesignInstrumentation extends Instrumentation {
         choose(4);page(42);shot("08-delete-confirmation");choose(1);page(41);check(entries().length>=3,"cancel deletion preserves states");
         choose(4);page(42);choose(0);page(40);waitFor(()->entries().length==2,"confirmed deletion removes only selected state");
         choose(1);page(41);choose(0);state(8,2,1,0);waitFor(this::greenPreview,"named state restores actual game framebuffer");
-        key(KeyEvent.KEYCODE_BACK);state(8,2,1,1);choose(1);page(40);
+        key(KeyEvent.KEYCODE_BACK);state(8,2,1,1);choose(2);page(40);
         choose(4);page(26);shot("save-import-export");back(40);
         choose(3);page(18);shot("classic-states");choose(0);state(8,2,1,0);
         File states=new File(context.getFilesDir(),"states");File[] manual=states.listFiles(f->f.getName().startsWith(fixtureIds.get(2)+"-")&&f.getName().endsWith(".state")&&!f.getName().endsWith(".auto.state"));
         check(manual!=null&&manual.length==1,"legacy manual save stays available beside named states");
-        key(KeyEvent.KEYCODE_BACK);state(8,2,1,1);choose(5);state(0,2,0,0);
+        key(KeyEvent.KEYCODE_BACK);state(8,2,1,1);focus(11);shot("quick-menu-bottom");choose(11);state(0,2,0,0);
         tab(4,2);shot("09-settings");choose(5);page(34);shot("achievement-settings");
         choose(1);page(35);shot("account-fields");back(34);back(2);choose(0);page(10);shot("10-display");back(2);
         choose(2);page(11);choose(1);page(29);choose(5);page(11);
@@ -377,6 +388,7 @@ public final class InterfaceRedesignInstrumentation extends Instrumentation {
     }
     @Override public void onCreate(Bundle args) {
         super.onCreate(args);landscape="landscape".equals(args.getString("orientation","portrait"));
+        quickOnly="true".equals(args.getString("quick_only","false"));
         fixtures=new File(args.getString("fixture_dir",""));start();
     }
     @Override public void onStart() {

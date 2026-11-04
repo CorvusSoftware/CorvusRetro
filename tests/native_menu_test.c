@@ -37,7 +37,7 @@ typedef struct {
     float minimum_badge;
     float viewport_center;
     bool home_tab, settings_tab;
-    unsigned switch_ends, games_drawn, header_crows, row_icons;
+    unsigned switch_ends, games_drawn, header_crows, header_settings, row_icons;
     bool panel_drawn, focused_card;
     float switch_thumb, toggle_text_end;
 } capture;
@@ -113,6 +113,7 @@ static float measure(void *ctx, const char *s, float size) {
 static void icon(void *ctx, int kind, float x, float y, float size, uint32_t color) {
     capture *c = ctx;
     if (kind == CR_ICON_CROW && y < 56) ++c->header_crows;
+    if (kind == CR_ICON_SETTINGS && y < 56) ++c->header_settings;
     if (y > 56 && (size == 26 || size == 28)) ++c->row_icons;
     if (y > 600 && kind == CR_ICON_HOME) c->home_tab = true;
     if (y > 600 && kind == CR_ICON_SETTINGS) c->settings_tab = true;
@@ -191,33 +192,42 @@ static void tab(cr_ui *u, int i) {
 }
 static void quick_order(cr_ui *u) {
     static const struct { int action; const char *label; } expected[] = {
-        {CR_QUICK_RESUME, "Reprendre"}, {CR_QUICK_LOAD_STATE, "Charger un état"},
-        {CR_QUICK_SAVE_STATE, "Sauvegarder un état"}, {CR_QUICK_RESTART, "Redémarrer"},
-        {CR_QUICK_CORE_OPTIONS, "Options du jeu"}, {CR_QUICK_CLOSE, "Quitter le jeu"},
-        {CR_QUICK_STATES, "Sauvegardes d’état"}, {CR_QUICK_GAME_SAVES, "Sauvegardes du jeu"},
-        {CR_QUICK_CONTROLS, "Commandes"}, {CR_QUICK_PLAYER, "Joueur contrôlé"},
-        {CR_QUICK_ACHIEVEMENTS, "Succès"}, {CR_QUICK_CORE_INFO, "Informations sur le cœur"},
-        {CR_QUICK_MAIN, "Accueil"}
+        {CR_QUICK_RESUME, "Reprendre"}, {CR_QUICK_RESTART, "Redémarrer"},
+        {CR_QUICK_LOAD_STATE, "Charger un état"}, {CR_QUICK_SAVE_STATE, "Sauvegarder un état"},
+        {CR_QUICK_STATES, "États classiques"}, {CR_QUICK_GAME_SAVES, "Sauvegardes .sav / .srm"},
+        {CR_QUICK_CORE_OPTIONS, "Options du cœur"}, {CR_QUICK_CONTROLS, "Commandes"},
+        {CR_QUICK_PLAYER, "Joueur contrôlé"}, {CR_QUICK_ACHIEVEMENTS, "Succès"},
+        {CR_QUICK_CORE_INFO, "Informations sur le cœur"}, {CR_QUICK_MAIN, "Accueil"},
+        {CR_QUICK_CLOSE, "Quitter le jeu"}
     };
     unsigned saved_players = u->engine.players;
-    for (unsigned players = 1; players <= 2; ++players) {
-        u->engine.players = players;
-        int index = 0;
-        for (size_t i = 0; i < sizeof(expected) / sizeof(expected[0]); ++i) {
-            if (players == 1 && expected[i].action == CR_QUICK_PLAYER) continue;
-            check(cr_ui_quick_row(u, expected[i].action) == index,
-                  "stable quick actions map to the explicit presentation order");
-            u->focus = index++;
-            cr_ui_move(u, 0);
-            capture c = draw(u);
-            check(!strcmp(c.focus_label, expected[i].label),
-                  "drawn quick labels follow the mockup first and retain every additional working tool");
+    float saved_width = u->width, saved_height = u->height;
+    for (int landscape = 0; landscape < 2; ++landscape) {
+        cr_ui_size(u, landscape ? 700 : 384, landscape ? 384 : 700);
+        for (unsigned players = 1; players <= 2; ++players) {
+            u->engine.players = players;
+            int index = 0;
+            for (size_t i = 0; i < sizeof(expected) / sizeof(expected[0]); ++i) {
+                if (players == 1 && expected[i].action == CR_QUICK_PLAYER) continue;
+                check(cr_ui_quick_row(u, expected[i].action) == index,
+                      "stable quick actions map to the explicit presentation order");
+                u->focus = index++;
+                cr_ui_move(u, 0);
+                capture c = draw(u);
+                check(!strcmp(c.focus_label, expected[i].label),
+                      "quick menu groups session, saves, options and information before the final close action");
+                cr_menu_rect area = cr_interface_row_bounds(u, u->focus);
+                check(cr_interface_target(u, area.x + area.w / 2, area.y + area.h / 2,
+                                          CR_QUICK_COUNT - (players == 1), false) == 10000 + u->focus,
+                      "focused quick row remains touchable after portrait or landscape scrolling");
+            }
+            check(index == CR_QUICK_COUNT - (players == 1), "quick menu exposes only applicable actions");
+            if (players == 1)
+                check(cr_ui_quick_row(u, CR_QUICK_PLAYER) == -1, "single-player menu omits the player-switch action");
         }
-        check(index == CR_QUICK_COUNT - (players == 1), "quick menu exposes only applicable actions");
-        if (players == 1)
-            check(cr_ui_quick_row(u, CR_QUICK_PLAYER) == -1, "single-player menu omits the player-switch action");
     }
     u->engine.players = saved_players;
+    cr_ui_size(u, saved_width, saved_height);
     u->focus = 0;
     u->quick_scroll = 0;
 }
@@ -411,6 +421,11 @@ int main(void) {
     capture c = draw(&u);
     check(c.home_tab && c.settings_tab, "navigation uses home and settings icons");
     check(c.header_crows == 1, "home header retains the Corvus crow brand");
+    check(c.header_settings == 0, "home title has no duplicate settings icon");
+    cr_ui_touch(&u, 0, CR_TOUCH_DOWN, u.width - 24, 28);
+    cr_ui_touch(&u, 0, CR_TOUCH_UP, u.width - 24, 28);
+    check(u.page == CR_MAIN && !u.depth, "removed header button has no hidden touch action");
+
     check(c.row_icons && c.label_fonts && c.hint_fonts,
           "native cards retain readable 16/13dp labels and hints with dedicated icons");
     u.page = CR_CORES;
@@ -676,11 +691,12 @@ int main(void) {
     const char *load = strstr(c.text, "Charger un état");
     const char *save = strstr(c.text, "Sauvegarder un état");
     const char *restart = strstr(c.text, "Redémarrer");
-    const char *options = strstr(c.text, "Options du jeu");
-    const char *close = strstr(c.text, "Quitter le jeu");
-    check(resume && load && save && restart && options && close &&
-              resume < load && load < save && save < restart && restart < options && options < close,
-          "the first six quick actions follow the supplied mockup");
+    const char *classic = strstr(c.text, "États classiques");
+    const char *battery = strstr(c.text, "Sauvegardes .sav / .srm");
+    check(resume && restart && load && save && classic && battery &&
+              resume < restart && restart < load && load < save && save < classic && classic < battery,
+          "session actions precede the grouped named, classic and battery saves");
+    check(!strstr(c.text, "Quitter le jeu"), "close is kept away from the first quick-menu actions");
     check(!strstr(c.text, "Shaders") && !strstr(c.text, "Triches"), "quick root contains working actions only");
     quick_order(&u);
     u.focus = cr_ui_quick_row(&u, CR_QUICK_RESTART);

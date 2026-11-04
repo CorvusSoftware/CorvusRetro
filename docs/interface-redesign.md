@@ -64,11 +64,14 @@ Un [jeu de 48 icônes vectorielles](icons.md) harmonise la navigation, les régl
 et les actions. Renommer, dupliquer, partager et supprimer disposent de symboles
 dédiés, avec le même tracé décliné dans les trois palettes.
 
-Le menu rapide est un panneau sur la dernière image du jeu. Ses premières
-actions sont Reprendre, Charger un état, Sauvegarder un état, Redémarrer,
-Options du jeu et Quitter le jeu. Les autres outils restent accessibles en
-faisant défiler : états classiques, batterie, commandes, succès, informations
-et accueil. Quitter le contenu conserve le cœur chargé.
+Le menu rapide est un panneau sur la dernière image du jeu. Les actions de
+session (Reprendre, Redémarrer) précèdent les sauvegardes nommées, classiques
+et batteries. Viennent ensuite les options du cœur, les commandes, le joueur
+contrôlé si applicable, les succès et les informations sur le cœur. Accueil et
+Quitter le jeu terminent la liste ; fermer conserve le cœur chargé.
+
+L'accueil affiche le logo CorvusRetro et son titre. Les réglages s'ouvrent avec
+l'onglet inférieur, sans bouton supplémentaire dans la barre de titre.
 
 ## Frontières techniques
 
