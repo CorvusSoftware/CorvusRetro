@@ -8,18 +8,19 @@ Les actions propres à une partie restent dans le Menu rapide.
 
 | Catégorie | Sous-paramètres |
 | --- | --- |
-| Interface utilisateur | Thèmes ; Notifications |
-| Vidéo | Garder l'écran allumé ; Présentation de l'image ; Filtrage |
-| Audio | Activer le son ; Volume du jeu |
+| Affichage | Garder l'écran allumé ; Présentation de l'image ; Filtrage |
 | Commandes | Commandes tactiles ; Manettes |
+| Audio | Activer le son ; Volume du jeu |
+| Système | Interface ; Sauvegardes ; Informations ; Importer du contenu |
 | Sauvegardes | Copies de sécurité ; État automatique |
 | RetroAchievements | Activer RetroAchievements ; Compte |
+| À propos | Application ; Cœur chargé ; Licence et crédits |
 
 Une sélection de valeur affiche la valeur courante et la valeur par défaut.
 Retour restaure la page, la sélection et le défilement précédents. Depuis le
 Menu rapide, le retour conserve la partie en pause jusqu'à sa reprise.
 
-## Interface utilisateur
+## Système > Interface utilisateur
 
 **Thèmes** : CorvusRetro, NVIDIA Shield et ASUS. Les anciens choix sont conservés.
 
@@ -32,7 +33,7 @@ Ces préférences concernent les affichages du frontend pendant le jeu. Elles
 ne désactivent ni l'évaluation des succès ni leurs envois. Les messages d'erreur
 restent visibles. Désactiver un affichage retire aussi ses notifications en cours.
 
-## Vidéo
+## Affichage
 
 - **Garder l'écran allumé** : activé par défaut pendant le jeu.
 - **Présentation de l'image** : ratio natif adapté, par défaut ; ou échelle entière.
@@ -43,7 +44,7 @@ restent visibles. Désactiver un affichage retire aussi ses notifications en cou
   la texture du jeu, sans lisser les textes ou les icônes de l'interface.
 
 Les palettes, couleurs de compatibilité et autres options déclarées par un
-cœur restent dans **Menu rapide > Options du cœur**.
+cœur restent dans **Menu rapide > Options du jeu**.
 
 ## Audio
 

@@ -4,19 +4,19 @@ Copyright (C) 2026 CorvusSoftware. SPDX-License-Identifier: AGPL-3.0-only.
 
 ## Utilisation
 
-Ouvrir **Charger un cœur > Téléchargeur de cœurs**, choisir CorvusGB, CorvusGBC ou
-CorvusGBA et attendre la fin du téléchargement. Revenir à **Charger un cœur** : le
+Ouvrir **Cœurs > Téléchargeur de cœurs**, choisir CorvusGB, CorvusGBC ou
+CorvusGBA, puis **Installer** dans sa fiche. Revenir à **Cœurs** : le
 cœur est immédiatement disponible. Android ne demande pas d'installer un APK.
 **Décharger le cœur** libère son instance en mémoire ; le fichier téléchargé reste
 installé pour la prochaine utilisation. Ajouter un cœur conserve les autres.
 
-Sélectionner explicitement un cœur avant **Charger du contenu** ou avant de
-lancer un jeu de **Listes de lecture > Historique**. Le cœur déjà chargé doit
+Sélectionner explicitement un cœur avant d'importer ou de
+lancer un jeu de **Jeux** ou **Jeux > Menu > Historique**. Le cœur déjà chargé doit
 correspondre au jeu ; l'application ne change pas de cœur automatiquement.
-Les listes de lecture contiennent uniquement **Historique**.
+L'historique reste accessible dans le menu de bibliothèque.
 
-**Menu rapide > Fermer le contenu** sauvegarde le jeu et le ferme en conservant
-le cœur chargé. Le menu principal permet ensuite d'ouvrir un autre jeu avec ce
+**Menu rapide > Quitter le jeu** sauvegarde le jeu et le ferme en conservant
+le cœur chargé. L'accueil permet ensuite d'ouvrir un autre jeu avec ce
 cœur, ou de choisir **Décharger le cœur**. Une erreur de sauvegarde garde le jeu
 et le cœur actifs pour permettre une nouvelle tentative.
 

@@ -9,3 +9,8 @@
 - `input/play_layout`, `input/overlay`, les pilotes audio, CorvusCore/CorvusAPI et leurs pins ne sont pas modifiés par cette refonte.
 
 Preuves : native_interface (parcours réels), native_state_store (135 contrôles), anciennes suites natives et ASan/UBSan, tests Java, FrontendServicesInstrumentation et nouveau InterfaceRedesignInstrumentation.
+
+La [carte structurelle](../docs/repository-structure.md) compare ces frontières
+aux fichiers RetroArch réellement lus à la révision 168c451a le 4 novembre 2026.
+La séparation suit les responsabilités : navigation/actions, géométrie, dessin,
+primitives visuelles, stockage et services Android.

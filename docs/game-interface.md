@@ -26,19 +26,25 @@ et le bouton menu restent disponibles lorsque la surimpression est masquée.
 
 ## Menu rapide
 
-Le menu rapide est une liste plein écran qui suspend l'émulation. Il propose :
+Le menu rapide est un panneau sur la dernière image du jeu et suspend l'émulation.
+Il propose, dans cet ordre :
 
 1. Reprendre le contenu.
-2. Redémarrer le contenu.
-3. Fermer le contenu en conservant le cœur chargé.
-4. Sauvegardes d'état, avec état manuel et chargement du dernier état automatique disponible.
-5. Options du cœur, avec un état vide si aucun réglage n'est disponible.
-6. Commandes, pour l'affichage de la surimpression.
-7. Succès RetroAchievements.
-8. Informations sur le cœur.
-9. Menu principal.
+2. Charger un état nommé.
+3. Sauvegarder un état nommé avec aperçu.
+4. Redémarrer le contenu.
+5. Options du jeu, les réglages du cœur ou un état vide si aucun n'est disponible.
+6. Quitter le jeu en conservant le cœur chargé.
+7. Sauvegardes d'état, avec état manuel et chargement du dernier état automatique disponible.
+8. [Sauvegardes du jeu](save-files.md), pour importer ou exporter la batterie `.sav` ou `.srm`.
+9. Commandes, pour l'affichage de la surimpression.
 10. Joueur des commandes tactiles et du clavier, pendant une session à deux joueurs.
-11. [Sauvegardes du jeu](save-files.md), pour importer ou exporter la batterie `.sav` ou `.srm`.
+11. Succès RetroAchievements.
+12. Informations sur le cœur.
+13. Menu principal.
+
+Le panneau défile pour donner accès aux outils complémentaires. La collection
+d'états et leurs actions sont décrites dans [l'interface mobile](interface-redesign.md).
 
 Une opération non disponible pour le cœur est désactivée. Le retour d'un
 sous-menu conserve la pause, la sélection et le défilement du menu rapide.

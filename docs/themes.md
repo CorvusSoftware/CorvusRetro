@@ -11,16 +11,18 @@ Les tons ont été adaptés au contraste des petites icônes et du texte :
 
 | Rôle | Couleur |
 | --- | --- |
-| Fond bleu presque noir | `#090D14` |
-| En-tête bleu nuit | `#111827` |
-| Navigation ardoise | `#141E30` |
-| Accent lavande/violet | `#B69AFF` |
-| Icônes indigo | `#9A9DFF` |
-| Texte | `#EFF1FA` |
-| Texte secondaire | `#A8B2CD` |
+| Fond bleu presque noir | `#090B24` |
+| En-tête bleu nuit | `#090D21` |
+| Navigation bleu nuit | `#090B20` |
+| Accent violet | `#C465F5` |
+| Icônes lavande | `#D4A4FF` |
+| Texte | `#FAF8FF` |
+| Texte secondaire | `#B7B6D3` |
 
-L'icône de lancement reprend aussi ce fond et l'accent violet. Le logo fourni
-sert de référence chromatique ; il n'est pas remplacé par une image retouchée.
+Les cartes ajoutent des dégradés dans cette palette. Les couleurs de l'icône
+Android, des barres système et des commandes de jeu conservent leurs valeurs
+antérieures. Le logo fourni sert de référence chromatique ; il n'est pas
+remplacé par une image retouchée.
 
 ## ASUS
 

@@ -57,12 +57,13 @@ Les modules officiels sont disponibles pour **arm64-v8a** et **x86_64**.
 
 - **Interface entièrement native :** menus et navigation en C11, sans interface d'émulation Java.
 - **Commandes tactiles :** contours discrets, profils GB/GBC et GBA avec L/R, portrait et paysage, multitouch et masquage réversible.
-- **Menu rapide plein écran :** reprise, redémarrage, fermeture du jeu, sauvegarde et chargement d’état, commandes et succès.
+- **Navigation mobile :** cinq onglets, accueil illustré, bibliothèque en grille/liste avec recherche et filtres, fiches des cœurs et gestion des états.
+- **Menu rapide :** panneau sur l'image du jeu, reprise, redémarrage, fermeture, sauvegarde et chargement d'état, commandes et succès.
 - **Options du cœur :** palettes GB/GBC, sauvegarde et horloge GBA, valeurs persistantes et application différée indiquée.
 - **Câble link local :** deux jeux, écrans côte à côte, commandes et batteries séparées ; configuration visible tant que le cœur reste chargé.
-- **Historique et sauvegardes :** historique seul dans les listes de lecture, import/export batterie `.sav` et `.srm`, choix du joueur en câble link, états instantanés séparés selon le moteur.
+- **Historique et sauvegardes :** historique, import/export batterie `.sav` et `.srm`, choix du joueur en câble link, états nommés avec aperçu, renommage, duplication, partage et suppression confirmée.
 - **Gestion du contenu :** cœur compatible chargé avant le jeu ; fermer le contenu conserve le cœur chargé.
-- **Paramètres et sous-paramètres :** six catégories, notifications, vidéo, volume, commandes tactiles, manettes, copies de sécurité et états automatiques persistants.
+- **Paramètres et sous-paramètres :** affichage, commandes, audio, système, sauvegardes, RetroAchievements et informations ; préférences persistantes.
 - **Thèmes :** CorvusRetro, NVIDIA Shield et ASUS.
 - **Cœurs téléchargeables :** installation, mise à jour et suppression indépendantes de l'application, avec conservation des jeux et sauvegardes.
 - **RetroAchievements :** identification des jeux et suivi des succès dans le mode normal.
@@ -122,6 +123,7 @@ Ces commandes couvrent les tests natifs, les vérifications mémoire et le proje
 | Guide | Sujet |
 | :-- | :-- |
 | [Prise en main et navigation](docs/navigation.md) | Menus et réglages |
+| [Interface mobile](docs/interface-redesign.md) | Refonte, états nommés et frontières techniques |
 | [Commandes tactiles](docs/controls.md) | Boutons, gestes et orientation |
 | [Interface de jeu](docs/game-interface.md) | Profils par console et menu rapide |
 | [Sauvegardes du jeu](docs/save-files.md) | Import et export batterie `.sav` et `.srm` |

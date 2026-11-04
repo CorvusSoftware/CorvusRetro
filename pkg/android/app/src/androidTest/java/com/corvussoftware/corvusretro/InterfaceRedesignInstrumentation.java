@@ -124,6 +124,11 @@ public final class InterfaceRedesignInstrumentation extends Instrumentation {
         key(KeyEvent.KEYCODE_DPAD_CENTER);
     }
     private void back(int expected) throws Exception { key(KeyEvent.KEYCODE_BACK); page(expected); }
+    private void firstLibraryCard() throws Exception {
+        int columns = width() >= 700 ? 4 : 2;
+        float tile = (width() - 32 - (columns - 1) * 12) / columns;
+        tap(16 + tile / 2, Math.min(108 + tile * 1.26f / 2, height() - 88));
+    }
     private void shot(String name) throws Exception {
         SystemClock.sleep(500);
         Bitmap bitmap = getUiAutomation().takeScreenshot();
@@ -298,10 +303,10 @@ public final class InterfaceRedesignInstrumentation extends Instrumentation {
         choose(3);page(16);waitFor(()->!stateLine().contains("installing=1"),"catalogue available");shot("05-core-catalogue");back(3);
         choose(2);state(0,2,0,0);
         tab(1,25);float chipWidth=(width()-56)/4;tap(16+(chipWidth+8)+chipWidth/2,79);page(25);
-        float refusedTile=(width()-44)/2;tap(16+refusedTile/2,108+refusedTile*1.26f/2);state(25,2,0,0);
+        firstLibraryCard();state(25,2,0,0);
         check(number("content")==0,"GB filter cannot launch with a GBA core");
         float chip=(width()-56)/4;tap(16+3*(chip+8)+chip/2,79);
-        float tile=(width()-44)/2;tap(16+tile/2,108+tile*1.26f/2);state(8,2,1,0);waitFor(this::greenPreview,"original ARM game renders actual green framebuffer");shot("11-preserved-game");
+        firstLibraryCard();state(8,2,1,0);waitFor(this::greenPreview,"original ARM game renders actual green framebuffer");shot("11-preserved-game");
         key(KeyEvent.KEYCODE_BACK);state(8,2,1,1);shot("12-quick-menu");
         choose(2);page(40);waitFor(()->entries().length>=1,"native new state is committed");shot("07-state-list");
         choose(1);page(41);waitFor(this::greenPreview,"state action preview displays original game pixels");shot("08-state-actions");

@@ -14,23 +14,30 @@ Les pages sans capacité déclarée par le cœur affichent leur état indisponib
 
 | Chemin | Contenu |
 | --- | --- |
-| Menu principal | Menu rapide si un contenu est chargé, charger/décharger le cœur, charger du contenu, Sous-système si un cœur est chargé, Informations |
-| Menu principal > Informations | À propos, informations du cœur chargé, licence et crédits |
-| Listes de lecture | Historique uniquement |
-| Menu rapide | Reprendre, Redémarrer, Fermer, Sauvegardes d'état, Options du cœur, Commandes, Succès, Informations sur le cœur, Menu principal, joueur contrôlé en câble link, Sauvegardes du jeu |
-| Menu rapide > Sauvegardes d'état | Sauvegarder l'état, Charger l'état |
+| Accueil | Continuer ou importer, bibliothèque, cœurs, Saves, charger/décharger le cœur, Sous-système si un cœur est chargé |
+| Jeux | Grille/liste, filtres Tous/GB/GBC/GBA, recherche, actions du jeu |
+| Jeux > Menu | Importer un jeu, importer un dossier, historique, grille/liste |
+| Saves | Partie courante et états par jeu |
+| Saves > Jeu | Nouvel état, états nommés et actions ; états classiques et batterie pour la partie courante |
+| Cœurs | Charger un cœur, fiche par cœur, téléchargement, suppression |
+| Cœurs > Fiche | Informations réelles, installer ou charger/réinstaller/désinstaller |
+| Menu rapide | Reprendre, Charger un état, Sauvegarder un état, Redémarrer, Options du jeu, Quitter le jeu, puis outils complémentaires en défilement |
+| Menu rapide > Sauvegardes d'état | État manuel et dernier état automatique |
 | Menu rapide > Sauvegardes du jeu | Importer `.sav` ou `.srm`, exporter `.sav` ou `.srm`, choix du joueur en câble link |
-| Réglages > Interface utilisateur | Thèmes, Notifications |
-| Réglages > Vidéo | Veille, présentation de l'image, filtrage |
+| Réglages > Affichage | Veille, présentation de l'image, filtrage |
 | Réglages > Audio | Son et volume du jeu |
 | Réglages > Commandes | Commandes tactiles, Manettes |
+| Réglages > Système | Interface avec thèmes/notifications, sauvegardes, informations, import de contenu |
 | Réglages > Sauvegardes | Copies de sécurité, État automatique |
 | Réglages > RetroAchievements | Activation, Compte |
+| Réglages > À propos | Application, cœur chargé, licence et crédits |
 
 Le bouton Retour restaure la page précédente, sa sélection, son filtre et son
-défilement. Les trois onglets restent Menu principal, Listes de lecture, Réglages,
-avec les icônes de maison, de liste et d'engrenage. Le menu rapide suspend le jeu
-et occupe tout l'écran. Fermer le contenu conserve le cœur chargé.
+défilement. Les cinq onglets sont Accueil, Jeux, Saves, Cœurs et Réglages.
+La géométrie des cartes et des panneaux est partagée entre dessin et toucher.
+Le menu rapide suspend le jeu et affiche un panneau sur sa dernière image.
+Fermer le contenu conserve le cœur chargé. La [référence de l'interface mobile](interface-redesign.md)
+décrit la collection d'états nommés et l'adaptation de la maquette.
 Les [menus du cœur](core-menus.md) décrivent les options persistantes,
 la sélection de deux jeux pour le câble link et les capacités des sessions.
 

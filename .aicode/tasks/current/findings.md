@@ -7,7 +7,9 @@ Trois findings P2 résolus et revus indépendamment :
 - Identifier chaque saisie Android par génération C/JNI ; invalider mailbox et callbacks de l'ancien éditeur, même pour un nouveau champ de même numéro.
 - Relire les états après un échec final de renommage/duplication/suppression/création, car le stockage peut avoir déjà appliqué l'opération avant un fsync échoué.
 
-Le premier scénario Android a révélé une garde NativeActivity limitée aux champs RA : Entrée était absorbée par le menu pour recherche/renommage. La garde des touches et des axes inclut maintenant ui_editing. Une nouvelle exécution physique est en cours.
+Le premier scénario Android a révélé une garde NativeActivity limitée aux champs RA : Entrée était absorbée par le menu pour recherche/renommage. La garde des touches et des axes inclut maintenant ui_editing. Le parcours portrait sur émulateur valide Entrée, IME_DONE, Retour et les résultats périmés pour recherche et renommage.
+
+Le premier parcours paysage utilisait les coordonnées d'une grille à deux colonnes alors que la largeur native produit quatre colonnes. Le clic tombait dans la navigation, sans lancement. Le scénario calcule maintenant la largeur réelle des cartes et vise leur partie visible ; les assertions de lancement et de framebuffer restent inchangées.
 
 Les réglages d'affichage reprennent uniquement les fonctions effectives (natif/entier, filtre, écran allumé). Aucune fausse option de ratio forcé ou plein écran n'est affichée.
 Les cœurs officiels actuels ne permettent pas les états en câble link ; l'interface expose ce refus. Les autres outils de liaison sont conservés.

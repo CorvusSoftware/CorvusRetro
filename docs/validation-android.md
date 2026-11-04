@@ -73,6 +73,38 @@ HTTPS déterministe. Un passage de ces tests ne prouve pas une connexion au
 service public depuis un téléphone. Distinguer explicitement build, tests hôtes,
 émulateur Android, exécution ARM64 et appareil physique.
 
+### Parcours de la nouvelle interface
+
+Pour les menus refondus, le runner de référence est désormais
+`InterfaceRedesignInstrumentation`, et non les coordonnées de navigation de
+l'ancienne interface dans `RetroAchievementsInstrumentation`.
+
+```sh
+./gradlew --no-daemon \
+  -PcorvusTestRunner=com.corvussoftware.corvusretro.InterfaceRedesignInstrumentation \
+  :app:assembleDebug :app:assembleDebugAndroidTest
+adb install -r pkg/android/app/build/outputs/apk/debug/app-debug.apk
+adb install -r pkg/android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+adb shell am instrument -w -e orientation portrait -e fixture_dir "$FIXTURE_DIR" \
+  com.corvussoftware.corvusretro.test/com.corvussoftware.corvusretro.InterfaceRedesignInstrumentation
+```
+
+`FIXTURE_DIR` désigne un dossier Android contenant les trois archives officielles
+GB/GBC/GBA x86_64 `0.15.0` déjà vérifiées. Exécuter aussi avec
+`-e orientation landscape`. Les programmes originaux sont créés par le runner,
+qui isole leurs identifiants et restaure les préférences modifiées. Le transport
+de catalogue est contrôlé ; l'installateur conserve les contrôles de taille,
+SHA-256, ZIP, ELF et permissions privées. Les captures restent dans les fichiers
+privés de l'application de test et ne doivent pas être ajoutées au dépôt.
+
+Le parcours couvre les cinq onglets, recherche et filtres, clavier réel et
+tickets périmés, lancement avec cœur compatible, menu rapide, états réels et
+actions, anciens états, réglages, trois thèmes, suppression et réinstallation
+individuelle d'un cœur sans perte de jeux ou d'états.
+
+`FrontendServicesInstrumentation` constitue un runner distinct pour les services
+d'images et de partage, avec le même mécanisme `-PcorvusTestRunner`.
+
 ## Publication
 
 Le build signé doit employer le certificat durable de la base déjà distribuée.
@@ -608,3 +640,42 @@ natives strictes et ASan/UBSan, tests JVM, 38 scénarios de dérive contrôlée,
 Redmi Note 13 5G avec casque filaire reste à faire ; aucune ROM Pokémon,
 écoute physique, campagne Bluetooth ou exécution ARM64 n'est revendiquée.
 Le tag et les octets publics de 0.22.2 restent immuables.
+
+## Qualification de la refonte mobile
+
+La refonte de [PR #30](https://github.com/CorvusSoftware/CorvusRetro/pull/30)
+couvre les menus de la maquette et le menu rapide. Le rendu du jeu, les profils
+tactiles par console, les pilotes audio et les moteurs sont conservés.
+
+- 21 suites natives strictes et 21 suites ASan/UBSan passent, avec les
+  régressions historiques et les nouveaux parcours d'interface et d'états.
+- 25 tests JVM, compilation de la base et des tests, et lint Android passent.
+  Le contrôle APK vérifie zéro cœur, les deux ABI du frontend, l'alignement
+  16 Ko et la signature debug.
+- `FrontendServicesInstrumentation` passe 31 contrôles sur les vrais services
+  Android d'images et de partage privé en lecture seule.
+- `InterfaceRedesignInstrumentation` passe ses parcours complets en portrait
+  et paysage sur Android 10/API29 x86_64. Ils exercent Entrée, Retour,
+  IME_DONE, les anciens tickets rejetés, les filtres, un vrai framebuffer GBA,
+  le menu rapide, la création de trois états, renommage, duplication, partage,
+  suppression confirmée, restauration, état classique, réglages, trois thèmes
+  et installation/réinstallation d'un cœur avec conservation des données.
+- Les captures des deux orientations ont été inspectées, notamment les marges
+  système, la grille à quatre colonnes en paysage et les panneaux défilants.
+  Aucun crash de l'application n'est enregistré sur ces parcours.
+- La revue indépendante a été suivie de corrections et d'une nouvelle revue
+  sans finding : prévalidation des états avant remplacement de partie,
+  générations de saisie et rafraîchissement après une erreur finale d'IO.
+
+La base debug testée a pour SHA-256
+`ee15f9cf49893132af016b67637f279d5ddd0f65f8f3f360f321028a6b8a2442`.
+Le test paysage a d'abord révélé des coordonnées de test calculées pour deux
+colonnes ; elles ont été corrigées avant le parcours réussi, sans changement de
+la base APK. Les compteurs de contrôles incluent des boucles de pixels et de
+lecture shell ; ils ne représentent pas des milliers de scénarios indépendants.
+
+Ces parcours utilisent des programmes originaux, un transport de catalogue et
+d'archives contrôlé, et un émulateur logiciel. Ils ne qualifient ni un appareil
+physique, ni l'exécution ARM64, ni le réseau de production, ni une écoute audio.
+Aucun changement de version, fusion ou publication d'APK n'est effectué pour
+cette préparation de refonte. La release publique 0.22.2 reste inchangée.
