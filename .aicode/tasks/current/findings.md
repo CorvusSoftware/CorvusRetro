@@ -1,3 +1,2 @@
-Ancien jeu32 icônes et actions génériques :fichier pour renommer, dossier pour partager, croix pour supprimer. Nouveau jeu42 avec symboles dédiés et style commun.
-Bloc étendu :base464 synchronisée C/Java, tableaux et boucles glyphes bornés avant ce bloc.233 glyphes fixes, atlas1024x2048 et marqueur inchangés. Revue indépendante sans finding,42 noms et ordres concordants, anciennes valeurs préservées.
-Qualification finale :172 contrôles atlas Android réels,21 strictes+21 ASan, build/lint/APK et parcours Android portrait/trois thèmes passent. Captures inspectées, aucun crash. CI exacte reste la dernière barrière avant PR prête.
+Plusieurs associations étaient inexactes même avec un style cohérent. La miniaturisation automatique pouvait aussi masquer la bonne intention ; les écrans vides dessinaient tous une GBA.
+Correction du modèle, des dessins ambigus et des remplacements visuels. Tests couvrant les symboles effectivement dessinés, pas seulement les IDs du modèle.

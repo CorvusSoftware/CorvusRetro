@@ -743,3 +743,23 @@ SHA-256 de la base debug qualifiée :
 `e6f55d97afd477f5221b104d541cc0219f411348522621b24d157e27b00e95e2`.
 Il s'agit d'essais sur émulateur API29 x86_64 avec programmes originaux et
 transport contrôlé, sans nouvelle qualification de téléphone physique ou ARM64.
+
+## Correspondance des icônes et des actions
+
+Les 48 pictogrammes sont associés aux objets et actions décrits dans
+[le guide des icônes](icons.md). Les 42 IDs existants et l'allocation de l'atlas
+restent stables. Les tests natifs contrôlent aussi les symboles réellement
+dessinés pour les catégories vides et le déchargement du cœur.
+
+Les 21 suites strictes et les 21 suites ASan/UBSan passent, ainsi que build/lint,
+base sans cœur, deux ABI et alignement 16 Ko. L'atlas Android passe 196 contrôles
+de formes, de lisibilité et de marges ; sa planche est inspectée. Le parcours
+portrait complet passe sur cette même base, avec captures inspectées pour
+import/export, états classiques, actions d'états, compte, Système et éjection
+du cœur. Aucun crash n'est enregistré. La revue indépendante ne relève aucun
+problème bloquant.
+
+SHA-256 de cette base debug :
+`9215deb7964fd043ea3038a182c9c446b6e36cd397973dfd06d1c5234c485b85`.
+Essais sur émulateur API29 x86_64 avec programmes originaux et transport
+d'archives contrôlé ; sans nouvelle qualification physique, ARM64 ou audio.

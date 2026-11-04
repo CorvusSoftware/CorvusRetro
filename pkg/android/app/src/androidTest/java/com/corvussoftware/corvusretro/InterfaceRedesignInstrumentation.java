@@ -301,7 +301,7 @@ public final class InterfaceRedesignInstrumentation extends Instrumentation {
         tab(2,39);shot("07-saves-browser");
         tab(3,3);shot("04-cores");coreOverflow(2);shot("06-core-installed");back(3);
         choose(3);page(16);waitFor(()->!stateLine().contains("installing=1"),"catalogue available");shot("05-core-catalogue");back(3);
-        choose(2);state(0,2,0,0);
+        choose(2);state(0,2,0,0);shot("home-core-loaded");
         tab(1,25);float chipWidth=(width()-56)/4;tap(16+(chipWidth+8)+chipWidth/2,79);page(25);
         firstLibraryCard();state(25,2,0,0);
         check(number("content")==0,"GB filter cannot launch with a GBA core");
@@ -324,14 +324,16 @@ public final class InterfaceRedesignInstrumentation extends Instrumentation {
         choose(4);page(42);choose(0);page(40);waitFor(()->entries().length==2,"confirmed deletion removes only selected state");
         choose(1);page(41);choose(0);state(8,2,1,0);waitFor(this::greenPreview,"named state restores actual game framebuffer");
         key(KeyEvent.KEYCODE_BACK);state(8,2,1,1);choose(1);page(40);
-        choose(3);page(18);choose(0);state(8,2,1,0);
+        choose(4);page(26);shot("save-import-export");back(40);
+        choose(3);page(18);shot("classic-states");choose(0);state(8,2,1,0);
         File states=new File(context.getFilesDir(),"states");File[] manual=states.listFiles(f->f.getName().startsWith(fixtureIds.get(2)+"-")&&f.getName().endsWith(".state")&&!f.getName().endsWith(".auto.state"));
         check(manual!=null&&manual.length==1,"legacy manual save stays available beside named states");
         key(KeyEvent.KEYCODE_BACK);state(8,2,1,1);choose(5);state(0,2,0,0);
-        tab(4,2);shot("09-settings");choose(0);page(10);shot("10-display");back(2);
+        tab(4,2);shot("09-settings");choose(5);page(34);shot("achievement-settings");
+        choose(1);page(35);shot("account-fields");back(34);back(2);choose(0);page(10);shot("10-display");back(2);
         choose(2);page(11);choose(1);page(29);choose(5);page(11);
         check(context.getSharedPreferences("corvus",Context.MODE_PRIVATE).getInt("audio_volume",-1)==50,"audio sub-setting persists the selected real volume");back(2);
-        choose(3);page(45);choose(0);page(9);choose(0);page(7);choose(2);page(9);tab(0,0);shot("home-asus");
+        choose(3);page(45);shot("system-settings");choose(0);page(9);choose(0);page(7);choose(2);page(9);tab(0,0);shot("home-asus");
         tab(4,2);choose(3);page(45);choose(0);page(9);choose(0);page(7);choose(1);page(9);tab(0,0);shot("home-shield");
         tab(4,2);choose(3);page(45);choose(0);page(9);choose(0);page(7);choose(0);page(9);tab(0,0);
         tab(3,3);coreOverflow(2);choose(2);page(38);choose(0);state(3,-1,0,0);

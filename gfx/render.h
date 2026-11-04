@@ -50,6 +50,12 @@ enum {
     CR_ICON_CHECK,
     CR_ICON_EXIT,
     CR_ICON_ADD,
+    CR_ICON_SYSTEM,
+    CR_ICON_IMPORT,
+    CR_ICON_EXPORT,
+    CR_ICON_LOCK,
+    CR_ICON_SLIDERS,
+    CR_ICON_FILTER,
     CR_ICON_COUNT
 };
 /* Mirrored by MainActivity: text glyphs must never overwrite the icon block. */

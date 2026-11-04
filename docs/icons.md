@@ -1,6 +1,6 @@
 # Icônes de l'interface
 
-Le jeu comprend 42 pictogrammes originaux de CorvusSoftware. Les ressources
+Le jeu comprend 48 pictogrammes originaux de CorvusSoftware. Les ressources
 référencées dans `MainActivity.ICONS`, sous `res/drawable`, utilisent une grille 24 x 24,
 un contour de 1,75 unité, des extrémités arrondies et des fonds transparents
 légers. Le corbeau frontal identifie CorvusRetro et apparaît aussi dans la puce
@@ -14,7 +14,7 @@ CorvusRetro, noir/blanc pour ASUS, vert pour NVIDIA Shield. Les proportions des
 | --- | --- |
 | Navigation | Accueil, grille, bibliothèque, dossier, recherche, plus, retour, suivant, menu |
 | Cœurs et contenu | Puce avec corbeau, corbeau, cartouche, fichier, sous-systèmes, déchargement |
-| Réglages | Engrenage, palette, écran, vidéo, casque, volume, manette, toucher, compte, informations |
+| Réglages | Engrenage, palette, écran, vidéo, haut-parleur, volume, manette, toucher, compte, informations |
 | Sauvegardes | Disquette, ajout, copies, restauration, crayon, duplication, partage, corbeille |
 | Actions et suivi | Lecture, redémarrage, sortie, fermeture, téléchargement, validation, historique, cloche, trophée |
 
@@ -22,16 +22,41 @@ Renommer, dupliquer, partager et supprimer ont leurs propres symboles. La
 création d'un état utilise un ajout, tandis que les états existants gardent la
 disquette. Les menus C conservent les actions et identifiants existants.
 
+## Correspondance des entrées
+
+| Entrée ou action | Symbole visible |
+| --- | --- |
+| Accueil / Réglages | Maison / engrenage |
+| Bibliothèque / présentation en liste | Grille / liste à puces |
+| Cœur / décharger le cœur | Puce Corvus / éjection |
+| Sous-système | Deux consoles reliées par un câble |
+| Système / options du cœur | Équipement système / curseurs de réglage |
+| Audio / volume | Haut-parleur / haut-parleur avec ondes |
+| Filtrage de l'image | Pixels |
+| Importer ou charger une sauvegarde | Fichier avec flèche entrante |
+| Exporter en .sav ou .srm | Fichier avec flèche sortante |
+| Sauvegarder / copies de secours | Disquette / disquettes superposées |
+| Charger l'état automatique | Disquette avec horloge |
+| Réinitialiser, redémarrer ou actualiser | Flèche circulaire |
+| Identifiant / mot de passe | Personne / cadenas |
+| Succès / notifications | Trophée / cloche |
+| Renommer / dupliquer / partager / supprimer | Crayon / deux documents / partage / corbeille |
+
+Les écrans vides utilisent le symbole de leur catégorie : grille pour les jeux,
+disquette pour les sauvegardes, puce pour les cœurs et loupe pour une recherche
+sans résultat. Les consoles et couvertures restent réservées aux jeux et aux
+fiches de cœur concernés. Elles ne remplacent plus le bouton de déchargement.
+
 ## Contrat de l'atlas
 
-`gfx/render.h` déclare les identifiants : les 32 premiers restent stables et les
-dix nouveaux sont ajoutés à la suite. Leur ordre correspond au tableau `ICONS`
+`gfx/render.h` déclare les identifiants : les 42 identifiants existants restent stables et les
+six symboles supplémentaires sont ajoutés à la suite. Leur ordre correspond au tableau `ICONS`
 de `MainActivity`. Android rasterise les ressources ; les menus et leur rendu
 restent en C11/OpenGL ES2.
 
 L'atlas reste un bitmap 1024 x 2048, avec des cellules de 64 pixels et un inset
-d'icône de 48 pixels. Les icônes occupent le bloc réservé 464..511, dont les 42
-premières cellules sont utilisées. Les 233 caractères fixes sont conservés et
+d'icône de 48 pixels. Les icônes occupent le bloc réservé 464..511, dont les 48
+cellules sont utilisées. Les 233 caractères fixes sont conservés et
 le cache Unicode dynamique utilise 233..463 avec éviction LRU. Le marqueur blanc
 des primitives demeure hors de l'inset des icônes.
 

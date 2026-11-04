@@ -44,8 +44,8 @@ void cr_menu_setting_apply(cr_ui *u, int id, int value) {
         cr_engine_set_save_policy(&u->engine, (unsigned)u->backup_count, u->auto_state != 0);
 }
 int cr_menu_setting_icon(int id) {
-    static const int icons[SET_COUNT] = {CR_ICON_VOLUME, CR_ICON_DISPLAY, CR_ICON_VIDEO,
-        CR_ICON_TOUCH, CR_ICON_TOUCH, CR_ICON_TOUCH, CR_ICON_NOTIFICATIONS,
+    static const int icons[SET_COUNT] = {CR_ICON_VOLUME, CR_ICON_DISPLAY, CR_ICON_FILTER,
+        CR_ICON_SLIDERS, CR_ICON_SLIDERS, CR_ICON_SLIDERS, CR_ICON_NOTIFICATIONS,
         CR_ICON_NOTIFICATIONS, CR_ICON_BACKUP, CR_ICON_SAVES};
     return icons[id];
 }

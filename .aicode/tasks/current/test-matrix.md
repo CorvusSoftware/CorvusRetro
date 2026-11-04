@@ -1,4 +1,5 @@
-P0 :42 ressources distinctes et visibles à24px, respect des marges d'atlas et du marqueur blanc.
-P0 : indices historiques inchangés, C/Java même base464, glyphes texte exclus du bloc icônes, aucune croissance du bitmap.
-P1 : compilation Android2ABI/lint, suites natives, écran d'accueil/réglages/actions d'états et trois thèmes ; dimensions validées conservées.
-P1 : revue ciblée et CI exacte avant PR prête.
+PASS P0 : sauver/charger/auto, import/export, reset, mot de passe, filtre, système et liste/grille.
+PASS P0 : catégories vides et éjection effectivement dessinées sans miniature générique.
+PASS P1 :48 ressources, IDs et allocation stables, atlas196, planche inspectée.
+PASS P1 :21 suites natives et21 ASan, build/lint/contrôlesAPK, parcours Android portrait complet, captures et revue.
+CI du commit publié à contrôler dans PR #30 avant sortie du brouillon.

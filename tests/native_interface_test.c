@@ -5,6 +5,7 @@
 #define _XOPEN_SOURCE 700
 #include "menu_driver.h"
 #include "interface_layout.h"
+#include "menu_entries.h"
 #include "core_registry.h"
 #include "state_store.h"
 #include <ftw.h>
@@ -63,7 +64,7 @@ static void share(void *context, const char *name, const uint8_t *bytes, size_t 
     memcpy(f->shared, bytes, size); f->shared_size = size;
     snprintf(f->shared_name, sizeof(f->shared_name), "%s", name);
 }
-typedef struct { char text[16384]; } capture;
+typedef struct { char text[16384]; uint64_t icons, empty_icons; } capture;
 static void rect(void *c,float x,float y,float w,float h,uint32_t color) {
     (void)c;(void)x;(void)y;(void)w;(void)h;(void)color;
 }
@@ -77,7 +78,12 @@ static void text(void *context,const char *value,float x,float y,float size,uint
 }
 static float measure(void *c,const char *value,float size) { (void)c;return strlen(value)*size*.5f; }
 static void icon(void *c,int kind,float x,float y,float size,uint32_t color) {
-    (void)c;(void)kind;(void)x;(void)y;(void)size;(void)color;
+    (void)x;(void)y;(void)color;
+    capture *result=c;
+    if (kind>=0 && kind<CR_ICON_COUNT) {
+        result->icons|=UINT64_C(1)<<kind;
+        if (size==64) result->empty_icons|=UINT64_C(1)<<kind;
+    }
 }
 static void video(void *c,const uint32_t *pixels,int width,int height,float x,float y,float w,float h) {
     (void)c;(void)pixels;(void)width;(void)height;(void)x;(void)y;(void)w;(void)h;
@@ -86,7 +92,7 @@ static void line(void *c,float x,float y,float x2,float y2,float width,uint32_t 
     (void)c;(void)x;(void)y;(void)x2;(void)y2;(void)width;(void)color;
 }
 static capture draw(cr_ui *u) {
-    capture c = {{0}};
+    capture c = {0};
     cr_painter painter = {.context=&c,.rect=rect,.circle=circle,.text=text,.measure=measure,
                          .icon=icon,.game=video,.line=line};
     cr_ui_draw(u,&painter);return c;
@@ -175,6 +181,38 @@ static void home_dimensions(cr_ui *u) {
     }
     u->scroll=0;
 }
+static void icon_meaning(cr_ui *u) {
+    u->page=CR_SETTINGS;
+    check(cr_menu_entry_get(u,3).icon==CR_ICON_SYSTEM,"system category describes the device, not the settings gear");
+    u->page=CR_GAME_SAVES;
+    check(cr_menu_entry_get(u,0).icon==CR_ICON_IMPORT &&
+          cr_menu_entry_get(u,1).icon==CR_ICON_EXPORT && cr_menu_entry_get(u,2).icon==CR_ICON_EXPORT,
+          "battery import and both exports have directional file actions");
+    u->page=CR_SAVESTATES;
+    check(cr_menu_entry_get(u,0).icon==CR_ICON_SAVES && cr_menu_entry_get(u,1).icon==CR_ICON_IMPORT &&
+          cr_menu_entry_get(u,2).icon==CR_ICON_RESTORE,"save, load and last automatic state are distinguished");
+    u->page=CR_RA_ACCOUNT;
+    check(cr_menu_entry_get(u,0).icon==CR_ICON_ACCOUNT && cr_menu_entry_get(u,1).icon==CR_ICON_LOCK,
+          "username and password have identity and lock symbols");
+    u->page=CR_VIDEO_SETTINGS;
+    check(cr_menu_entry_get(u,2).icon==CR_ICON_FILTER,"image filtering shows pixels rather than a play screen");
+    u->page=CR_OVERLAY_LAYOUT;
+    check(cr_menu_entry_get(u,2).icon==CR_ICON_RESTART,"layout reset is not file restoration");
+    u->page=CR_LIBRARY_ACTIONS;u->library_list=false;
+    check(cr_menu_entry_get(u,3).icon==CR_ICON_LIST,"switching to a list shows a list");
+    u->library_list=true;
+    check(cr_menu_entry_get(u,3).icon==CR_ICON_GRID,"switching to a grid shows a grid");
+    u->library_list=false;
+    size_t saved_count=u->game_count;u->game_count=0;
+    const int pages[]={CR_LIBRARY,CR_SAVES_LIBRARY,CR_CORE_DOWNLOADS};
+    const int symbols[]={CR_ICON_GRID,CR_ICON_SAVES,CR_ICON_CORE};
+    for (int i=0;i<3;++i) {
+        u->page=pages[i];capture rendered=draw(u);
+        check((rendered.empty_icons&(UINT64_C(1)<<symbols[i]))!=0,
+              "empty screen actually draws its category icon, not a GBA console");
+    }
+    u->game_count=saved_count;u->page=CR_MAIN;u->scroll=0;u->focus=0;
+}
 int main(void) {
     char root[]="/tmp/corvus-interface-XXXXXX",path[4096];fixture f={0};
     check(mkdtemp(root)!=NULL,"private integration fixture");
@@ -199,6 +237,7 @@ int main(void) {
         .refresh_core_catalog=refresh,.install_core_pack=install,.share_state=share},root);
     home_dimensions(&u);
     cr_ui_size(&u,384,720);
+    icon_meaning(&u);
     const int pages[]={CR_MAIN,CR_LIBRARY,CR_SAVES_LIBRARY,CR_CORES,CR_SETTINGS};
     for(int i=0;i<5;++i) {tab(&u,i);check(u.page==pages[i] && u.tab==i,"all five visible tabs navigate to their actual roots");}
     tab(&u,1);row(&u,1);check(!u.engine.loaded && strstr(u.message,"cœur"),"game card cannot launch without a selected core");
@@ -233,6 +272,9 @@ int main(void) {
     int gba_row=-1;for(size_t i=0;i<cr_registry_count();++i) if(cr_registry_index_at(i)==gba) gba_row=(int)i;
     check(gba_row>=0,"GBA is reachable in the real core manager");row(&u,gba_row);
     check(u.engine.handle && !u.engine.loaded && u.page==CR_MAIN,"explicit core selection loads no game");
+    c=draw(&u);
+    check((c.icons&(UINT64_C(1)<<CR_ICON_UNLOAD))!=0,
+          "loaded-core action visibly draws eject instead of a console thumbnail");
     row(&u,0);check(cr_ui_running(&u) && !strcmp(u.engine.id,f.records[GAME_A].id),"continue launches the latest real game with the selected core");
     check(cr_engine_step(&u.engine,0),"original ARM fixture renders its first frame");
     cr_ui_back(&u);quick(&u,CR_QUICK_SAVE_STATE);

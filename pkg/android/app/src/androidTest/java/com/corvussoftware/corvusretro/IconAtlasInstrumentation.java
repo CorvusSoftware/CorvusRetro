@@ -41,8 +41,8 @@ public final class IconAtlasInstrumentation extends Instrumentation {
             int[] resources = (int[]) field.get(null);
             Field baseField = MainActivity.class.getDeclaredField("ICON_ATLAS_BASE"); baseField.setAccessible(true);
             int iconBase = baseField.getInt(null);
-            check(resources.length == 42 && iconBase == 464 && iconBase + resources.length <= 512,
-                    "42 native icons fit their reserved block after the text glyph cache");
+            check(resources.length == 48 && iconBase == 464 && iconBase + resources.length <= 512,
+                    "48 native icons fit their reserved block after the text glyph cache");
             atlas = activity.atlas();
             check(atlas.getWidth() == 1024 && atlas.getHeight() == 2048, "glyph atlas dimensions remain stable");
             montage = Bitmap.createBitmap(1024, ((resources.length + 7) / 8) * 132, Bitmap.Config.ARGB_8888);

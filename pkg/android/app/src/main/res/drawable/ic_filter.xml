@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- CorvusRetro - CorvusSoftware
+     Copyright (C) 2026 CorvusSoftware
+     SPDX-License-Identifier: AGPL-3.0-only -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#20FFFFFF" android:pathData="M3.5,3 H8.5 Q9,3 9,3.5 V8.5 Q9,9 8.5,9 H3.5 Q3,9 3,8.5 V3.5 Q3,3 3.5,3 Z" />
+    <path android:fillColor="#20FFFFFF" android:pathData="M9.5,9 H14.5 Q15,9 15,9.5 V14.5 Q15,15 14.5,15 H9.5 Q9,15 9,14.5 V9.5 Q9,9 9.5,9 Z" />
+    <path android:fillColor="#20FFFFFF" android:pathData="M15.5,15 H20.5 Q21,15 21,15.5 V20.5 Q21,21 20.5,21 H15.5 Q15,21 15,20.5 V15.5 Q15,15 15.5,15 Z" />
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeWidth="1.75" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M5,3 H19 Q21,3 21,5 V19 Q21,21 19,21 H5 Q3,21 3,19 V5 Q3,3 5,3 Z" />
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeWidth="1.75" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M3,9 H21 M3,15 H21 M9,3 V21 M15,3 V21" />
+</vector>

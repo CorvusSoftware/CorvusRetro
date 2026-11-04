@@ -54,7 +54,9 @@ public final class MainActivity extends NativeActivity {
             R.drawable.ic_folder, R.drawable.ic_display, R.drawable.ic_touch, R.drawable.ic_volume,
             R.drawable.ic_backup, R.drawable.ic_restore, R.drawable.ic_grid, R.drawable.ic_search,
             R.drawable.ic_rename, R.drawable.ic_duplicate, R.drawable.ic_share, R.drawable.ic_trash,
-            R.drawable.ic_more, R.drawable.ic_check, R.drawable.ic_exit, R.drawable.ic_add};
+            R.drawable.ic_more, R.drawable.ic_check, R.drawable.ic_exit, R.drawable.ic_add,
+            R.drawable.ic_system, R.drawable.ic_import, R.drawable.ic_export, R.drawable.ic_lock,
+            R.drawable.ic_sliders, R.drawable.ic_filter};
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final Object importLock = new Object();
     private GameLibrary library;

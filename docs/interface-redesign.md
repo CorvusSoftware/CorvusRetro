@@ -60,7 +60,7 @@ implémentés : présentation native ou entière, filtrage et écran allumé.
 Les thèmes CorvusRetro, NVIDIA Shield et ASUS gardent leurs identifiants et
 préférences ; les couleurs des commandes de jeu sont conservées.
 
-Un [jeu de 42 icônes vectorielles](icons.md) harmonise la navigation, les réglages
+Un [jeu de 48 icônes vectorielles](icons.md) harmonise la navigation, les réglages
 et les actions. Renommer, dupliquer, partager et supprimer disposent de symboles
 dédiés, avec le même tracé décliné dans les trois palettes.
 

@@ -252,8 +252,8 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
         };
         static const int icons[CR_QUICK_COUNT] = {
             CR_ICON_PLAY, CR_ICON_RESTART, CR_ICON_EXIT, CR_ICON_SAVES,
-            CR_ICON_CORE, CR_ICON_INPUT, CR_ICON_ACHIEVEMENTS, CR_ICON_INFO,
-            CR_ICON_HOME, CR_ICON_INPUT, CR_ICON_SAVES, CR_ICON_RESTORE, CR_ICON_SAVES
+            CR_ICON_SLIDERS, CR_ICON_INPUT, CR_ICON_ACHIEVEMENTS, CR_ICON_INFO,
+            CR_ICON_HOME, CR_ICON_INPUT, CR_ICON_SAVES, CR_ICON_IMPORT, CR_ICON_SAVES
         };
         fill(&r, labels[index], hints[index], icons[index], ACT_QUICK_ACTION, index);
         r.disabled = (index == CR_QUICK_RESTART && !cr_engine_can_reset(&u->engine)) ||
@@ -272,7 +272,7 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
         if (cr_engine_option(&u->engine, (size_t)index, &option)) {
             uint32_t value = cr_engine_option_value(&u->engine, option.key);
             fill(&r, option.label, value < option.value_count ? option.values[value].label :
-                 "Valeur indisponible", CR_ICON_CORE, ACT_CORE_OPTION, index);
+                 "Valeur indisponible", CR_ICON_SLIDERS, ACT_CORE_OPTION, index);
         }
     } else if (u->page == CR_CORE_OPTION_VALUES) {
         corvus_core_option option;
@@ -280,7 +280,7 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
             fill(&r, option.values[index].label, (uint32_t)index == option.default_index ?
                  "Valeur par défaut" : (option.flags & CORVUS_OPTION_RESTART_REQUIRED ?
                  "Application au prochain redémarrage" : "Application immédiate"),
-                 CR_ICON_CORE, ACT_OPTION_VALUE, index);
+                 CR_ICON_SLIDERS, ACT_OPTION_VALUE, index);
             r.checked = cr_engine_option_value(&u->engine, option.key) == (uint32_t)index;
         }
     } else if (u->page == CR_SUBSYSTEMS) {
@@ -296,7 +296,7 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
         if (cr_menu_selected_subsystem(u, &subsystem)) {
             if (index < 2)
                 fill(&r, subsystem.games[index].label, u->link_ids[index][0] ? u->link_titles[index] :
-                     "Choisir un contenu", CR_ICON_INPUT, ACT_SUBSYSTEM_SLOT, index);
+                     "Choisir un contenu", CR_ICON_CONTENT, ACT_SUBSYSTEM_SLOT, index);
             else {
                 fill(&r, "Démarrer les contenus", "Lancer les deux consoles reliées",
                      CR_ICON_PLAY, ACT_SUBSYSTEM_START, 0);
@@ -320,14 +320,14 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
     } else if (u->page == CR_GAME_SAVES) {
         if (u->engine.players > 1 && index == 0) {
             fill(&r, "Joueur de la sauvegarde", u->save_player ? "Joueur 2" : "Joueur 1",
-                 CR_ICON_CONTENT, ACT_SAVE_PLAYER, 0);
+                 CR_ICON_ACCOUNT, ACT_SAVE_PLAYER, 0);
         } else if (index - (u->engine.players > 1) == 3) {
             fill(&r, "Copies de secours", "Exporter une batterie avant import", CR_ICON_BACKUP, ACT_BACKUP_MENU, 0);
         } else {
             int operation = index - (u->engine.players > 1);
             static const char *labels[] = {"Importer une sauvegarde", "Exporter en .sav", "Exporter en .srm"};
             fill(&r, labels[operation], operation ? "Copie de la mémoire batterie actuelle" :
-                 "Le contenu redémarrera après confirmation", CR_ICON_FILE, ACT_SAVE_TRANSFER, operation);
+                 "Le contenu redémarrera après confirmation", operation ? CR_ICON_EXPORT : CR_ICON_IMPORT, ACT_SAVE_TRANSFER, operation);
             r.disabled = u->save_request || !u->platform.save_transfer ||
                          !cr_engine_battery_size(&u->engine, u->save_player);
         }
@@ -335,24 +335,33 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
         char label[64]; snprintf(label, sizeof(label), "Copie de secours %d", index + 1);
         bool available = (u->backup_available & (1u << index)) != 0;
         fill(&r, label, available ? "Exporter en .sav" : "Absente ou illisible pour ce joueur",
-             CR_ICON_BACKUP, ACT_EXPORT_BACKUP, index);
+             CR_ICON_EXPORT, ACT_EXPORT_BACKUP, index);
         r.disabled = !available;
     } else if (u->page == CR_SAVE_CONFIRM) {
         fill(&r, index ? "Annuler" : "Importer et redémarrer le contenu",
-             index ? "Conserver la partie actuelle" : "Copie de secours conservée", CR_ICON_FILE,
+             index ? "Conserver la partie actuelle" : "Copie de secours conservée", index ? CR_ICON_BACK : CR_ICON_IMPORT,
              index ? ACT_SAVE_CANCEL : ACT_SAVE_COMMIT, 0);
     } else if (u->page == CR_SAVESTATES) {
         static const char *labels[] = {"Sauvegarder l’état", "Charger l’état", "Charger l'état automatique"};
         fill(&r, labels[index], index == 2 ? "Dernier état créé à la fermeture" :
              (index ? "Restaurer la sauvegarde de ce contenu" : "Enregistrer la position actuelle"),
-             CR_ICON_FILE, index == 2 ? ACT_LOAD_AUTO_STATE : (index ? ACT_LOAD_STATE : ACT_SAVE_STATE), 0);
+             index == 0 ? CR_ICON_SAVES : index == 1 ? CR_ICON_IMPORT : CR_ICON_RESTORE, index == 2 ? ACT_LOAD_AUTO_STATE : (index ? ACT_LOAD_STATE : ACT_SAVE_STATE), 0);
         if (index == 2) r.disabled = !u->auto_state_available;
     } else if (u->page == CR_MAIN) {
         if (!index) {
             int recent = -1;
             for (size_t i = 0; i < u->game_count; ++i)
                 if (u->games[i].played && (recent < 0 || u->games[i].played > u->games[recent].played)) recent = (int)i;
-            if (u->engine.loaded) fill(&r, "Continuer", u->title, CR_ICON_PLAY, ACT_QUICK, 0);
+            if (u->engine.loaded) {
+                int current = cr_menu_game_index(u, u->engine.id);
+                if (current >= 0) game_row(&r, u, current, ACT_QUICK);
+                else {
+                    fill(&r, "", "", CR_ICON_CONTENT, ACT_QUICK, 0);
+                    r.console = cr_registry_legacy_system(u->engine.system);
+                }
+                snprintf(r.label, sizeof(r.label), "Continuer");
+                snprintf(r.hint, sizeof(r.hint), "%.220s", u->title);
+            }
             else if (recent >= 0) {
                 game_row(&r, u, recent, ACT_GAME);
                 snprintf(r.hint, sizeof(r.hint), "%.220s", u->games[recent].title);
@@ -369,8 +378,7 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
         } else if (index == 4) {
             fill(&r, u->engine.handle ? "Décharger le cœur" : "Charger un cœur",
                  u->engine.handle ? core_name(u->engine.system) : "Aucun cœur actif",
-                 CR_ICON_CORE, u->engine.handle ? ACT_UNLOAD : ACT_CORES, 0);
-            r.console = cr_registry_legacy_system(u->engine.system);
+                 u->engine.handle ? CR_ICON_UNLOAD : CR_ICON_CORE, u->engine.handle ? ACT_UNLOAD : ACT_CORES, 0);
         } else fill(&r, "Sous-système", "Configurations du cœur actif", CR_ICON_SUBSYSTEM, ACT_PAGE, CR_SUBSYSTEMS);
     } else if (u->page == CR_LISTS) {
         fill(&r, "Historique", "Contenus récemment ouverts", CR_ICON_HISTORY, ACT_HISTORY, 0);
@@ -381,7 +389,7 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
             r.disabled = !u->engine.handle || u->importing;
         } else
             fill(&r, "Bibliothèque", "Jeux importés et importation de dossiers",
-                 CR_ICON_LIST, ACT_LIBRARY, 0);
+                 CR_ICON_GRID, ACT_LIBRARY, 0);
     } else if (u->page == CR_LIBRARY) {
         if (!index) {
             fill(&r, "Importer et organiser", "Jeux, dossiers et historique", CR_ICON_FOLDER, ACT_PAGE, CR_LIBRARY_ACTIONS);
@@ -390,7 +398,7 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
         if (!index) { fill(&r, "Importer un jeu", u->engine.handle ? "Ouvrir un fichier compatible" : "Chargez un cœur pour importer", CR_ICON_CONTENT, ACT_PICK, 0); r.disabled = !u->engine.handle || u->importing; }
         else if (index == 1) { fill(&r, "Importer un dossier", u->engine.handle ? "Ajouter plusieurs jeux" : "Chargez un cœur pour importer", CR_ICON_FOLDER, ACT_FOLDER, 0); r.disabled = !u->engine.handle || u->importing; }
         else if (index == 2) fill(&r, "Historique", "Retrouver les dernières parties", CR_ICON_HISTORY, ACT_HISTORY, 0);
-        else fill(&r, u->library_list ? "Afficher en grille" : "Afficher en liste", "Présentation de la bibliothèque", CR_ICON_LIST, ACT_LIBRARY, 1);
+        else fill(&r, u->library_list ? "Afficher en grille" : "Afficher en liste", "Présentation de la bibliothèque", u->library_list ? CR_ICON_GRID : CR_ICON_LIST, ACT_LIBRARY, 1);
     } else if (u->page == CR_GAME_ACTIONS) {
         int game = cr_menu_game_index(u, u->states_game_id);
         if (game >= 0) {
@@ -400,7 +408,7 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
             } else {
                 int core = cr_registry_find(u->games[game].core_id);
                 fill(&r, core >= 0 ? "Charger le cœur associé" : "Installer le cœur associé",
-                     u->games[game].core_id, CR_ICON_CORE, core >= 0 ? ACT_SELECT : ACT_OPEN_DOWNLOADER, core);
+                     u->games[game].core_id, core >= 0 ? CR_ICON_CORE : CR_ICON_DOWNLOAD, core >= 0 ? ACT_SELECT : ACT_OPEN_DOWNLOADER, core);
             }
         }
     } else if (u->page == CR_SAVES_LIBRARY) {
@@ -439,7 +447,7 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
         } else {
             static const char *labels[] = {"Charger", "Renommer", "Dupliquer", "Partager", "Supprimer"};
             static const int actions[] = {ACT_STATE_LOAD, ACT_STATE_RENAME, ACT_STATE_DUPLICATE, ACT_STATE_SHARE, ACT_STATE_DELETE_CONFIRM};
-            static const int icons[] = {CR_ICON_PLAY, CR_ICON_RENAME, CR_ICON_DUPLICATE, CR_ICON_SHARE, CR_ICON_TRASH};
+            static const int icons[] = {CR_ICON_IMPORT, CR_ICON_RENAME, CR_ICON_DUPLICATE, CR_ICON_SHARE, CR_ICON_TRASH};
             fill(&r, labels[index], "", icons[index], actions[index], 0);
             r.disabled = !available || (index == 3 && !u->platform.share_state);
             if (!index && available) r.disabled = !u->engine.handle ||
@@ -482,21 +490,21 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
         } else if (index == 1) {
             fill(&r, core ? "Réinstaller" : "Actualiser", u->catalog_loading ? "Recherche en cours..." :
                  (u->core_catalog.error[0] ? u->core_catalog.error : "Catalogue des développeurs"),
-                 CR_ICON_RESTART, core && pack_index >= 0 ? ACT_INSTALL_CORE_PACK : ACT_REFRESH_CATALOG, pack_index);
+                 core && pack_index >= 0 ? CR_ICON_DOWNLOAD : CR_ICON_RESTART, core && pack_index >= 0 ? ACT_INSTALL_CORE_PACK : ACT_REFRESH_CATALOG, pack_index);
             r.disabled = u->installing || u->catalog_loading;
         } else if (index == 2) {
             fill(&r, "Désinstaller", "Jeux et sauvegardes conservés", CR_ICON_TRASH, ACT_CORE_REMOVE_CONFIRM, core_index);
             r.disabled = !core || !u->platform.can_remove_core || !u->platform.remove_core ||
                 !u->platform.can_remove_core(u->platform.context, core->id) || u->installing;
             r.destructive = true;
-        } else fill(&r, "Bibliothèque", "Retrouver vos jeux importés", CR_ICON_LIST, ACT_LIBRARY, 0);
+        } else fill(&r, "Bibliothèque", "Retrouver vos jeux importés", CR_ICON_GRID, ACT_LIBRARY, 0);
     } else if (u->page == CR_CORE_DOWNLOADS) {
         if (index == 0) {
             fill(&r, "Actualiser le catalogue",
                  u->catalog_loading ? "Récupération en cours..." :
                  (u->core_catalog.error[0] ? u->core_catalog.error :
                   "Rechercher les cœurs CorvusSoftware"),
-                 CR_ICON_DOWNLOAD, ACT_REFRESH_CATALOG, 0);
+                 CR_ICON_RESTART, ACT_REFRESH_CATALOG, 0);
         } else {
             const cr_core_pack *pack = &u->core_catalog.packs[index - 1];
             const cr_core_descriptor *installed = cr_registry_get(cr_registry_find(pack->core_id));
@@ -515,17 +523,17 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
         const char *hints[] = {"Écran, filtrage et proportions", "Tactile, manettes et affectation", "Son et volume du jeu",
                               "Interface, thèmes et fichiers", "Copies et états automatiques", "Activation et compte", "Version, crédits et licences"};
         const int pages[] = {CR_VIDEO_SETTINGS, CR_OSD_SETTINGS, CR_AUDIO_SETTINGS, CR_SYSTEM_SETTINGS, CR_SAVE_SETTINGS, CR_RA_SETTINGS, CR_INFORMATION};
-        const int icons[] = {CR_ICON_DISPLAY, CR_ICON_INPUT, CR_ICON_AUDIO, CR_ICON_SETTINGS, CR_ICON_SAVES, CR_ICON_ACHIEVEMENTS, CR_ICON_INFO};
+        const int icons[] = {CR_ICON_DISPLAY, CR_ICON_INPUT, CR_ICON_AUDIO, CR_ICON_SYSTEM, CR_ICON_SAVES, CR_ICON_ACHIEVEMENTS, CR_ICON_INFO};
         fill(&r, labels[index], hints[index], icons[index], ACT_PAGE, pages[index]);
     } else if (u->page == CR_SYSTEM_SETTINGS) {
         static const char *labels[] = {"Interface", "Sauvegardes", "Informations", "Importer du contenu"};
         static const char *hints[] = {"Thèmes et notifications", "Copies et états automatiques", "Application, cœur et licences", "Jeux et dossiers"};
         static const int pages[] = {CR_UI_SETTINGS, CR_SAVE_SETTINGS, CR_INFORMATION, CR_CONTENT};
-        static const int icons[] = {CR_ICON_THEME, CR_ICON_SAVES, CR_ICON_INFO, CR_ICON_FOLDER};
+        static const int icons[] = {CR_ICON_DISPLAY, CR_ICON_SAVES, CR_ICON_INFO, CR_ICON_IMPORT};
         fill(&r, labels[index], hints[index], icons[index], ACT_PAGE, pages[index]);
     } else if (u->page == CR_RA_SETTINGS) {
         fill(&r, index ? "Compte" : "Activer RetroAchievements", index ? "Connexion et état du compte" :
-             "Mode normal", CR_ICON_ACCOUNT, index ? ACT_PAGE : ACT_RA_ENABLE, CR_RA_ACCOUNT);
+             "Mode normal", index ? CR_ICON_ACCOUNT : CR_ICON_ACHIEVEMENTS, index ? ACT_PAGE : ACT_RA_ENABLE, CR_RA_ACCOUNT);
         if (!index) { r.toggle = true; r.checked = u->ra_enabled; }
     } else if (u->page == CR_ACHIEVEMENTS || u->page == CR_RA_ACCOUNT) {
         index += u->page == CR_RA_ACCOUNT ? 1 : 4;
@@ -536,10 +544,10 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
             fill(&r, "Identifiant", user[0] ? user : "Saisir le nom du compte", CR_ICON_ACCOUNT, status.connected || status.pending ? ACT_NONE : ACT_RA_USER, 0);
         } else if (index == 2) {
             fill(&r, "Mot de passe", u->ra_password[0] || (u->ra_editing == 2 && u->ra_preview[0])
-                    ? "Saisi, jamais enregistré" : "Saisir avec le clavier Android", CR_ICON_ACCOUNT, status.connected || status.pending ? ACT_NONE : ACT_RA_PASSWORD, 0);
+                    ? "Saisi, jamais enregistré" : "Saisir avec le clavier Android", CR_ICON_LOCK, status.connected || status.pending ? ACT_NONE : ACT_RA_PASSWORD, 0);
         } else if (index == 3) {
             fill(&r, status.connected ? "Se déconnecter" : "Se connecter", status.pending ? "Connexion en cours..." :
-                    "Le jeton de session est chiffré sur cet appareil", CR_ICON_ACCOUNT, ACT_RA_CONNECT, 0);
+                    "Le jeton de session est chiffré sur cet appareil", status.connected ? CR_ICON_EXIT : CR_ICON_ACCOUNT, ACT_RA_CONNECT, 0);
         } else if (index == 4) {
             fill(&r, "État", u->engine.players > 1 ? "Succès indisponibles en liaison locale" :
                  (status.message[0] ? status.message : "Connectez votre compte pour activer les succès"), CR_ICON_INFO, ACT_NONE, 0);
@@ -580,7 +588,7 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
     } else if (u->page == CR_OVERLAY_SETTINGS && index == 2) {
         fill(&r, "Taille et position", "Ajuster ou rétablir la disposition", CR_ICON_TOUCH, ACT_PAGE, CR_OVERLAY_LAYOUT);
     } else if (u->page == CR_OVERLAY_LAYOUT && index == 2) {
-        fill(&r, "Rétablir la disposition", "Taille et position automatiques", CR_ICON_RESTORE, ACT_LAYOUT_RESET, 0);
+        fill(&r, "Rétablir la disposition", "Taille et position automatiques", CR_ICON_RESTART, ACT_LAYOUT_RESET, 0);
     } else if (u->page == CR_CONTROLLER_SETTINGS) {
         char name[192] = {0};
         if (index < 2) {
@@ -590,7 +598,7 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
             fill(&r, label, connected ? name : "Aucune manette connectée", CR_ICON_INPUT, ACT_NONE, 0);
         } else fill(&r, "Affectation des touches", "Profil commun aux manettes", CR_ICON_INPUT, ACT_PAGE, CR_CONTROLLER_BINDINGS);
     } else if (u->page == CR_CONTROLLER_BINDINGS) {
-        if (index == 10) fill(&r, "Rétablir les touches", "Revenir au profil automatique", CR_ICON_RESTORE, ACT_BIND_RESET, 0);
+        if (index == 10) fill(&r, "Rétablir les touches", "Revenir au profil automatique", CR_ICON_RESTART, ACT_BIND_RESET, 0);
         else {
             char name[96]; cr_controller_binding_name(u->controller_bindings[index], name, sizeof(name));
             fill(&r, binding_labels[index], u->controller_capture == index ? "Bouton de manette, ou Retour" : name,
@@ -634,7 +642,7 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
         for (size_t i = 0; i < u->game_count; i++)
             if (u->filter < 0 ? u->games[i].played > 0 : u->games[i].system == u->filter) {
                 if (n++ == index) {
-                    fill(&r, u->games[i].title, core_name(u->games[i].system), CR_ICON_FILE, ACT_GAME,
+                    fill(&r, u->games[i].title, core_name(u->games[i].system), CR_ICON_CONTENT, ACT_GAME,
                          (int)i);
                     r.disabled = !u->engine.handle || u->engine.system != u->games[i].system;
                     if (!u->engine.handle)

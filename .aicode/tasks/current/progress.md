@@ -1,6 +1,9 @@
-État : READY_FOR_REVIEW, nouveau jeu d'icônes intégré et qualifié localement. Base dfc5aa2, branche feature/mobile-interface-redesign, PR30 ouverte ; pas de merge/release.
-42 VectorDrawable originaux24dp, contours1.75 arrondis et fonds légers, corbeau frontal.32 IDs historiques conservés ;10 ajoutés : grille, recherche, crayon, duplication, partage, corbeille, plus, validation, sortie, ajout. Menus et helpers utilisent ces glyphes sans changer actions, cibles ni dimensions d'accueil validées.
-Atlas : baseC/Java464,48 cellules réservées,42 utilisées. Bitmap1024x2048,233 glyphes fixes et marqueur blanc conservés ; cacheUnicode231 cellules233..463. Tableaux et boucles GL bornés au même point, gardes de compilation. Logo du lanceur fourni par le mainteneur conservé.
-Preuves :21/21 strictes et21/21 ASan/UBSan ; build debug/test, lint et contrôle APK zéro cœur/deuxABI/16Ko passent. IconAtlasInstrumentation172 contrôles Android réels (bornes, contenu, formes uniques et24px), planche trois palettes inspectée. Parcours InterfaceRedesignInstrumentation portrait complet PASS sur la même base ; captures accueil/réglages/recherche/cœurs/actions d'états/menu rapide et trois thèmes inspectées, journal crash vide. Revue indépendante sans finding :IDs, correspondance42 ressources, UV/marqueur, cache et usages.
-BaseAPK SHA256 e6f55d97afd477f5221b104d541cc0219f411348522621b24d157e27b00e95e2. Preuves hors Git dans /workspace/setup/interface-icons : native.log, asan.log, final-atlas-build.log, android-ui.log, apk.log, atlas-qualification.json, atlas.png, screens.jpg et runtime/ui-portrait-20261104-115449. Atlas et runnerUI ont exactement la même baseAPK.
-Documentation : docs/icons.md, liens README et interface-redesign, carte du code. Dernière étape : commit/push et CI exacte avant PR prête ; vérifier GitHub et final-ci.log lors d'une reprise. Les données d'essai restent originales et hors APK ; émulateur API29x86_64 et transport contrôlé, aucune qualification physique/ARM64/public-network/écouteaudio nouvelle. Profil signé5561 non touché.
+État : implémentation et vérification locale terminées, PR #30.
+
+Les icônes décrivent leur fonction : Système, Import, Export, Verrou, Curseurs et Filtre ajoutés dans la réserve existante ; audio, liste, sauvegardes, redémarrage et liaison redessinés. Les cartes d'action et écrans vides ne masquent plus les symboles avec une GBA générique. Continuer retrouve le jeu courant.
+
+Actions, 42 anciens IDs, dimensions et allocation de l'atlas conservés. Pas de modification du jeu, des moteurs, de l'audio ou des dépendances.
+
+Preuves locales : 21 suites natives, 21 suites ASan/UBSan, build/lint Android, contrôles APK et atlas196 passent. Parcours Android portrait complet et captures des menus concernés inspectés ; crash.log vide. Revue indépendante sans finding bloquant. Preuves hors dépôt : /workspace/setup/icon-meaning.
+
+Publication dans PR #30 ; vérifier la CI du commit publié avant sortie du brouillon. Aucune fusion ni release dans cette tâche.

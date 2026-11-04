@@ -340,7 +340,9 @@ static void empty(const cr_ui *u, const cr_painter *p, const cr_theme *theme, in
     if (!title) return;
     float y = cr_interface_content_top(u) + (u->page == CR_STATE_LIST ? 110 :
         u->page == CR_SAVES_LIBRARY ? 190 : 120) - u->scroll;
-    cr_widget_console(p, (cr_menu_rect){u->width / 2 - 50, y - 70, 100, 66}, 2, theme);
+    int symbol = u->page == CR_CORE_DOWNLOADS ? CR_ICON_CORE :
+                 u->page == CR_LIBRARY ? (u->library_query[0] ? CR_ICON_SEARCH : CR_ICON_GRID) : CR_ICON_SAVES;
+    icon(p, symbol, u->width / 2 - 32, y - 70, 64, theme->icon);
     cr_widget_center(p, title, u->width / 2, y + 28, 16, theme->text, u->width - 32);
     cr_widget_center(p, hint, u->width / 2, y + 54, 12, theme->muted, u->width - 32);
 }
