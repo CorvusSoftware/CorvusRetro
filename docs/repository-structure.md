@@ -6,7 +6,10 @@ services implémentés dans CorvusRetro.
 
 | CorvusRetro | Référence dans RetroArch | Rôle |
 | --- | --- | --- |
-| `menu/menu_driver.c` | `menu/menu_driver.c`, `menu/menu_displaylist.c`, `menu/cbs/` | Navigation, modèle des entrées et actions |
+| `menu/menu_driver.c` | `menu/menu_driver.c` | API publique, navigation, entrées et cycle de vie |
+| `menu/menu_displaylist.c`, `menu/menu_entries.h` | `menu/menu_displaylist.c`, `menu/menu_entries.h` | Construction des lignes, filtres, recherche et métadonnées |
+| `menu/menu_setting.[ch]` | `menu/menu_setting.[ch]` | Spécifications, lecture, validation et application des réglages |
+| `menu/cbs/menu_cbs_ok.c`, `menu/menu_cbs.h` | `menu/cbs/menu_cbs_ok.c`, `menu/menu_cbs.h` | Actions des entrées, contenus et sauvegardes |
 | `menu/interface_layout.[ch]` | Géométrie des pilotes `menu/drivers/` | Rectangles communs au dessin, toucher, focus et défilement |
 | `menu/interface_draw.[ch]` | `menu/drivers/` | Composition des écrans et panneaux |
 | `menu/widgets.[ch]`, `menu/theme.[ch]` | Primitives visuelles et palettes des pilotes | Cartes, formes, consoles et couleurs |
@@ -66,12 +69,27 @@ le 4 novembre 2026 :
   pour le popup des succès.
 
 Cette séparation porte sur les responsabilités, sans plafond uniforme de lignes.
-La refonte CorvusRetro applique ce principe à son volume actuel :
-`menu_driver.c` possède l'état et les actions, `interface_layout.c` la géométrie,
+CorvusRetro applique ce principe dans ses sources : `menu_driver.c` possède
+l'état, la navigation et le cycle de vie ; `menu_displaylist.c` construit les
+entrées, filtres et métadonnées ; `menu_setting.c` porte les spécifications et
+effets des préférences ; `cbs/menu_cbs_ok.c` exécute les actions de contenu,
+de cœur et de sauvegarde. `interface_layout.c` possède la géométrie,
 `interface_draw.c` la composition et `widgets.c` les primitives réutilisées.
 Le dessinateur reçoit un lecteur d'entrées et un `cr_painter` ; il n'installe
 aucun cœur et n'écrit aucune sauvegarde. Les popups restent dans `gfx/widgets`,
 et les opérations de fichiers dans `cores/state_store.c`.
+
+`menu_entries.h` définit les données de ligne et leur lecteur, indépendamment du
+dessinateur. `menu_internal.h` expose uniquement le pont privé de navigation et
+de synchronisation des succès nécessaire aux actions. `menu_driver.h` garde
+l'API publique `cr_ui` et les mêmes identifiants de pages ; les autres contrats
+restent internes aux composants du menu. Aucun nouveau propriétaire du moteur
+ni thread n'est introduit par cette extraction.
+
+`CORVUS_MENU_SOURCES` dans CMake déclare les modules une seule fois et sert au
+frontend comme au test de registre compilé sans catalogue. Le chargement initial
+des préférences conserve sa validation et son ordre après l'initialisation du
+moteur ; il reste distinct de l'application d'une valeur choisie par le joueur.
 
 Les classes Android suivent les mêmes frontières : `FrontendImages` prépare
 les images avec `FrontendImageFiles`, et `StateShares` délègue les fichiers à

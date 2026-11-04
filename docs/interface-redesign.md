@@ -59,6 +59,12 @@ et accueil. Quitter le contenu conserve le cœur chargé.
 
 ## Frontières techniques
 
+Le pilote coordonne navigation, entrées et cycle de vie. Les listes et leurs
+métadonnées sont dans `menu_displaylist.c`, les réglages dans `menu_setting.c`,
+et les actions dans `cbs/menu_cbs_ok.c`. Les données de ligne et le lecteur
+appartiennent à `menu_entries.h` ; le dessinateur consomme ce contrat sans
+définir le modèle du menu. Voir [l'organisation des composants](repository-structure.md).
+
 La géométrie des cartes, de la grille et des panneaux est commune au dessin,
 au toucher, au focus et au défilement. Les champs du clavier restent rendus en
 C ; chaque édition Android porte un ticket qui invalide les anciens résultats.

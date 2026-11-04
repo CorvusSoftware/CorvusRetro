@@ -1,15 +1,7 @@
-# Constats de refonte
+# Découpage natif
 
-Les données d'origine n'avaient pas de jaquettes persistées, description/taille native des cœurs ou collection d'états nommés. Ces frontières sont étendues sans modifier les identités ni les chemins historiques.
+Architecture et diff relus indépendamment sans finding concret. Listes, réglages, actions et orchestration sont séparés, avec données de lignes indépendantes du renderer et contrats privés.
 
-Trois findings P2 résolus et revus indépendamment :
-- Prévalider version et intégrité de l'état avant de remplacer une autre partie ; les refus version/corruption/absence conservent le handle, l'identité et la machine du jeu courant (test108contrôles).
-- Identifier chaque saisie Android par génération C/JNI ; invalider mailbox et callbacks de l'ancien éditeur, même pour un nouveau champ de même numéro.
-- Relire les états après un échec final de renommage/duplication/suppression/création, car le stockage peut avoir déjà appliqué l'opération avant un fsync échoué.
+La comparaison ponctuelle de 93 fonctions, de la lecture initiale, des enums et des globals confirme la préservation. La compilation a capturé deux omissions mécaniques corrigées : compteur déplacé avec les transferts et nom du callback plateforme préservé.
 
-Le premier scénario Android a révélé une garde NativeActivity limitée aux champs RA : Entrée était absorbée par le menu pour recherche/renommage. La garde des touches et des axes inclut maintenant ui_editing. Le parcours portrait sur émulateur valide Entrée, IME_DONE, Retour et les résultats périmés pour recherche et renommage.
-
-Le premier parcours paysage utilisait les coordonnées d'une grille à deux colonnes alors que la largeur native produit quatre colonnes. Le clic tombait dans la navigation, sans lancement. Le scénario calcule maintenant la largeur réelle des cartes et vise leur partie visible ; les assertions de lancement et de framebuffer restent inchangées.
-
-Les réglages d'affichage reprennent uniquement les fonctions effectives (natif/entier, filtre, écran allumé). Aucune fausse option de ratio forcé ou plein écran n'est affichée.
-Les cœurs officiels actuels ne permettent pas les états en câble link ; l'interface expose ce refus. Les autres outils de liaison sont conservés.
+21/21 strictes et 21/21 ASan/UBSan, core-free, build/lint/APK et parcours Android portrait/paysage passent. Captures inspectées, aucun crash enregistré. La dernière barrière avant PR prête reste la CI de la tête exacte.

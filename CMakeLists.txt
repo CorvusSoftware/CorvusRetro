@@ -83,9 +83,12 @@ find_package(Threads REQUIRED)
 include(cmake/Rcheevos.cmake)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CORVUS_INTERFACE_SOURCES menu/interface_layout.c menu/interface_draw.c menu/widgets.c)
-add_library(corvus_frontend STATIC cores/engine.c cores/state_store.c cores/core_registry.c menu/menu_driver.c ${CORVUS_INTERFACE_SOURCES}
-    menu/theme.c gfx/viewport.c input/play_layout.c input/overlay.c input/controller_ports.c gfx/widgets/notifications.c)
+set(CORVUS_MENU_SOURCES
+    menu/menu_driver.c menu/menu_displaylist.c menu/menu_setting.c menu/cbs/menu_cbs_ok.c
+    menu/interface_layout.c menu/interface_draw.c menu/widgets.c menu/theme.c)
+add_library(corvus_frontend STATIC cores/engine.c cores/state_store.c cores/core_registry.c
+    ${CORVUS_MENU_SOURCES} gfx/viewport.c input/play_layout.c input/overlay.c
+    input/controller_ports.c gfx/widgets/notifications.c)
 target_link_libraries(corvus_frontend PUBLIC CorvusAPI::CorvusAPI corvus_cheevos ${CMAKE_DL_LIBS} m Threads::Threads)
 if(CORVUS_BUNDLED_CORE_TARGETS)
     add_dependencies(corvus_frontend ${CORVUS_BUNDLED_CORE_TARGETS})
@@ -205,7 +208,9 @@ else()
     file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/test-empty/cr_bundled_cores.h"
         "static const char *const cr_bundled_core_modules[] = {0};\n")
     add_executable(native_registry_test "${CORVUS_ROOT}/tests/native_registry_test.c"
-        cores/engine.c cores/state_store.c cores/core_registry.c menu/menu_driver.c ${CORVUS_INTERFACE_SOURCES} menu/theme.c gfx/viewport.c input/play_layout.c input/overlay.c input/controller_ports.c gfx/widgets/notifications.c)
+        cores/engine.c cores/state_store.c cores/core_registry.c ${CORVUS_MENU_SOURCES}
+        gfx/viewport.c input/play_layout.c input/overlay.c input/controller_ports.c
+        gfx/widgets/notifications.c)
     target_include_directories(native_registry_test PRIVATE
         ${CORVUS_INCLUDE_DIRS} "${CMAKE_CURRENT_BINARY_DIR}/test-empty")
     target_link_libraries(native_registry_test PRIVATE CorvusAPI::CorvusAPI corvus_cheevos ${CMAKE_DL_LIBS} m Threads::Threads)

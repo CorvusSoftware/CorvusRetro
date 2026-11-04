@@ -1,6 +1,9 @@
 # Carte de la refonte native
 
-- `menu/menu_driver.[ch]` possède la navigation, les filtres, le moteur actif, les opérations de sauvegarde et les callbacks plateforme.
+- `menu/menu_driver.[ch]` possède l'API publique, la navigation, les entrées, le cycle de vie et la coordination du moteur actif.
+- `menu/menu_displaylist.c` construit les lignes, filtres et métadonnées à partir de `cr_ui`. `menu_entries.h` porte leurs types, lecteurs et sélecteurs partagés sans dépendre du dessinateur.
+- `menu/menu_setting.[ch]` possède les spécifications immuables, lecture/validation initiale et application des préférences. `menu/cbs/menu_cbs_ok.c` exécute les actions de cœur/contenu/états/import et transferts ; `menu_cbs.h` conserve leurs IDs et contrats privés.
+- `menu/menu_internal.h` limite le pont actions/pilote aux changements de page et à la synchronisation des succès. `CORVUS_MENU_SOURCES` est réutilisée par le frontend et native_registry_test.
 - `menu/interface_layout.[ch]` fournit la géométrie commune au dessin, toucher, focus et défilement. `interface_draw.[ch]` et `widgets.[ch]` dessinent les cartes, grille, commandes de menu et panneaux au travers de `cr_painter`.
 - `cores/state_store.[ch]` gère les états nommés, métadonnées et aperçus PPM transactionnels sous `states/library`. Il appelle `cr_engine_state_copy/restore` sur le propriétaire. Les anciens manuels/auto et la batterie gardent leurs chemins.
 - `frontend/platform.h` -> `android_backend.[ch]` -> `MainActivity` : frontières JNI bornées pour données jeux/catalogue, clavier, images et partage. Les résultats texte sont filtrés par ticket de génération et champ actif, avec mailbox invalidée à chaque nouvelle édition.

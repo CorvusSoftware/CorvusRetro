@@ -679,3 +679,30 @@ d'archives contrôlé, et un émulateur logiciel. Ils ne qualifient ni un appare
 physique, ni l'exécution ARM64, ni le réseau de production, ni une écoute audio.
 Aucun changement de version, fusion ou publication d'APK n'est effectué pour
 cette préparation de refonte. La release publique 0.22.2 reste inchangée.
+
+## Découpage des modules de menu
+
+L'extraction issue de `e4061e8` sépare la construction des entrées dans
+`menu_displaylist.c`, les préférences dans `menu_setting.c` et les opérations
+des actions dans `cbs/menu_cbs_ok.c`. Le pilote conserve navigation, entrées,
+cycle de vie et coordination du dessin. L'API publique et la structure `cr_ui`
+ne changent pas ; CMake partage une seule liste de modules entre le frontend
+et le test de registre.
+
+Une comparaison ponctuelle avant/après confirme les corps des 93 fonctions
+d'origine, après renommage des symboles privés et extraction exacte de la
+lecture initiale des préférences. L'ordre des enums, les spécifications et
+tables, ainsi que le compteur unique des transferts, sont conservés. La revue
+indépendante des frontières et des déclarations n'a relevé aucun finding.
+
+Les 21 suites natives strictes, les 21 suites ASan/UBSan, le frontend sans cœur,
+le build debug et de son instrumentation, et le lint Android passent sur ce
+découpage. L'APK contient les deux frontends alignés à 16 Ko et aucun cœur.
+La base debug a pour SHA-256
+`27e7c0cab1357a0fea454b211cdfbc50846e211e8e46330a37a3eabd81b676ba`.
+
+Les parcours Android complets portrait et paysage passent sur cette base,
+avec captures inspectées et aucun crash enregistré. Les limites du
+dispositif de validation restent celles de la refonte : émulateur API29 x86_64,
+programmes originaux et transport d'archives contrôlé, sans appareil physique,
+exécution ARM64, réseau public ou écoute audio qualifiés.

@@ -1,5 +1,5 @@
-P0 : navigation à cinq onglets, retour/focus/défilement/toucher partageant la géométrie, accès aux outils, bibliothèque/recherche/filtres sans cœur.
-P0 : états nommés réels, atomicité/échecs/identités, compatibilité manuel/auto/batterie/link ; aucune IO dans le dessin ni appel moteur depuis un worker.
-P0 : jeu/tactile/audio/notifications conservés sauf présentation du menu rapide ; tests moteur/audio/commandes.
-P1 : cache image borné, annulation/lifecycle, données réelles du catalogue, installation/suppression de cœur.
-P1 : rendu portrait/paysage/trois thèmes/petit écran avec captures inspectées ; APK sans cœur, lint et CI du commit exact.
+P0 : contenu exact des listes, IDs/actions/valeurs, navigation/focus/back et géométrie conservés ; suites native_menu, native_interface, configuration, bibliothèque et no-core.
+P0 : ordre d'initialisation des préférences, effets d'application, stockage/états/batterie et callbacks inchangés ; tests natifs existants et comparaison mécanique des fonctions déplacées.
+P0 : tous les nouveaux modules sont présents dans corvus_frontend et native_registry_test ; compilation stricte et ASan/UBSan, build core-free.
+P1 : compilation APK ARM64/x86_64, lint, zéro cœur et alignement 16 Ko ; parcours Android sur code final.
+P1 : revue indépendante de frontières, symboles privés et préservation, CI de la tête exacte.

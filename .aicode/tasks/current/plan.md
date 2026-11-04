@@ -1,8 +1,8 @@
-Objectif : réaliser la maquette native CorvusRetro pour accueil, bibliothèque/recherche, cœurs/détails, sauvegardes/actions, réglages et menu rapide. Écran de jeu et commandes conservés. Budget DEEP.
-Base main69952eb ; branche feature/mobile-interface-redesign. Les fonctions existantes, identités, sauvegardes, thèmes et protections restent accessibles. Pas de démo ni de jeux factices. Aucun changement des moteurs/ABI/pins.
-1. Navigation C11 cinq onglets et géométrie commune dessin/toucher/focus/défilement.
-2. Présentation native : cartes/arrondis/dégradés, header original, consoles, états vides et adaptations portrait/paysage/thèmes.
-3. Métadonnées/images/services Android bornés et détails réels des cœurs ; recherche native avec IME.
-4. Magasin d'états nommés réel, previews et actions sûres, anciens chemins conservés ; batteries .sav/.srm et link toujours accessibles.
-5. Intégration des parcours puis tests hôtes stricts/ASan, Java, APK/lint et Android visuel/fonctionnel. Review indépendante puis PR/CI exacte. Pas de fusion/release implicite.
-Risques : anciens tests figent trois onglets/76dp ; données absentes de la maquette ne doivent pas devenir boutons sans effet ; stockage d'états et images restent bornés et hors rendu.
+Objectif : appliquer réellement le découpage par responsabilité de RetroArch au menu natif CorvusRetro. Budget DEEP, comportement inchangé.
+Base : e4061e8 sur feature/mobile-interface-redesign, PR #30 ouverte, main 69952eb.
+1. Extraire construction des entrées/recherche/métadonnées dans menu_displaylist.c.
+2. Extraire spécifications et logique des réglages dans menu_setting.c.
+3. Extraire validation et opérations de contenu/sauvegarde dans cbs/menu_cbs_ok.c.
+4. Garder navigation, entrées et lifecycle dans menu_driver.c ; types de lignes indépendants du renderer et contrats privés, API publique inchangée.
+5. Déclarer une seule liste CMake partagée par frontend et test de registre ; vérifier déplacement mécanique, suites strictes/ASan, zéro cœur, APK/lint, parcours Android et revue indépendante.
+6. Actualiser la carte du code, publier dans PR #30 et vérifier CI exacte. Aucune fusion ou release.
