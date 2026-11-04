@@ -1,3 +1,3 @@
-Accueil : hauteurs fixes et hero défini dans deux fichiers causaient une composition trop courte. Le hero utilise désormais la géométrie commune, avec répartition de l'espace portrait et cadrage sans étirement.
-Sous-système : sixième entrée défilante. Deux anciennes assertions exigeaient les six lignes sans défilement ; l'assertion du sous-système est conservée après focus/défilement, les cinq cartes de base restent visibles.
-Revue indépendante et recheck : aucun finding. Tests natifs/ASan, build/lint/APK, parcours portrait et contrôles ciblés finaux passent ; captures inspectées, aucun crash enregistré. CI exacte reste la dernière barrière avant PR prête.
+Ancien jeu32 icônes et actions génériques :fichier pour renommer, dossier pour partager, croix pour supprimer. Nouveau jeu42 avec symboles dédiés et style commun.
+Bloc étendu :base464 synchronisée C/Java, tableaux et boucles glyphes bornés avant ce bloc.233 glyphes fixes, atlas1024x2048 et marqueur inchangés. Revue indépendante sans finding,42 noms et ordres concordants, anciennes valeurs préservées.
+Qualification finale :172 contrôles atlas Android réels,21 strictes+21 ASan, build/lint/APK et parcours Android portrait/trois thèmes passent. Captures inspectées, aucun crash. CI exacte reste la dernière barrière avant PR prête.

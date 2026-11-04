@@ -10,6 +10,7 @@
 - `GameLibrary` conserve identités et index ; la jaquette facultative est une métadonnée indépendante. `FrontendImages`/`FrontendImageFiles` préparent les bitmaps sur un worker ; GL garde une LRU bornée de textures jusqu'à512px.
 - `StateShares`/`StateShareFiles` -> `StateShareProvider` : export d'un instantané de données en lecture seule par URI privée et permission temporaire.
 - `input/play_layout`, `input/overlay`, les pilotes audio, CorvusCore/CorvusAPI et leurs pins ne sont pas modifiés par cette refonte.
+- Icônes : `gfx/render.h` -> `MainActivity.ICONS` et les 42 VectorDrawable -> atlas rasterisé -> `gfx/drivers/gl2`. Base commune464, 48 cellules réservées ; glyphes fixes0..232, cacheUnicode233..463. Taille1024x2048 et marqueur blanc conservés. Voir `docs/icons.md` et `IconAtlasInstrumentation` avant toute modification du contrat.
 
 Preuves : native_interface (parcours réels), native_state_store (135 contrôles), anciennes suites natives et ASan/UBSan, tests Java, FrontendServicesInstrumentation et nouveau InterfaceRedesignInstrumentation.
 

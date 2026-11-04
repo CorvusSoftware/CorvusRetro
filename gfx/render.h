@@ -40,8 +40,20 @@ enum {
     CR_ICON_VOLUME,
     CR_ICON_BACKUP,
     CR_ICON_RESTORE,
+    CR_ICON_GRID,
+    CR_ICON_SEARCH,
+    CR_ICON_RENAME,
+    CR_ICON_DUPLICATE,
+    CR_ICON_SHARE,
+    CR_ICON_TRASH,
+    CR_ICON_MORE,
+    CR_ICON_CHECK,
+    CR_ICON_EXIT,
+    CR_ICON_ADD,
     CR_ICON_COUNT
 };
+/* Mirrored by MainActivity: text glyphs must never overwrite the icon block. */
+enum { CR_ICON_ATLAS_BASE = 464, CR_ICON_ATLAS_CAPACITY = 48 };
 typedef struct {
     void *context;
     void (*rect)(void *, float, float, float, float, uint32_t);

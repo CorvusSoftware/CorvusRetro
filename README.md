@@ -124,6 +124,7 @@ Ces commandes couvrent les tests natifs, les vérifications mémoire et le proje
 | :-- | :-- |
 | [Prise en main et navigation](docs/navigation.md) | Menus et réglages |
 | [Interface mobile](docs/interface-redesign.md) | Refonte, états nommés et frontières techniques |
+| [Icônes](docs/icons.md) | Jeu vectoriel, palettes et contrat de l'atlas |
 | [Commandes tactiles](docs/controls.md) | Boutons, gestes et orientation |
 | [Interface de jeu](docs/game-interface.md) | Profils par console et menu rapide |
 | [Sauvegardes du jeu](docs/save-files.md) | Import et export batterie `.sav` et `.srm` |

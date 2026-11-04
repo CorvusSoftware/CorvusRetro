@@ -12,6 +12,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+_Static_assert(CR_ICON_COUNT <= CR_ICON_ATLAS_CAPACITY, "Icon block exceeds atlas capacity");
+_Static_assert(CR_ICON_ATLAS_BASE + CR_ICON_ATLAS_CAPACITY == 512, "Atlas grid must stay bounded");
+
 static GLuint shader(GLenum type, const char *source) {
     GLuint s = glCreateShader(type);
     glShaderSource(s, 1, &source, NULL);
@@ -247,13 +250,13 @@ static uint32_t next_utf8(const char **text) {
 static int glyph_index(cr_gl *g, uint32_t cp) {
     if (cp >= 32 && cp <= 255)
         return (int)cp - 32;
-    for (int i = 224; i < 480; i++)
+    for (int i = 224; i < CR_ICON_ATLAS_BASE; i++)
         if (g->codepoints[i] == cp) {
             g->stamps[i] = ++g->stamp;
             return i;
         }
     int slot = 233;
-    for (int i = 233; i < 480; i++)
+    for (int i = 233; i < CR_ICON_ATLAS_BASE; i++)
         if (!g->codepoints[i]) {
             slot = i;
             break;
@@ -309,7 +312,7 @@ static void draw_text(void *ctx, const char *text, float x, float baseline, floa
 }
 static void icon(void *ctx, int index, float x, float y, float size, uint32_t color) {
     if (index < 0 || index >= CR_ICON_COUNT) index = CR_ICON_INFO;
-    int slot = 480 + index;
+    int slot = CR_ICON_ATLAS_BASE + index;
     quad(ctx, x, y, size, size, (slot % 16 * 64 + 8) / 1024.f, (slot / 16 * 64 + 8) / 2048.f,
          48.f / 1024, 48.f / 2048, color);
 }

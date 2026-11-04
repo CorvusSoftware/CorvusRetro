@@ -60,6 +60,10 @@ implémentés : présentation native ou entière, filtrage et écran allumé.
 Les thèmes CorvusRetro, NVIDIA Shield et ASUS gardent leurs identifiants et
 préférences ; les couleurs des commandes de jeu sont conservées.
 
+Un [jeu de 42 icônes vectorielles](icons.md) harmonise la navigation, les réglages
+et les actions. Renommer, dupliquer, partager et supprimer disposent de symboles
+dédiés, avec le même tracé décliné dans les trois palettes.
+
 Le menu rapide est un panneau sur la dernière image du jeu. Ses premières
 actions sont Reprendre, Charger un état, Sauvegarder un état, Redémarrer,
 Options du jeu et Quitter le jeu. Les autres outils restent accessibles en

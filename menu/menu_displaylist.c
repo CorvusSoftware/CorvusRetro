@@ -251,7 +251,7 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
             "Choisir une sauvegarde de ce jeu", "Créer une nouvelle sauvegarde nommée"
         };
         static const int icons[CR_QUICK_COUNT] = {
-            CR_ICON_PLAY, CR_ICON_RESTART, CR_ICON_CLOSE, CR_ICON_SAVES,
+            CR_ICON_PLAY, CR_ICON_RESTART, CR_ICON_EXIT, CR_ICON_SAVES,
             CR_ICON_CORE, CR_ICON_INPUT, CR_ICON_ACHIEVEMENTS, CR_ICON_INFO,
             CR_ICON_HOME, CR_ICON_INPUT, CR_ICON_SAVES, CR_ICON_RESTORE, CR_ICON_SAVES
         };
@@ -410,7 +410,7 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
         } else game_row(&r, u, index - 1, ACT_STATE_GAME);
     } else if (u->page == CR_STATE_LIST) {
         if (!index) {
-            fill(&r, "Nouvelle sauvegarde", "Enregistrer la position actuelle", CR_ICON_SAVES, ACT_STATE_CREATE, 0);
+            fill(&r, "Nouvelle sauvegarde", "Enregistrer la position actuelle", CR_ICON_ADD, ACT_STATE_CREATE, 0);
             r.disabled = !u->engine.loaded || strcmp(u->engine.id, u->states_game_id) || !cr_engine_can_state(&u->engine);
             if (r.disabled) snprintf(r.hint, sizeof(r.hint), "Lancez ce jeu avec un cœur compatible");
         } else if ((size_t)(index - 1) < u->saved_state_count) {
@@ -434,12 +434,12 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
         bool available = u->selected_state >= 0 && (size_t)u->selected_state < u->saved_state_count;
         if (u->page == CR_STATE_DELETE_CONFIRM) {
             fill(&r, index ? "Annuler" : "Supprimer cet état", index ? "Conserver la sauvegarde" : "Cette action est définitive",
-                 index ? CR_ICON_BACK : CR_ICON_CLOSE, index ? ACT_CORE_REMOVE_CANCEL : ACT_STATE_DELETE, 0);
+                 index ? CR_ICON_BACK : CR_ICON_TRASH, index ? ACT_CORE_REMOVE_CANCEL : ACT_STATE_DELETE, 0);
             r.destructive = !index; r.disabled = !available;
         } else {
             static const char *labels[] = {"Charger", "Renommer", "Dupliquer", "Partager", "Supprimer"};
             static const int actions[] = {ACT_STATE_LOAD, ACT_STATE_RENAME, ACT_STATE_DUPLICATE, ACT_STATE_SHARE, ACT_STATE_DELETE_CONFIRM};
-            static const int icons[] = {CR_ICON_PLAY, CR_ICON_FILE, CR_ICON_BACKUP, CR_ICON_FOLDER, CR_ICON_CLOSE};
+            static const int icons[] = {CR_ICON_PLAY, CR_ICON_RENAME, CR_ICON_DUPLICATE, CR_ICON_SHARE, CR_ICON_TRASH};
             fill(&r, labels[index], "", icons[index], actions[index], 0);
             r.disabled = !available || (index == 3 && !u->platform.share_state);
             if (!index && available) r.disabled = !u->engine.handle ||
@@ -449,16 +449,16 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
         }
     } else if (u->page == CR_REMOVE_CORES) {
         int slot = removable_core_at(u,index);
-        if (slot >= 0) fill(&r,core_name(slot),"Supprimer ce cœur téléchargé",CR_ICON_CLOSE,ACT_CORE_REMOVE_CONFIRM,slot);
+        if (slot >= 0) fill(&r,core_name(slot),"Supprimer ce cœur téléchargé",CR_ICON_TRASH,ACT_CORE_REMOVE_CONFIRM,slot);
     } else if (u->page == CR_REMOVE_CORE_CONFIRM) {
         char label[160];
         snprintf(label,sizeof(label),"Supprimer %.128s",u->remove_core_name);
         fill(&r,index ? "Annuler" : label,index ? "Revenir à la liste des cœurs" :
-             "Jeux et sauvegardes conservés",index ? CR_ICON_BACK : CR_ICON_CLOSE,
+             "Jeux et sauvegardes conservés",index ? CR_ICON_BACK : CR_ICON_TRASH,
              index ? ACT_CORE_REMOVE_CANCEL : ACT_CORE_REMOVE,0);
     } else if (u->page == CR_CORES) {
         if (index > (int)cr_registry_count()) {
-            fill(&r,"Supprimer un cœur téléchargé","Conserver jeux et sauvegardes",CR_ICON_CLOSE,ACT_PAGE,CR_REMOVE_CORES);
+            fill(&r,"Supprimer un cœur téléchargé","Conserver jeux et sauvegardes",CR_ICON_TRASH,ACT_PAGE,CR_REMOVE_CORES);
         } else if (index == (int)cr_registry_count()) {
             fill(&r, "Téléchargeur de cœurs", "Catalogue officiel CorvusSoftware",
                  CR_ICON_DOWNLOAD, ACT_OPEN_DOWNLOADER, 0);
@@ -485,7 +485,7 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
                  CR_ICON_RESTART, core && pack_index >= 0 ? ACT_INSTALL_CORE_PACK : ACT_REFRESH_CATALOG, pack_index);
             r.disabled = u->installing || u->catalog_loading;
         } else if (index == 2) {
-            fill(&r, "Désinstaller", "Jeux et sauvegardes conservés", CR_ICON_CLOSE, ACT_CORE_REMOVE_CONFIRM, core_index);
+            fill(&r, "Désinstaller", "Jeux et sauvegardes conservés", CR_ICON_TRASH, ACT_CORE_REMOVE_CONFIRM, core_index);
             r.disabled = !core || !u->platform.can_remove_core || !u->platform.remove_core ||
                 !u->platform.can_remove_core(u->platform.context, core->id) || u->installing;
             r.destructive = true;
@@ -614,7 +614,7 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
         fill(&r, cr_menu_settings[id].label, value, cr_menu_setting_icon(id), ACT_SETTING_VALUES, id);
     } else if (u->page == CR_INFORMATION) {
         if (index == 2 + (u->engine.handle ? 1 : 0))
-            fill(&r,"Supprimer un cœur téléchargé","Conserver jeux et sauvegardes",CR_ICON_CLOSE,ACT_PAGE,CR_REMOVE_CORES);
+            fill(&r,"Supprimer un cœur téléchargé","Conserver jeux et sauvegardes",CR_ICON_TRASH,ACT_PAGE,CR_REMOVE_CORES);
         else if (index == 0)
             fill(&r, "À propos de CorvusRetro", "Application native de CorvusSoftware",
                  CR_ICON_INFO, ACT_ABOUT, 0);

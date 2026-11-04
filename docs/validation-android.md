@@ -723,3 +723,23 @@ trois raccourcis, le cœur, le sous-système défilant et la rotation en paysage
 Les captures finales sont inspectées et aucun crash n'est enregistré.
 SHA-256 de cette base debug :
 `8cbc1fe1da503758fb37d65b121b509439eee3a2d8745a7735eb47c03c58bdc0`.
+
+## Nouveau jeu d'icônes
+
+Les 42 ressources vectorielles sont rasterisées par Android dans l'atlas réel,
+sans croissance du bitmap. `IconAtlasInstrumentation` passe 172 contrôles :
+formes distinctes, contenu visible, absence de débordement et lisibilité à
+24 pixels. La planche de contrôle affiche les trois palettes. Les anciens
+32 identifiants restent stables, avec dix nouveaux pictogrammes dédiés aux actions.
+
+Les 21 suites strictes et les 21 suites ASan/UBSan, build debug/test, lint et
+contrôles APK passent. Sur la même base, le parcours Android portrait complet
+exerce accueil, bibliothèque, cœurs, états et leurs actions, réglages et les trois
+thèmes. Les captures sont inspectées et aucun crash n'est enregistré. La revue
+indépendante confirme la correspondance C/Java, les UV, le marqueur blanc et
+les bornes du cache de caractères avant la base464.
+
+SHA-256 de la base debug qualifiée :
+`e6f55d97afd477f5221b104d541cc0219f411348522621b24d157e27b00e95e2`.
+Il s'agit d'essais sur émulateur API29 x86_64 avec programmes originaux et
+transport contrôlé, sans nouvelle qualification de téléphone physique ou ARM64.

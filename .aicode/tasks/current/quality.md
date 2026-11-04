@@ -3,21 +3,22 @@ Status: PASS
 Risk: STANDARD
 
 Criteria:
-- PASS : composition portrait proportionnée, grande zone vide supprimée et cinq cartes visibles sur trois viewports.
-- PASS : dessin et cibles/focus/défilement partagent la même géométrie ; sous-système conservé après défilement.
-- PASS : illustration sans étirement, console préservée et texte lisible ; autres pages/jeu conservés.
+- PASS :42 pictogrammes originaux cohérents, lisibles à24px et déclinés dans les trois palettes.
+- PASS :32IDs historiques conservés ;10glyphes dédiés effectivement associés aux actions correspondantes.
+- PASS :base C/Java464 cohérente, glyphes hors bloc d'icônes et marqueur préservé, texture inchangée.
+- PASS :dimensions/gestes/actions conservés, parcours Android et captures réels.
 
 Evidence:
-- 21 suites natives strictes et21 ASan/UBSan ; nouveaux contrôles des proportions et anciennes assertions conservées.
-- Build debug/test, lint et APK sans cœur/deux ABI/16Ko.
-- Parcours portrait complet avec la nouvelle géométrie ; contrôles ciblés de l'APK final pour raccourcis/cœur/sous-système/paysage après le dernier cadrage.
-- Captures inspectées et journal crash vide.
+- IconAtlasInstrumentation :172 contrôles sur ressources Android réelles, dont visibilité/distinction à24px et marges propres.
+- 21 suites strictes et21 ASan/UBSan ; compilation debug/tests, lint et APK zéro cœur/deuxABI/16Ko.
+- InterfaceRedesignInstrumentation :parcours portrait complet, thèmes Corvus/ASUS/Shield, états et actions, suppression/réinstallation ; captures inspectées, crash.log vide.
+- Atlas et UI qualifiés sur la même base e6f55d97afd477f5221b104d541cc0219f411348522621b24d157e27b00e95e2.
 
 Review:
-- Revue indépendante de géométrie/clipping/focus/scroll puis recheck du dernier cadrage, sans finding.
+- Revue indépendante des IDs, ressources, UV, cache glyphes, marqueur et usages :aucun finding.
 
 Open risks:
-- Émulateur API29x86_64, programmes originaux et transport contrôlé ; aucune qualification physique/ARM64/réseaupublic/écouteaudio revendiquée.
+- Émulateur API29x86_64, programmes originaux et transport contrôlé ; aucune nouvelle qualification physique/runtimeARM64/réseaupublic/écouteaudio.
 
 Decision:
-- Preuves suffisantes pour la correction de proportions en PR. CI du commit exact à vérifier avant PR prête ; aucune fusion/release dans cette tâche.
+- Preuves suffisantes pour la livraison en PR. CI du commit exact requise avant PR prête ; fusion/release hors périmètre.

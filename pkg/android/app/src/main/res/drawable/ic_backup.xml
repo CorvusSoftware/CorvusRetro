@@ -5,7 +5,8 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp" android:height="24dp"
     android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#20FFFFFF" android:pathData="M6,8.5 H18 Q20,8.5 20,10.5 V18.5 Q20,20.5 18,20.5 H6 Q4,20.5 4,18.5 V10.5 Q4,8.5 6,8.5 Z" />
     <path android:fillColor="#00000000" android:strokeColor="#FFFFFF"
-        android:strokeWidth="1.8" android:strokeLineCap="round"
-        android:strokeLineJoin="round" android:pathData="M8,3 H19 Q21,3 21,5 V16 Q21,18 19,18 H8 Q6,18 6,16 V5 Q6,3 8,3 Z M3,8 V19 Q3,21 5,21 H16 M10,8 H17 M10,12 H15" />
+        android:strokeWidth="1.75" android:strokeLineCap="round"
+        android:strokeLineJoin="round" android:pathData="M6,8.5 H18 Q20,8.5 20,10.5 V18.5 Q20,20.5 18,20.5 H6 Q4,20.5 4,18.5 V10.5 Q4,8.5 6,8.5 Z M7,5.5 H17 M10,2.5 H14 M12,17 V11.5 M9.5,14 L12,11.5 L14.5,14" />
 </vector>

@@ -18,22 +18,16 @@ static void clip(const cr_painter *p, float x, float y, float w, float h) {
     if (p->clip) p->clip(p->context, x, y, fmaxf(1, w), fmaxf(1, h));
 }
 static void close_icon(const cr_painter *p, float x, float y, uint32_t color) {
-    cr_widget_line(p, x - 5, y - 5, x + 5, y + 5, 1.7f, color);
-    cr_widget_line(p, x + 5, y - 5, x - 5, y + 5, 1.7f, color);
+    icon(p, CR_ICON_CLOSE, x - 9, y - 9, 18, color);
 }
 static void overflow(const cr_painter *p, float x, float y, uint32_t color) {
-    if (p->circle) for (int i = -1; i <= 1; ++i) p->circle(p->context, x, y + i * 5, 1.5f, color);
+    icon(p, CR_ICON_MORE, x - 10, y - 10, 20, color);
 }
-static void search_icon(const cr_painter *p, float x, float y, uint32_t fg, uint32_t bg) {
-    if (p->circle) {
-        p->circle(p->context, x - 2, y - 2, 6.5f, fg);
-        p->circle(p->context, x - 2, y - 2, 4.8f, bg);
-    }
-    cr_widget_line(p, x + 3, y + 3, x + 8, y + 8, 1.7f, fg);
+static void search_icon(const cr_painter *p, float x, float y, uint32_t color) {
+    icon(p, CR_ICON_SEARCH, x - 11, y - 11, 22, color);
 }
 static void tick(const cr_painter *p, float x, float y, uint32_t color) {
-    cr_widget_line(p, x - 5, y, x - 1, y + 4, 2, color);
-    cr_widget_line(p, x - 1, y + 4, x + 6, y - 4, 2, color);
+    icon(p, CR_ICON_CHECK, x - 10, y - 10, 20, color);
 }
 static bool image(const cr_painter *p, const char *key, cr_menu_rect r) {
     return p->image && key && key[0] && p->image(p->context, key, r.x, r.y, r.w, r.h, 1);
@@ -69,7 +63,7 @@ static void navigation(const cr_ui *u, const cr_painter *p, const cr_theme *them
     cr_widget_line(p, 0, u->height - 64, u->width, u->height - 64, 1,
                    cr_widget_mix(theme->navigation, theme->divider, .5f));
     static const char *labels[] = {"Accueil", "Jeux", "Saves", "Cœurs", "Réglages"};
-    static const int icons[] = {CR_ICON_HOME, CR_ICON_LIST, CR_ICON_FOLDER, CR_ICON_CORE, CR_ICON_SETTINGS};
+    static const int icons[] = {CR_ICON_HOME, CR_ICON_GRID, CR_ICON_FOLDER, CR_ICON_CORE, CR_ICON_SETTINGS};
     for (int i = 0; i < 5; ++i) {
         cr_menu_rect area = cr_interface_navigation(u, i);
         float center = area.x + area.w / 2;
@@ -82,10 +76,7 @@ static void navigation(const cr_ui *u, const cr_painter *p, const cr_theme *them
                 cr_widget_mix(theme->navigation, u->theme == CR_THEME_ASUS ? 0xff151515 : theme->focus, level));
         }
         uint32_t color = cr_widget_mix(theme->navigation_passive, theme->navigation_active, level);
-        if (i == 1) {
-            for (int cell = 0; cell < 4; ++cell)
-                cr_widget_round(p, (cr_menu_rect){center - 10 + (cell % 2) * 12, area.y + 13 + (cell / 2) * 12, 9, 9}, 2, color);
-        } else icon(p, icons[i], center - 11, area.y + 12, 22, color);
+        icon(p, icons[i], center - 11, area.y + 12, 22, color);
         cr_widget_center(p, labels[i], center, area.y + 52, 10.5f, color, area.w - 4);
     }
 }
@@ -112,7 +103,7 @@ static void header(const cr_ui *u, const cr_painter *p, const cr_theme *theme, c
     if (u->page == CR_LIBRARY) {
         uint32_t bg = cr_widget_mix(theme->header, theme->focus, pressing(u, -200));
         if (p->circle && pressing(u, -200) > 0) p->circle(p->context, u->width - 72, 28, 20, bg);
-        search_icon(p, u->width - 72, 28, theme->header_text, bg);
+        search_icon(p, u->width - 72, 28, theme->header_text);
         if (p->circle && pressing(u, -201) > 0)
             p->circle(p->context, u->width - 27, 28, 20, cr_widget_mix(theme->header, theme->focus, pressing(u, -201)));
         overflow(p, u->width - 27, 28, theme->header_text);
@@ -201,7 +192,7 @@ static void library_controls(const cr_ui *u, const cr_painter *p, const cr_theme
         cr_menu_rect r = cr_interface_search(u);
         cr_widget_round(p, r, 12, cr_widget_mix(theme->accent, theme->text, .15f));
         cr_widget_round(p, (cr_menu_rect){r.x + 1, r.y + 1, r.w - 2, r.h - 2}, 11, theme->surface);
-        search_icon(p, r.x + 19, r.y + 22, theme->text, theme->surface);
+        search_icon(p, r.x + 19, r.y + 22, theme->text);
         text(p, u->library_query[0] ? u->library_query : "Rechercher un jeu...", r.x + 37, r.y + 28,
              14, u->library_query[0] ? theme->text : theme->muted, r.w - 78);
         close_icon(p, r.x + r.w - 21, r.y + 22, cr_widget_mix(theme->muted, theme->text, pressing(u, -202)));
@@ -276,8 +267,7 @@ static void regular_row(const cr_ui *u, const cr_painter *p, const cr_theme *the
     if (row.toggle) toggle(p, theme, r.x + r.w - 60, r.y + 21, row.checked);
     else if (row.checked) {
         float x = r.x + r.w - (dots ? 62 : 26);
-        if (p->circle) p->circle(p->context, x, r.y + r.h / 2, 12, theme->accent);
-        tick(p, x, r.y + r.h / 2, theme->background);
+        tick(p, x, r.y + r.h / 2, theme->accent);
     }
     if (dots) {
         float level = pressing(u, -5000 - index);

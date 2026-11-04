@@ -42,6 +42,7 @@ public final class MainActivity extends NativeActivity {
     static { System.loadLibrary("corvusretro"); }
     private static final int OPEN_CONTENT = 10;
     private static final int OPEN_FOLDER = 11;
+    private static final int ICON_ATLAS_BASE = 464;
     private static final int[] EXTRA_GLYPHS = {0x153, 0x152, 0x2190, 0x2191, 0x2192, 0x2193, 0x2026, 0x2018, 0x2019};
     private static final int[] ICONS = {R.drawable.ic_core, R.drawable.ic_corvus, R.drawable.ic_content,
             R.drawable.ic_library, R.drawable.ic_settings, R.drawable.ic_history, R.drawable.ic_info,
@@ -51,7 +52,9 @@ public final class MainActivity extends NativeActivity {
             R.drawable.ic_achievements, R.drawable.ic_download, R.drawable.ic_restart, R.drawable.ic_play,
             R.drawable.ic_close, R.drawable.ic_notifications, R.drawable.ic_account, R.drawable.ic_subsystem,
             R.drawable.ic_folder, R.drawable.ic_display, R.drawable.ic_touch, R.drawable.ic_volume,
-            R.drawable.ic_backup, R.drawable.ic_restore};
+            R.drawable.ic_backup, R.drawable.ic_restore, R.drawable.ic_grid, R.drawable.ic_search,
+            R.drawable.ic_rename, R.drawable.ic_duplicate, R.drawable.ic_share, R.drawable.ic_trash,
+            R.drawable.ic_more, R.drawable.ic_check, R.drawable.ic_exit, R.drawable.ic_add};
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final Object importLock = new Object();
     private GameLibrary library;
@@ -562,7 +565,7 @@ public final class MainActivity extends NativeActivity {
             canvas.restore();
         }
         for (int i = 0; i < ICONS.length; i++) {
-            int slot = 480 + i, x = slot % 16 * 64, y = slot / 16 * 64;
+            int slot = ICON_ATLAS_BASE + i, x = slot % 16 * 64, y = slot / 16 * 64;
             Drawable icon = getResources().getDrawable(ICONS[i], getTheme()).mutate();
             icon.setTint(Color.WHITE); icon.setBounds(x + 8, y + 8, x + 56, y + 56); icon.draw(canvas);
         }
