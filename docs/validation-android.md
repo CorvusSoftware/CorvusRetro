@@ -812,3 +812,28 @@ System UI du démarrage a été fermé avant reprise des essais.
 Base debug qualifiée : `edee3f440048ca6c7e635fbcdb22203c8311673d263395d075542a4aae570338`.
 Émulateur API29 x86_64, programmes originaux et transport d'archives contrôlé ;
 pas de nouvelle qualification physique, ARM64, réseau public ou audio.
+
+## Livraison corrective 0.23.1
+
+PR #31 fusionnée sur autorisation du mainteneur. Source de l'APK :
+`29b091945b4213e3a72ddcd83fecf1fa3656709b`, tag `v0.23.1`, versionCode32.
+CI PR[41878516891](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41878516891),
+main[41882858763](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41882858763),
+build signé[41883818990](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41883818990)
+et publication[41884748183](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41884748183) réussis.
+
+APK public SHA256 : `b1a4fb6f7322c6a016694e1802472f1955544d044be5e181971f360cbadb4cb9`.
+Les octets publics sont identiques à la base signée qualifiée. Certificat
+durable, provenance, deux ABI, alignement16Ko, absence de cœur et MP3 original
+vérifiés. Les deux bibliothèques natives contiennent la version À propos0.23.1.
+
+La publication utilise explicitement le build signé qualifié, via source_run_id.
+
+Upgrade signé31->32 sur émulateur API29x86_64 : UID, données, première
+installation et thème ASUS conservés, texte du jeu historique identique en
+pixels. Les captures sont contrôlées automatiquement : ancien bouton absent
+et géométrie du logo conforme à la capture debug déjà inspectée. Pas de nouvelle
+inspection manuelle des captures signées. Aucun nouveau crash applicatif observé.
+Les essais fonctionnels ciblés portrait/paysage de la correction restent
+qualifiés ; seuls version, À propos et README ont changé depuis ces essais.
+Pas de nouvelle qualification physique, ARM64, réseau public ou audio.
