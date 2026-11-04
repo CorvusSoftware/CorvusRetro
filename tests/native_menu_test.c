@@ -499,7 +499,7 @@ int main(void) {
     cr_ui_catalog(&u, &catalog); c = draw(&u);
     check(!u.catalog_loading && strstr(c.text, "CorvusGB") && strstr(c.text, "mise à jour"),
           "individual core with a different version is presented as an update");
-    snprintf(catalog.packs[0].version, sizeof(catalog.packs[0].version), "0.15.0");
+    snprintf(catalog.packs[0].version, sizeof(catalog.packs[0].version), "0.16.0");
     cr_ui_catalog(&u, &catalog); c = draw(&u);
     check(strstr(c.text, "Installé") && !strstr(c.text, "mise à jour"),
           "an identical installed core is marked installed instead of updated");
@@ -553,7 +553,7 @@ int main(void) {
     cr_ui_back(&u); check(u.page == CR_SUBSYSTEMS && u.focus == 0, "link back restores subsystem row");
     cr_ui_back(&u); check(u.page == CR_MAIN && u.focus == 5 && !u.depth, "subsystem back restores its home card");
     tab(&u, 4); row(&u, 6); row(&u, 1); c = draw(&u);
-    check(u.page == CR_CORE_INFO && strstr(c.text, "CorvusGB") && strstr(c.text, "0.15.0"),
+    check(u.page == CR_CORE_INFO && strstr(c.text, "CorvusGB") && strstr(c.text, "0.16.0"),
           "real core information is reachable from About");
     cr_ui_back(&u); cr_ui_back(&u); tab(&u, 0); row(&u, 4);
     check(!u.engine.handle, "core unloaded"); c = draw(&u);

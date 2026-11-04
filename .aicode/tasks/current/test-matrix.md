@@ -1,12 +1,14 @@
-# Matrice de validation
+# Validation de livraison
 
-- P0 : ABI optionnelle absente/malformée, anciens cœurs utilisables.
-- P0 : effets réels GB/GBC/GBA et deux joueurs ; refus et allocation atomiques ;
-  reset, états, import batterie, déchargement.
-- P0 : .cht borné, UTF-8/BOM/échappements, doublons, handler mémoire refusé,
-  stockage atomique et injections fsync/allocation.
-- P0 : édition preview/final, collage refusé non destructif, tickets IME et
-  transferts annulés/anciens, liste privée corrompue protégée.
-- P1 : menu, profils/joueurs, flags automatiques ; Android portrait/paysage,
-  SAF réel via fournisseur de test, icône dans l'atlas.
-- P1 : APK sans cœur, deux ABI16Ko, lint/JVM et CI exacte des trois dépôts.
+- P0 : CI exacte des révisions fusionnées et pins API/Core cohérents.
+- P0 : six archives natives, ZIP unique, ELF/ABI/16Ko, export triche obligatoire,
+  provenance/source et octets publics SHA256 identiques au lot qualifié.
+- P0 : exécution des archives publiques x86_64 dans le frontend, triches,
+  chargement et fermeture, IME/SAF en portrait et paysage.
+- P0 : catalogue v1 vérifié avant promotion, flux historique0.18.0 inchangé.
+- P0 : APK durablement signé, version0.24.0/code33, zéro cœur, deux ABI16Ko,
+  provenance, son original et À propos ; mise à jour32->33 conservant les données.
+- P0 : publication des octets déjà qualifiés, nouveau tag et assets immuables,
+  téléchargement public identique ; workflow de publication réactivé.
+- P1 : suite native, sanitizers, JVM/lint et CI Android de la préparation.
+- Limites : émulateurAPI29x86_64, pas de nouveau test sur téléphone physiqueARM64.

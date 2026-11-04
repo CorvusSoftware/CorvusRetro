@@ -51,6 +51,7 @@ public final class InterfaceRedesignInstrumentation extends Instrumentation {
     private int checks;
     private boolean landscape, quickOnly, cheatsOnly;
     private File fixtures;
+    private String coreVersion = "0.15.0";
     private String oldGames;
     private float originalWidth, originalHeight;
     private MainActivity activity;
@@ -213,11 +214,11 @@ public final class InterfaceRedesignInstrumentation extends Instrumentation {
                 .putInt("video_integer",0).putInt("video_smooth",0).putInt("audio_volume",100).commit(), "native settings fixture");
         JSONArray cores = new JSONArray();
         for (int system=0;system<3;++system) {
-            File archive = new File(fixtures,CORE_NAMES[system]+"-0.15.0-android-x86_64.zip");
+            File archive = new File(fixtures,CORE_NAMES[system]+"-"+coreVersion+"-android-x86_64.zip");
             check(archive.isFile(),"official core fixture archive " + system);
             String address = "https://github.com/CorvusSoftware/CorvusRetro/releases/download/v0.16.0/" + archive.getName();
             JSONObject metadata = new JSONObject().put("id",CORE_IDS[system]).put("name",CORE_NAMES[system])
-                    .put("description","Module officiel pour qualification de l'interface").put("version","0.15.0")
+                    .put("description","Module officiel pour qualification de l'interface").put("version",coreVersion)
                     .put("abi","x86_64").put("api_version",0).put("library_name","libcorvus_"+CORE_IDS[system].substring(7)+".so")
                     .put("size",archive.length()).put("sha256",CoreStore.hash(archive)).put("archive_url",address);
             new CoreStore(context).install(new CoreRepository.Core(metadata),archive);
@@ -441,6 +442,7 @@ public final class InterfaceRedesignInstrumentation extends Instrumentation {
         super.onCreate(args);landscape="landscape".equals(args.getString("orientation","portrait"));
         quickOnly="true".equals(args.getString("quick_only","false"));
         cheatsOnly="true".equals(args.getString("cheats_only","false"));
+        coreVersion=args.getString("core_version","0.15.0");
         fixtures=new File(args.getString("fixture_dir",""));start();
     }
     @Override public void onStart() {
