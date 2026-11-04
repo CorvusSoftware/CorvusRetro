@@ -42,9 +42,13 @@ final class GameLibrary {
         final long played;
         final String coreId;
         final String systemId;
+        final String cover;
         Game(String id, String title, int system, long played, String coreId, String systemId) {
+            this(id,title,system,played,coreId,systemId,"");
+        }
+        Game(String id, String title, int system, long played, String coreId, String systemId, String cover) {
             this.id = id; this.title = title; this.system = system; this.played = played;
-            this.coreId = coreId; this.systemId = systemId;
+            this.coreId = coreId; this.systemId = systemId; this.cover = cover;
         }
     }
     private static String legacyCoreId(int system) {
@@ -105,11 +109,30 @@ final class GameLibrary {
                 if (!coreId.isEmpty() && !validSymbol(coreId)) continue;
                 if (!systemId.isEmpty() && !validSymbol(systemId)) continue;
                 result.add(new Game(id, record.optString("title", id),
-                                    system, record.optLong("played", 0), coreId, systemId));
+                                    system, record.optLong("played", 0), coreId, systemId, cover(id)));
             }
         } catch (org.json.JSONException ignored) { /* An unreadable index is shown as empty. */ }
         result.sort(Comparator.comparingLong((Game game) -> game.played).reversed().thenComparing(game -> game.title));
         return result;
+    }
+    String cover(String id) {
+        if (id == null || !id.matches("[0-9a-f]{64}-(?:[0-9]|[12][0-9]|3[01]|c[0-9a-f]{16})")) return "";
+        try {
+            String url = preferences.getString("game_cover_" + id, "");
+            return url != null && url.length() < 256 && RetroAchievementsImages.allowed(url) ? url : "";
+        } catch (ClassCastException malformed) { return ""; }
+    }
+    void cover(String id, String url) throws IOException {
+        if (url == null || url.length() >= 256 || !RetroAchievementsImages.allowed(url))
+            throw new IOException("Image de jeu non autorisée");
+        synchronized (INDEX_LOCK) {
+            if (find(id) == null) throw new IOException("Jeu absent de la bibliothèque");
+            String key = "game_cover_" + id, previous = preferences.getString(key, "");
+            if (!preferences.edit().putString(key,url).commit()) {
+                preferences.edit().putString(key,previous).commit();
+                throw new IOException("Image de jeu non enregistrée");
+            }
+        }
     }
     Game find(String id) {
         for (Game game : games()) if (game.id.equals(id)) return game;

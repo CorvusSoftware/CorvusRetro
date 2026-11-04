@@ -89,13 +89,14 @@ int main(int argc, char **argv) {
     check(ui.game_count == 3 && ui.games[0].system == -1 && ui.games[1].system == -1 &&
               ui.games[2].system == 0,
           "games whose cores are absent stay in the library without reassignment");
-    cr_ui_confirm(&ui);
-    cr_ui_confirm(&ui);
+    ui.focus = 4; cr_ui_confirm(&ui);
+    ui.focus = 0; cr_ui_confirm(&ui);
     check(ui.engine.handle && ui.engine.system == 0, "select the installed GBA core");
-    ui.focus = 1;
-    cr_ui_confirm(&ui);
-    check(ui.page == CR_CONTENT, "content submenu keeps the selected core");
-    cr_ui_confirm(&ui);
+    ui.focus = 1; cr_ui_confirm(&ui);
+    check(ui.page == CR_LIBRARY, "library keeps the selected core");
+    ui.focus = 0; cr_ui_confirm(&ui);
+    check(ui.page == CR_LIBRARY_ACTIONS, "library exposes import actions");
+    ui.focus = 0; cr_ui_confirm(&ui);
     check(picker_requested && ui.importing, "start a picker request for the selected core");
     cr_import incoming = {.system = 0};
     snprintf(incoming.id, sizeof(incoming.id), "%s", wrong_id);

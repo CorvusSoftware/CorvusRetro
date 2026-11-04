@@ -37,6 +37,8 @@ static pthread_mutex_t text_mutex = PTHREAD_MUTEX_INITIALIZER;
 static char text_value[513];
 static int text_field;
 static bool text_ready, text_accepted;
+static uint64_t text_generation;
+static int text_active_field;
 static pthread_mutex_t controller_mutex = PTHREAD_MUTEX_INITIALIZER;
 static cr_controller_device controller_devices[CR_CONTROLLER_DEVICE_CAP];
 static char controller_names[CR_CONTROLLER_DEVICE_CAP][128];
@@ -173,21 +175,30 @@ JNIEXPORT void JNICALL Java_com_corvussoftware_corvusretro_MainActivity_coreCata
     cr_core_catalog next = {0};
     string_copy(env, error, next.error, sizeof(next.error));
     jsize size = rows ? (*env)->GetArrayLength(env, rows) : 0;
-    if (size < 0 || size > CR_MAX_CORE_PACKS * 5 || size % 5 != 0) {
+    if (size < 0 || size > CR_MAX_CORE_PACKS * 8 || size % 8 != 0) {
         snprintf(next.error, sizeof(next.error), "Catalogue incompatible");
     } else {
-        for (jsize i = 0; i < size; i += 5) {
+        for (jsize i = 0; i < size; i += 8) {
             cr_core_pack *pack = &next.packs[next.count];
-            for (int f = 0; f < 5; ++f) {
+            for (int f = 0; f < 8; ++f) {
                 jstring field = (*env)->GetObjectArrayElement(env, rows, i + f);
                 if (f == 0) string_copy(env, field, pack->id, sizeof(pack->id));
                 if (f == 1) string_copy(env, field, pack->name, sizeof(pack->name));
                 if (f == 2) string_copy(env, field, pack->version, sizeof(pack->version));
                 if (f == 3) string_copy(env, field, pack->core_id, sizeof(pack->core_id));
                 if (f == 4) string_copy(env, field, pack->abi, sizeof(pack->abi));
+                if (f == 5) string_copy(env, field, pack->description, sizeof(pack->description));
+                if (f == 6) string_copy(env, field, pack->system_name, sizeof(pack->system_name));
+                if (f == 7) {
+                    char number[32], *end = NULL;
+                    string_copy(env, field, number, sizeof(number));
+                    unsigned long long value = strtoull(number, &end, 10);
+                    if (number[0] >= '1' && number[0] <= '9' && end && !*end && value <= 64u * 1024u * 1024u)
+                        pack->size = (uint64_t)value;
+                }
                 if (field) (*env)->DeleteLocalRef(env, field);
             }
-            if (!pack->id[0] || !pack->name[0] || !pack->version[0] || !pack->core_id[0]) {
+            if (!pack->id[0] || !pack->name[0] || !pack->version[0] || !pack->core_id[0] || !pack->size) {
                 next.count = 0;
                 snprintf(next.error, sizeof(next.error), "Metadonnees du catalogue invalides");
                 break;
@@ -201,12 +212,21 @@ JNIEXPORT void JNICALL Java_com_corvussoftware_corvusretro_MainActivity_coreCata
     pthread_mutex_unlock(&core_mutex);
     wake_frontend();
 }
-JNIEXPORT void JNICALL Java_com_corvussoftware_corvusretro_MainActivity_textInputResult(
-    JNIEnv *env, jclass cls, jint field, jstring text, jboolean accepted) {
+JNIEXPORT void JNICALL Java_com_corvussoftware_corvusretro_MainActivity_textInputResultNative(
+    JNIEnv *env, jclass cls, jint field, jstring text, jboolean accepted, jlong ticket) {
     (void)cls;
+    if (!field || field < -4 || field > 4) return;
+    int input = field < 0 ? -field : field;
+    size_t limit = input == 3 ? 128 : input == 4 ? 96 : sizeof(text_value);
     pthread_mutex_lock(&text_mutex);
-    string_copy(env, text, text_value, sizeof(text_value));
+    if (!ticket || (uint64_t)ticket != text_generation || input != text_active_field ||
+        (field < 0 && !accepted)) {
+        pthread_mutex_unlock(&text_mutex);
+        return;
+    }
+    string_copy(env, text, text_value, limit);
     text_field = field; text_accepted = accepted; text_ready = true;
+    if (field > 0) text_active_field = 0;
     pthread_mutex_unlock(&text_mutex);
     wake_frontend();
 }
@@ -344,6 +364,12 @@ bool cr_android_import(cr_import *out) {
 bool cr_android_init(cr_android *p, struct android_app *app) {
     memset(p, 0, sizeof(*p));
     p->app = app;
+    pthread_mutex_lock(&text_mutex);
+    if (!++text_generation) ++text_generation;
+    text_active_field = 0;
+    text_ready = false;
+    memset(text_value, 0, sizeof(text_value));
+    pthread_mutex_unlock(&text_mutex);
     JavaVM *vm = app->activity->vm;
     if ((*vm)->GetEnv(vm, (void **)&p->env, JNI_VERSION_1_6) != JNI_OK) {
         if ((*vm)->AttachCurrentThread(vm, &p->env, NULL) != JNI_OK)
@@ -364,6 +390,8 @@ bool cr_android_init(cr_android *p, struct android_app *app) {
     METHOD(glyph, "glyph", "(I)Landroid/graphics/Bitmap;");
     METHOD(advance, "advance", "(I)F");
     METHOD(games, "games", "()[Ljava/lang/String;");
+    METHOD(game_image, "gameImage", "(Ljava/lang/String;Ljava/lang/String;)V");
+    METHOD(share_state, "shareState", "(Ljava/lang/String;[B)V");
     METHOD(root, "filesRoot", "()Ljava/lang/String;");
     METHOD(credits, "credits", "()Ljava/lang/String;");
     METHOD(preference, "preference", "(Ljava/lang/String;I)I");
@@ -386,7 +414,7 @@ bool cr_android_init(cr_android *p, struct android_app *app) {
     METHOD(achievement_request, "achievementRequest", "(JLjava/lang/String;Ljava/lang/String;)V");
     METHOD(achievement_credentials, "achievementCredentials", "()[Ljava/lang/String;");
     METHOD(achievement_credentials_set, "achievementCredentialsSet", "(Ljava/lang/String;Ljava/lang/String;)V");
-    METHOD(edit_text, "textInput", "(ILjava/lang/String;Z)V");
+    METHOD(edit_text, "textInput", "(ILjava/lang/String;ZJ)V");
     METHOD(achievement_image, "achievementImage", "(Ljava/lang/String;)Landroid/graphics/Bitmap;");
 #undef METHOD
     jobjectArray modules = (*p->env)->CallObjectMethod(p->env, app->activity->clazz,
@@ -427,6 +455,8 @@ void cr_android_destroy(cr_android *p) {
     pthread_mutex_unlock(&save_mutex);
     cr_achievement_tasks_clear();
     pthread_mutex_lock(&text_mutex);
+    if (!++text_generation) ++text_generation;
+    text_active_field = 0;
     memset(text_value, 0, sizeof(text_value));
     text_ready = false;
     pthread_mutex_unlock(&text_mutex);
@@ -517,20 +547,20 @@ static cr_game *games(void *ctx, size_t *count) {
     if (cr_android_clear_error(p) || !records)
         return NULL;
     jsize length = (*p->env)->GetArrayLength(p->env, records);
-    if (length < 0 || length % 6 != 0 || length / 6 > 16384) {
+    if (length < 0 || length % 7 != 0 || length / 7 > 16384) {
         (*p->env)->DeleteLocalRef(p->env, records);
         return NULL;
     }
-    cr_game *result = calloc((size_t)length / 6, sizeof(*result));
+    cr_game *result = calloc((size_t)length / 7, sizeof(*result));
     if (length && !result) {
         (*p->env)->DeleteLocalRef(p->env, records);
         return NULL;
     }
-    for (jsize i = 0; i + 5 < length; i += 6) {
+    for (jsize i = 0; i + 6 < length; i += 7) {
         cr_game game;
         memset(&game, 0, sizeof(game));
         char number[64];
-        for (int f = 0; f < 6; f++) {
+        for (int f = 0; f < 7; f++) {
             jstring s = (*p->env)->GetObjectArrayElement(p->env, records, i + f);
             if (f == 0)
                 string_copy(p->env, s, game.id, sizeof(game.id));
@@ -543,6 +573,7 @@ static cr_game *games(void *ctx, size_t *count) {
             }
             if (f == 4) string_copy(p->env, s, game.core_id, sizeof(game.core_id));
             if (f == 5) string_copy(p->env, s, game.system_id, sizeof(game.system_id));
+            if (f == 6) string_copy(p->env, s, game.cover, sizeof(game.cover));
             if (s)
                 (*p->env)->DeleteLocalRef(p->env, s);
         }
@@ -644,9 +675,18 @@ static void save_achievement_credentials(void *ctx, const char *user, const char
 }
 static void edit_text(void *ctx, int field, const char *text, bool secret) {
     cr_android *p = ctx;
+    if (field < 0 || field > 4 || secret != (field == 2)) return;
+    pthread_mutex_lock(&text_mutex);
+    if (!++text_generation) ++text_generation;
+    uint64_t ticket = text_generation;
+    text_active_field = field;
+    text_ready = false;
+    memset(text_value, 0, sizeof(text_value));
+    pthread_mutex_unlock(&text_mutex);
     jstring initial = (*p->env)->NewStringUTF(p->env, text);
     if (initial) {
-        (*p->env)->CallVoidMethod(p->env, p->app->activity->clazz, p->edit_text, field, initial, (jboolean)secret);
+        (*p->env)->CallVoidMethod(p->env, p->app->activity->clazz, p->edit_text,
+                                 field, initial, (jboolean)secret, (jlong)ticket);
         (*p->env)->DeleteLocalRef(p->env, initial);
     }
     cr_android_clear_error(p);
@@ -713,9 +753,34 @@ static void remove_core(void *context, const char *id) {
     (*p->env)->DeleteLocalRef(p->env,value);
     cr_android_clear_error(p);
 }
+static void game_image(void *context, const char *id, const char *url) {
+    cr_android *p = context;
+    if (!cr_game_id_valid(id) || !url || strlen(url) >= 256) return;
+    jstring game = (*p->env)->NewStringUTF(p->env, id);
+    jstring address = (*p->env)->NewStringUTF(p->env, url);
+    if (game && address)
+        (*p->env)->CallVoidMethod(p->env,p->app->activity->clazz,p->game_image,game,address);
+    if (game) (*p->env)->DeleteLocalRef(p->env,game);
+    if (address) (*p->env)->DeleteLocalRef(p->env,address);
+    cr_android_clear_error(p);
+}
+static void share_state(void *context, const char *title, const uint8_t *bytes, size_t size) {
+    cr_android *p = context;
+    if (!title || !bytes || !size || size > 16u * 1024u * 1024u) return;
+    jstring name = (*p->env)->NewStringUTF(p->env,title);
+    jbyteArray data = (*p->env)->NewByteArray(p->env,(jsize)size);
+    if (name && data) {
+        (*p->env)->SetByteArrayRegion(p->env,data,0,(jsize)size,(const jbyte *)bytes);
+        if (!cr_android_clear_error(p))
+            (*p->env)->CallVoidMethod(p->env,p->app->activity->clazz,p->share_state,name,data);
+    }
+    if (name) (*p->env)->DeleteLocalRef(p->env,name);
+    if (data) (*p->env)->DeleteLocalRef(p->env,data);
+    cr_android_clear_error(p);
+}
 cr_platform cr_android_services(cr_android *p) {
     return (cr_platform){p, pref, set_pref, pick, finish, games, touch, credits,
                          appearance, quit, refresh_catalog, install_pack, install_pending,
                          achievement_request, achievement_credentials, save_achievement_credentials, edit_text,
-                         pick_folder, save_transfer, finish_save_transfer, controller_info, achievement_sound, can_remove_core, remove_core};
+                         pick_folder, save_transfer, finish_save_transfer, controller_info, achievement_sound, can_remove_core, remove_core, game_image, share_state};
 }

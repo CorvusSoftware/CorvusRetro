@@ -4,6 +4,7 @@
 #ifndef CORVUS_GL2_H
 #define CORVUS_GL2_H
 #include "android_backend.h"
+#include "render.h"
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
 typedef struct {
@@ -28,9 +29,9 @@ typedef struct {
     GLint game_filter;
     cr_vertex vertices[12288];
     size_t count;
-    float advances[480];
-    uint32_t codepoints[480];
-    uint64_t stamps[480], stamp;
+    float advances[CR_ICON_ATLAS_BASE];
+    uint32_t codepoints[CR_ICON_ATLAS_BASE];
+    uint64_t stamps[CR_ICON_ATLAS_BASE], stamp;
     cr_gl_image images[16];
 } cr_gl;
 bool cr_gl_init(cr_gl *, cr_android *);

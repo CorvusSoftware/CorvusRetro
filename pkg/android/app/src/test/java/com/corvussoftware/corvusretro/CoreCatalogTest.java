@@ -33,7 +33,10 @@ public final class CoreCatalogTest {
         for (String abi : new String[] {"arm64-v8a", "x86_64"}) {
             CoreRepository.Catalog catalog = CoreRepository.parseCatalog(feed(entries), abi);
             assertEquals(3, catalog.cores.size());
-            assertEquals(15, catalog.records.length);
+            assertEquals(24, catalog.records.length);
+            assertEquals("Console", catalog.records[5]);
+            assertEquals("Game Boy", catalog.records[6]);
+            assertEquals("1930063", catalog.records[7]);
             for (String system : new String[] {"gb", "gbc", "gba"})
                 assertEquals(abi, catalog.cores.get("corvus." + system).abi);
         }

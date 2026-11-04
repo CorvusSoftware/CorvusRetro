@@ -69,12 +69,12 @@ static void choose(cr_ui *u, int row) {
 }
 static void select_core(cr_ui *u, int system) {
     check(u->page == CR_MAIN && !u->engine.handle, "core selection starts unloaded", u);
-    choose(u, 0); check(u->page == CR_CORES, "open core selection", u); choose(u, system);
+    choose(u, 4); check(u->page == CR_CORES, "open core selection", u); choose(u, system);
     check(u->page == CR_MAIN && u->engine.system == system && u->engine.handle, "select real core", u);
 }
 static void open_config(cr_ui *u) {
     check(u->page == CR_MAIN, "subsystem configuration starts at main", u);
-    choose(u, u->engine.loaded ? 3 : 2);
+    choose(u, 5);
     check(u->page == CR_SUBSYSTEMS, "main exposes subsystem list", u); choose(u, 0);
     check(u->page == CR_SUBSYSTEM_CONFIG, "real two-player subsystem opens slots", u);
 }
@@ -236,7 +236,7 @@ static void test_system(int system) {
     open_config(&u); check(u.link_ids[0][0] && u.link_ids[1][0], "closing content retains configurable subsystem slots", &u);
     choose(&u, 0); choose(&u, 0); check(u.importing && u.import_link, "begin stale slot import", &u);
     cr_ui_back(&u); cr_ui_back(&u); cr_ui_back(&u); check(u.page == CR_MAIN, "return to main during picker", &u);
-    choose(&u, 0); check(!u.engine.handle && !u.link_ids[0][0] && !u.link_ids[1][0] &&
+    choose(&u, 4); check(!u.engine.handle && !u.link_ids[0][0] && !u.link_ids[1][0] &&
         u.core_revision > revision, "explicit unload clears copied selections and advances revision", &u);
     select_core(&u, system);
     check(cr_engine_option_value(&u.engine, key) == selected && !u.subsystem_id[0], "reselect restores durable options with fresh link configuration", &u);

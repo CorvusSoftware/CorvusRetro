@@ -1,6 +1,11 @@
-État : DONE pour la livraison0.22.2 autorisée explicitement. PR #28 fusionnée, sourcef83ecd694f5cf373873a011febc910a9a658a2ad, tagv0.22.2/code30.
-CI main41597282038, signé41597582130, publication41598126420 réussis. APK public SHA2562d9cf2198f33263e0b9c132bf13d35f9f92207363b0b721d6311164f8b3cec88 identique à l'artefact signé testé ; certificat durable inchangé, deuxABI/16Ko/zérocoeur/MP3 original/absence provider test/provenance/Àpropos vérifiés.
-Upgrade signé0.22.1/code29->0.22.2/code30 API29x86_64 accepté, mêmeUID10116/dossier/première installation. ASUS/historiqueCorvus-preserved.gba conservés, région identique en pixels ; captures inspectées, aucun nouveau crash observé.
-Reçus : /workspace/setup/{release0222-state.json,signed0222-qualification.json,public0222-qualification.json,signed0222-runtime/upgrade.json}.
-Le comportement fonctionnel reste celui de1375f0e, revu indépendamment : 19 suites natives strictes+ASan/UBSan, tests JVM,38 scénarios audio,321 contrôles batterie et96Android GBA. Seuls les identifiants de version et À propos ont changé avant fusion. Pas d'écoute physique/ROMPokémon/Bluetooth/runtimeARM64 ; les parasites perçus sur le Redmi restent à confirmer.
-La branche documentaire met à jour README et preuves après publication. Vérifier sa CI exacte avant fusion ; les checks GitHub du SHA actif sont la source de vérité. Le tag et le binaire public restent inchangés.
+État : implémentation et vérification locale terminées, PR #30.
+
+Les icônes décrivent leur fonction : Système, Import, Export, Verrou, Curseurs et Filtre ajoutés dans la réserve existante ; audio, liste, sauvegardes, redémarrage et liaison redessinés. Les cartes d'action et écrans vides ne masquent plus les symboles avec une GBA générique. Continuer retrouve le jeu courant.
+
+Actions, 42 anciens IDs, dimensions et allocation de l'atlas conservés. Pas de modification du jeu, des moteurs, de l'audio ou des dépendances.
+
+Preuves locales : 21 suites natives, 21 suites ASan/UBSan, build/lint Android, contrôles APK et atlas196 passent. Parcours Android portrait complet et captures des menus concernés inspectés ; crash.log vide. Revue indépendante sans finding bloquant. Preuves hors dépôt : /workspace/setup/icon-meaning.
+
+Publication dans PR #30 ; vérifier la CI du commit publié avant sortie du brouillon. Aucune fusion ni release dans cette tâche.
+
+Nouvelle demande du mainteneur : fusionner PR #30 et sortir la version. Autorisation explicite reçue après validation des icônes. Préparation0.23.0/code31 ; mettre à jour version APK, À propos et liens README. Vérifier la CI du nouveau head, fusionner, attendre CI main et build signé, qualifier l'APK signé/mise à jour, puis tag et publication exacte. État de livraison hors dépôt : /workspace/setup/release0230/state.json.

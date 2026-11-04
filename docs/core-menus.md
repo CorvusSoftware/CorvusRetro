@@ -2,11 +2,11 @@
 
 CorvusRetro conserve deux entrées distinctes :
 
-- **Menu principal > Sous-système** apparaît dès qu'un cœur
+- **Accueil > Sous-système** apparaît dès qu'un cœur
   est chargé, même avant de charger un jeu. Fermer le contenu garde cette
   entrée, puisque le cœur reste chargé. Décharger le cœur la retire.
-- **Menu rapide > Options du cœur** se trouve entre les sauvegardes d'état
-  et les commandes. Le jeu reste en pause dans cette page ; Retour restaure
+- **Menu rapide > Options du jeu** expose les options du cœur, après
+  Redémarrer. Le jeu reste en pause dans cette page ; Retour restaure
   la sélection et le défilement du menu rapide.
 
 Les modules CorvusCore 0.15 proposent des réglages réels : palette GB,

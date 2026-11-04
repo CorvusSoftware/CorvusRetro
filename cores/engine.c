@@ -1576,22 +1576,47 @@ static bool selected_state_path(cr_engine *engine, char path[4096], bool automat
     base[size - 6] = 0;
     return sibling(engine, path, base, ".auto.state");
 }
-static bool save_state(cr_engine *engine, bool automatic) {
+bool cr_engine_state_copy(cr_engine *engine, uint8_t **bytes, size_t *size) {
+    if (!bytes || !size) return fail(engine, "Destination d’état invalide");
+    *bytes = NULL;
+    *size = 0;
     if (!ready(engine))
         return false;
     if (!cr_engine_can_state(engine))
         return fail(engine, "Ce cœur ne prend pas en charge les états de sauvegarde");
-    size_t size = engine->api.serialize_size(engine->handle);
-    if (!size || size > MAX_STATE)
+    size_t count = engine->api.serialize_size(engine->handle);
+    if (!count || count > MAX_STATE)
         return fail(engine, "État de sauvegarde invalide");
-    uint8_t *bytes = malloc(size);
-    if (!bytes)
+    uint8_t *copy = malloc(count);
+    if (!copy)
         return fail(engine, "Mémoire insuffisante");
-    bool copied = engine->api.serialize(engine->handle, bytes, size) != 0;
-    if (!copied)
-        sdk_error(engine);
+    if (!engine->api.serialize(engine->handle, copy, count)) {
+        free(copy);
+        return sdk_error(engine);
+    }
+    *bytes = copy;
+    *size = count;
+    success(engine);
+    return true;
+}
+bool cr_engine_state_restore(cr_engine *engine, const uint8_t *bytes, size_t size) {
+    if (!ready(engine)) return false;
+    if (!cr_engine_can_state(engine))
+        return fail(engine, "Ce cœur ne prend pas en charge les états de sauvegarde");
+    if (!bytes || !size || size > MAX_STATE)
+        return fail(engine, "État de sauvegarde invalide");
+    if (!finish_battery_save(engine, true)) return false;
+    if (!engine->api.unserialize(engine->handle, bytes, size)) return sdk_error(engine);
+    engine->audio_count = 0;
+    success(engine);
+    return true;
+}
+static bool save_state(cr_engine *engine, bool automatic) {
+    uint8_t *bytes = NULL;
+    size_t size = 0;
+    if (!cr_engine_state_copy(engine, &bytes, &size)) return false;
     char path[4096];
-    bool written = copied && selected_state_path(engine, path, automatic) &&
+    bool written = selected_state_path(engine, path, automatic) &&
                    write_file(engine, path, bytes, size);
     free(bytes);
     if (!written)
@@ -1610,13 +1635,9 @@ static bool load_state(cr_engine *engine, bool automatic) {
     if (!selected_state_path(engine, path, automatic) ||
         !read_file(engine, path, MAX_STATE, false, &bytes, &size))
         return false;
-    bool loaded = engine->api.unserialize(engine->handle, bytes, size) != 0;
+    bool loaded = cr_engine_state_restore(engine, bytes, size);
     free(bytes);
-    if (!loaded)
-        return sdk_error(engine);
-    engine->audio_count = 0;
-    success(engine);
-    return true;
+    return loaded;
 }
 bool cr_engine_save_state(cr_engine *engine) { return save_state(engine, false); }
 bool cr_engine_load_state(cr_engine *engine) { return load_state(engine, false); }

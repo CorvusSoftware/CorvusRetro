@@ -59,6 +59,9 @@ bool cr_engine_step_players(cr_engine *engine, const unsigned masks[2]);
 bool cr_engine_reset(cr_engine *engine);
 bool cr_engine_save_state(cr_engine *engine);
 bool cr_engine_load_state(cr_engine *engine);
+/* Owner-thread raw SDK snapshots. Caller frees copied bytes; restore drains pending battery IO. */
+bool cr_engine_state_copy(cr_engine *engine, uint8_t **bytes, size_t *size);
+bool cr_engine_state_restore(cr_engine *engine, const uint8_t *bytes, size_t size);
 bool cr_engine_save_auto_state(cr_engine *engine);
 bool cr_engine_load_auto_state(cr_engine *engine);
 /* Filesystem query for opening the state menu, never the draw loop. */

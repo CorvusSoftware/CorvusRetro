@@ -198,7 +198,7 @@ static int32_t input(struct android_app *app, AInputEvent *event) {
                                           controller_source(source),
                                           (source & AINPUT_SOURCE_DPAD) == AINPUT_SOURCE_DPAD);
     if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_KEY) {
-        if (a->ui.ra_editing) return 0;
+        if (a->ui.ra_editing || a->ui.ui_editing) return 0;
         int key = AKeyEvent_getKeyCode(event), action = AKeyEvent_getAction(event);
         bool down = action == AKEY_EVENT_ACTION_DOWN;
         if (key == AKEYCODE_BACK) {
@@ -263,7 +263,7 @@ static int32_t input(struct android_app *app, AInputEvent *event) {
             }
             cr_controller_axes(&a->controllers, (unsigned)port, directions);
             if (cr_ui_running(u)) controller_apply(a, (unsigned)port, previous);
-            else if (!u->ra_editing) {
+            else if (!u->ra_editing && !u->ui_editing) {
                 unsigned pressed = directions & ~previous;
                 if (pressed & (1u << 0)) cr_ui_move(u, -1);
                 if (pressed & (1u << 1)) cr_ui_move(u, 1);
@@ -329,7 +329,8 @@ void android_main(struct android_app *app) {
 #ifndef NDEBUG
     unsigned last_players = ~0u, last_controlled = ~0u;
     int last_page = -1, last_core = -2, last_content = -1, last_quick = -1, last_theme = -1,
-        last_active = -1, last_show_input = -1, last_installing = -1;
+        last_active = -1, last_show_input = -1, last_installing = -1, last_ui_editing = -1, last_focus = -1;
+    size_t last_query_length = SIZE_MAX;
 #endif
     while (!app->destroyRequested) {
         bool active = a->window && a->resumed;
@@ -398,11 +399,13 @@ void android_main(struct android_app *app) {
             last_content != a->ui.engine.loaded || last_quick != a->ui.quick ||
             last_theme != a->ui.theme || last_active != active || last_show_input != a->ui.show_input ||
             last_installing != a->ui.installing || last_players != a->ui.engine.players ||
-            last_controlled != a->ui.input_player) {
+            last_controlled != a->ui.input_player || last_ui_editing != a->ui.ui_editing ||
+            last_query_length != strlen(a->ui.library_query) || last_focus != a->ui.focus) {
             __android_log_print(ANDROID_LOG_DEBUG, "CorvusRetro",
-                                "frontend page=%d core=%d content=%d quick=%d theme=%d active=%d show_input=%d installing=%d players=%u controlled=%u",
+                                "frontend page=%d core=%d content=%d quick=%d theme=%d active=%d show_input=%d installing=%d players=%u controlled=%u search_length=%zu editing=%d focus=%d",
                                 a->ui.page, a->ui.engine.system, a->ui.engine.loaded, a->ui.quick,
-                                a->ui.theme, active, a->ui.show_input, a->ui.installing, a->ui.engine.players, a->ui.input_player);
+                                a->ui.theme, active, a->ui.show_input, a->ui.installing, a->ui.engine.players, a->ui.input_player,
+                                strlen(a->ui.library_query), a->ui.ui_editing, a->ui.focus);
             last_page = a->ui.page;
             last_core = a->ui.engine.system;
             last_content = a->ui.engine.loaded;
@@ -413,6 +416,9 @@ void android_main(struct android_app *app) {
             last_installing = a->ui.installing;
             last_players = a->ui.engine.players;
             last_controlled = a->ui.input_player;
+            last_query_length = strlen(a->ui.library_query);
+            last_ui_editing = a->ui.ui_editing;
+            last_focus = a->ui.focus;
         }
 #endif
         if (running != a->was_running) {

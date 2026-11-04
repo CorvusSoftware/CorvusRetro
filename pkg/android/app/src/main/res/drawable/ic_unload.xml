@@ -5,7 +5,11 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp" android:height="24dp"
     android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#20FFFFFF" android:pathData="M7,11 L12,4 L17,11 Z" />
     <path android:fillColor="#00000000" android:strokeColor="#FFFFFF"
-        android:strokeWidth="2" android:strokeLineCap="round"
-        android:strokeLineJoin="round" android:pathData="M4,17 H20 V21 H4 Z M4,13 L12,3 L20,13 Z" />
+        android:strokeWidth="1.75" android:strokeLineCap="round"
+        android:strokeLineJoin="round" android:pathData="M4,16 V19 Q4,20.5 5.5,20.5 H18.5 Q20,20.5 20,19 V16" />
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.75" android:strokeLineCap="round"
+        android:strokeLineJoin="round" android:pathData="M7,11 L12,4 L17,11 Z M8,14 H16" />
 </vector>

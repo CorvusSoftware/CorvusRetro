@@ -83,8 +83,12 @@ find_package(Threads REQUIRED)
 include(cmake/Rcheevos.cmake)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
-add_library(corvus_frontend STATIC cores/engine.c cores/core_registry.c menu/menu_driver.c
-    menu/theme.c gfx/viewport.c input/play_layout.c input/overlay.c input/controller_ports.c gfx/widgets/notifications.c)
+set(CORVUS_MENU_SOURCES
+    menu/menu_driver.c menu/menu_displaylist.c menu/menu_setting.c menu/cbs/menu_cbs_ok.c
+    menu/interface_layout.c menu/interface_draw.c menu/widgets.c menu/theme.c)
+add_library(corvus_frontend STATIC cores/engine.c cores/state_store.c cores/core_registry.c
+    ${CORVUS_MENU_SOURCES} gfx/viewport.c input/play_layout.c input/overlay.c
+    input/controller_ports.c gfx/widgets/notifications.c)
 target_link_libraries(corvus_frontend PUBLIC CorvusAPI::CorvusAPI corvus_cheevos ${CMAKE_DL_LIBS} m Threads::Threads)
 if(CORVUS_BUNDLED_CORE_TARGETS)
     add_dependencies(corvus_frontend ${CORVUS_BUNDLED_CORE_TARGETS})
@@ -157,6 +161,16 @@ else()
     target_link_options(native_async_battery_test PRIVATE -Wl,--wrap=fsync)
     add_test(NAME native_async_battery COMMAND native_async_battery_test)
     set_tests_properties(native_async_battery PROPERTIES TIMEOUT 30)
+    add_executable(native_state_store_test tests/native_state_store_test.c)
+    target_link_libraries(native_state_store_test PRIVATE corvus_frontend Threads::Threads)
+    target_compile_options(native_state_store_test PRIVATE -Wall -Wextra -Werror)
+    target_link_options(native_state_store_test PRIVATE -Wl,--wrap=fsync)
+    add_test(NAME native_state_store COMMAND native_state_store_test)
+    set_tests_properties(native_state_store PROPERTIES TIMEOUT 30)
+    add_executable(native_interface_test tests/native_interface_test.c)
+    target_link_libraries(native_interface_test PRIVATE corvus_frontend)
+    target_compile_options(native_interface_test PRIVATE -Wall -Wextra -Werror)
+    add_test(NAME native_interface COMMAND native_interface_test)
 
     add_executable(native_media_settings_test tests/native_media_settings_test.c)
     target_link_libraries(native_media_settings_test PRIVATE corvus_frontend)
@@ -194,7 +208,9 @@ else()
     file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/test-empty/cr_bundled_cores.h"
         "static const char *const cr_bundled_core_modules[] = {0};\n")
     add_executable(native_registry_test "${CORVUS_ROOT}/tests/native_registry_test.c"
-        cores/engine.c cores/core_registry.c menu/menu_driver.c menu/theme.c gfx/viewport.c input/play_layout.c input/overlay.c input/controller_ports.c gfx/widgets/notifications.c)
+        cores/engine.c cores/state_store.c cores/core_registry.c ${CORVUS_MENU_SOURCES}
+        gfx/viewport.c input/play_layout.c input/overlay.c input/controller_ports.c
+        gfx/widgets/notifications.c)
     target_include_directories(native_registry_test PRIVATE
         ${CORVUS_INCLUDE_DIRS} "${CMAKE_CURRENT_BINARY_DIR}/test-empty")
     target_link_libraries(native_registry_test PRIVATE CorvusAPI::CorvusAPI corvus_cheevos ${CMAKE_DL_LIBS} m Threads::Threads)
@@ -223,10 +239,10 @@ else()
     target_compile_options(native_notifications_test PRIVATE -Wall -Wextra -Werror)
     add_test(NAME native_notifications COMMAND native_notifications_test)
     if(CORVUS_SANITIZE)
-        foreach(target native_audio_sync_test native_async_battery_test native_audio_test native_core_removal_test corvus_frontend corvus_cheevos native_notifications_test native_cheevos_test native_achievement_tasks_test native_engine_test native_engine_configuration_test engine_configuration_normal engine_configuration_reordered engine_configuration_legacy engine_configuration_malformed engine_configuration_states native_frontend_test native_viewport_test native_controls_test native_menu_test native_configuration_menu_test native_controller_ports_test native_save_transfer_test native_media_settings_test native_settings_menu_test native_registry_test)
+        foreach(target native_interface_test native_state_store_test native_audio_sync_test native_async_battery_test native_audio_test native_core_removal_test corvus_frontend corvus_cheevos native_notifications_test native_cheevos_test native_achievement_tasks_test native_engine_test native_engine_configuration_test engine_configuration_normal engine_configuration_reordered engine_configuration_legacy engine_configuration_malformed engine_configuration_states native_frontend_test native_viewport_test native_controls_test native_menu_test native_configuration_menu_test native_controller_ports_test native_save_transfer_test native_media_settings_test native_settings_menu_test native_registry_test)
             target_compile_options(${target} PRIVATE -g -O1 -fsanitize=address,undefined -fno-omit-frame-pointer)
         endforeach()
-        foreach(target native_audio_sync_test native_async_battery_test native_audio_test native_core_removal_test native_notifications_test native_cheevos_test native_achievement_tasks_test native_engine_test native_engine_configuration_test engine_configuration_normal engine_configuration_reordered engine_configuration_legacy engine_configuration_malformed engine_configuration_states native_frontend_test native_viewport_test native_controls_test native_menu_test native_configuration_menu_test native_controller_ports_test native_save_transfer_test native_media_settings_test native_settings_menu_test native_registry_test)
+        foreach(target native_interface_test native_state_store_test native_audio_sync_test native_async_battery_test native_audio_test native_core_removal_test native_notifications_test native_cheevos_test native_achievement_tasks_test native_engine_test native_engine_configuration_test engine_configuration_normal engine_configuration_reordered engine_configuration_legacy engine_configuration_malformed engine_configuration_states native_frontend_test native_viewport_test native_controls_test native_menu_test native_configuration_menu_test native_controller_ports_test native_save_transfer_test native_media_settings_test native_settings_menu_test native_registry_test)
             target_link_options(${target} PRIVATE -fsanitize=address,undefined)
         endforeach()
     endif()

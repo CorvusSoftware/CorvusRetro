@@ -29,7 +29,12 @@ Read docs/core-downloader.md and docs/stable-content-identities.md when touching
 
 ## Architecture and file map
 
-- menu/menu_driver.c, menu_driver.h: menus, navigation, core selection, UI state.
+- menu/menu_driver.c, menu_driver.h: public UI API, navigation, input and lifecycle.
+- menu/menu_displaylist.c, menu_entries.h: menu rows, filters and read-only selectors.
+- menu/menu_setting.c, menu_setting.h: setting specifications, loading and application.
+- menu/cbs/menu_cbs_ok.c, menu_cbs.h: menu actions, content and save operations.
+- menu/menu_internal.h: private navigation/achievement bridge for menu actions.
+- menu/interface_layout.c, interface_draw.c, widgets.c: geometry, screen composition and visual primitives.
 - cores/core_registry.c, core_registry.h: discover bundled CorvusAPI modules,
   validate ABI/core metadata and resolve permanent core IDs.
 - cores/engine.c, engine.h: core lifecycle, frame/audio callbacks, saves and battery.
@@ -116,12 +121,17 @@ Keep a change spanning UI, Java, C ABI or persistence consistent across all affe
 
 Like RetroArch, a new menu entry often needs a complete multi-layer change.
 Before editing a menu:
-1. Locate the closest working option in menu/menu_driver.c and trace its action, navigation,
+1. Locate the closest working entry in menu/menu_displaylist.c and its action in
+   menu/cbs/menu_cbs_ok.c, then trace navigation in menu/menu_driver.c,
    native/Java platform callback, event response, state and tests.
 2. Follow the existing implementation pattern; avoid one-off UI behavior.
 3. Keep the catalog selection, download status and Java service synchronized.
 4. Write or expand tests/native_menu_test.c and any affected native tests.
 5. Check portrait/landscape, back navigation, accessibility text bounds and zero-core behavior.
+
+Keep platform-facing declarations in menu_driver.h and component contracts in the
+private menu headers. CORVUS_MENU_SOURCES in CMakeLists.txt is shared by the
+frontend and the registry regression target; add menu sources there only once.
 
 Do not copy example code from RetroArch. Preserve CorvusRetro's rendering and design.
 

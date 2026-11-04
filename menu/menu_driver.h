@@ -49,7 +49,15 @@ enum {
     CR_RA_ACCOUNT,
     CR_GAME_BACKUPS,
     CR_REMOVE_CORES,
-    CR_REMOVE_CORE_CONFIRM
+    CR_REMOVE_CORE_CONFIRM,
+    CR_SAVES_LIBRARY,
+    CR_STATE_LIST,
+    CR_STATE_ACTIONS,
+    CR_STATE_DELETE_CONFIRM,
+    CR_CORE_DETAILS,
+    CR_LIBRARY_ACTIONS,
+    CR_SYSTEM_SETTINGS,
+    CR_GAME_ACTIONS
 };
 /* Stable quick-menu row IDs; unsupported core operations stay disabled. */
 enum {
@@ -64,6 +72,8 @@ enum {
     CR_QUICK_MAIN,
     CR_QUICK_PLAYER,
     CR_QUICK_GAME_SAVES,
+    CR_QUICK_LOAD_STATE,
+    CR_QUICK_SAVE_STATE,
     CR_QUICK_COUNT
 };
 enum { CR_TOUCH_DOWN, CR_TOUCH_MOVE, CR_TOUCH_UP, CR_TOUCH_CANCEL };
@@ -80,7 +90,7 @@ typedef struct {
     float scroll, quick_scroll;
     bool quick;
 } cr_navigation;
-typedef struct {
+typedef struct cr_ui {
     cr_engine engine;
     cr_platform platform;
     cr_cheevos *achievements;
@@ -123,6 +133,14 @@ typedef struct {
     char title[512], message[512];
     char remove_core_id[96], remove_core_name[128];
     char *license;
+    char library_query[128], library_original_query[128];
+    int library_filter, ui_editing;
+    bool library_search, library_list;
+    char detail_core_id[96], detail_pack_id[96];
+    char states_game_id[96], state_rename[96];
+    struct cr_state_entry *saved_states;
+    size_t saved_state_count;
+    int selected_state;
     double message_time, time;
 } cr_ui;
 void cr_ui_init(cr_ui *, cr_platform, const char *);

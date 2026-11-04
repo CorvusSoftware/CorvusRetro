@@ -73,6 +73,38 @@ HTTPS déterministe. Un passage de ces tests ne prouve pas une connexion au
 service public depuis un téléphone. Distinguer explicitement build, tests hôtes,
 émulateur Android, exécution ARM64 et appareil physique.
 
+### Parcours de la nouvelle interface
+
+Pour les menus refondus, le runner de référence est désormais
+`InterfaceRedesignInstrumentation`, et non les coordonnées de navigation de
+l'ancienne interface dans `RetroAchievementsInstrumentation`.
+
+```sh
+./gradlew --no-daemon \
+  -PcorvusTestRunner=com.corvussoftware.corvusretro.InterfaceRedesignInstrumentation \
+  :app:assembleDebug :app:assembleDebugAndroidTest
+adb install -r pkg/android/app/build/outputs/apk/debug/app-debug.apk
+adb install -r pkg/android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+adb shell am instrument -w -e orientation portrait -e fixture_dir "$FIXTURE_DIR" \
+  com.corvussoftware.corvusretro.test/com.corvussoftware.corvusretro.InterfaceRedesignInstrumentation
+```
+
+`FIXTURE_DIR` désigne un dossier Android contenant les trois archives officielles
+GB/GBC/GBA x86_64 `0.15.0` déjà vérifiées. Exécuter aussi avec
+`-e orientation landscape`. Les programmes originaux sont créés par le runner,
+qui isole leurs identifiants et restaure les préférences modifiées. Le transport
+de catalogue est contrôlé ; l'installateur conserve les contrôles de taille,
+SHA-256, ZIP, ELF et permissions privées. Les captures restent dans les fichiers
+privés de l'application de test et ne doivent pas être ajoutées au dépôt.
+
+Le parcours couvre les cinq onglets, recherche et filtres, clavier réel et
+tickets périmés, lancement avec cœur compatible, menu rapide, états réels et
+actions, anciens états, réglages, trois thèmes, suppression et réinstallation
+individuelle d'un cœur sans perte de jeux ou d'états.
+
+`FrontendServicesInstrumentation` constitue un runner distinct pour les services
+d'images et de partage, avec le même mécanisme `-PcorvusTestRunner`.
+
 ## Publication
 
 Le build signé doit employer le certificat durable de la base déjà distribuée.
@@ -608,3 +640,126 @@ natives strictes et ASan/UBSan, tests JVM, 38 scénarios de dérive contrôlée,
 Redmi Note 13 5G avec casque filaire reste à faire ; aucune ROM Pokémon,
 écoute physique, campagne Bluetooth ou exécution ARM64 n'est revendiquée.
 Le tag et les octets publics de 0.22.2 restent immuables.
+
+## Qualification de la refonte mobile
+
+La refonte de [PR #30](https://github.com/CorvusSoftware/CorvusRetro/pull/30)
+couvre les menus de la maquette et le menu rapide. Le rendu du jeu, les profils
+tactiles par console, les pilotes audio et les moteurs sont conservés.
+
+- 21 suites natives strictes et 21 suites ASan/UBSan passent, avec les
+  régressions historiques et les nouveaux parcours d'interface et d'états.
+- 25 tests JVM, compilation de la base et des tests, et lint Android passent.
+  Le contrôle APK vérifie zéro cœur, les deux ABI du frontend, l'alignement
+  16 Ko et la signature debug.
+- `FrontendServicesInstrumentation` passe 31 contrôles sur les vrais services
+  Android d'images et de partage privé en lecture seule.
+- `InterfaceRedesignInstrumentation` passe ses parcours complets en portrait
+  et paysage sur Android 10/API29 x86_64. Ils exercent Entrée, Retour,
+  IME_DONE, les anciens tickets rejetés, les filtres, un vrai framebuffer GBA,
+  le menu rapide, la création de trois états, renommage, duplication, partage,
+  suppression confirmée, restauration, état classique, réglages, trois thèmes
+  et installation/réinstallation d'un cœur avec conservation des données.
+- Les captures des deux orientations ont été inspectées, notamment les marges
+  système, la grille à quatre colonnes en paysage et les panneaux défilants.
+  Aucun crash de l'application n'est enregistré sur ces parcours.
+- La revue indépendante a été suivie de corrections et d'une nouvelle revue
+  sans finding : prévalidation des états avant remplacement de partie,
+  générations de saisie et rafraîchissement après une erreur finale d'IO.
+
+La base debug testée a pour SHA-256
+`ee15f9cf49893132af016b67637f279d5ddd0f65f8f3f360f321028a6b8a2442`.
+Le test paysage a d'abord révélé des coordonnées de test calculées pour deux
+colonnes ; elles ont été corrigées avant le parcours réussi, sans changement de
+la base APK. Les compteurs de contrôles incluent des boucles de pixels et de
+lecture shell ; ils ne représentent pas des milliers de scénarios indépendants.
+
+Ces parcours utilisent des programmes originaux, un transport de catalogue et
+d'archives contrôlé, et un émulateur logiciel. Ils ne qualifient ni un appareil
+physique, ni l'exécution ARM64, ni le réseau de production, ni une écoute audio.
+Aucun changement de version, fusion ou publication d'APK n'est effectué pour
+cette préparation de refonte. La release publique 0.22.2 reste inchangée.
+
+## Découpage des modules de menu
+
+L'extraction issue de `e4061e8` sépare la construction des entrées dans
+`menu_displaylist.c`, les préférences dans `menu_setting.c` et les opérations
+des actions dans `cbs/menu_cbs_ok.c`. Le pilote conserve navigation, entrées,
+cycle de vie et coordination du dessin. L'API publique et la structure `cr_ui`
+ne changent pas ; CMake partage une seule liste de modules entre le frontend
+et le test de registre.
+
+Une comparaison ponctuelle avant/après confirme les corps des 93 fonctions
+d'origine, après renommage des symboles privés et extraction exacte de la
+lecture initiale des préférences. L'ordre des enums, les spécifications et
+tables, ainsi que le compteur unique des transferts, sont conservés. La revue
+indépendante des frontières et des déclarations n'a relevé aucun finding.
+
+Les 21 suites natives strictes, les 21 suites ASan/UBSan, le frontend sans cœur,
+le build debug et de son instrumentation, et le lint Android passent sur ce
+découpage. L'APK contient les deux frontends alignés à 16 Ko et aucun cœur.
+La base debug a pour SHA-256
+`27e7c0cab1357a0fea454b211cdfbc50846e211e8e46330a37a3eabd81b676ba`.
+
+Les parcours Android complets portrait et paysage passent sur cette base,
+avec captures inspectées et aucun crash enregistré. Les limites du
+dispositif de validation restent celles de la refonte : émulateur API29 x86_64,
+programmes originaux et transport d'archives contrôlé, sans appareil physique,
+exécution ARM64, réseau public ou écoute audio qualifiés.
+
+## Proportions de l'accueil
+
+Les anciennes hauteurs fixes laissaient environ 146 dp sous la carte du cœur
+dans le viewport 384 x 696 dp. La composition partage désormais sa géométrie
+adaptative entre dessin, toucher, focus et défilement. Les régressions vérifient
+360 x 640, 384 x 696 et 392 x 824 dp : cinq cartes visibles, marge basse bornée,
+cibles exactes et accès au sous-système supplémentaire par défilement.
+
+Les 21 suites natives strictes et les 21 suites ASan/UBSan passent, ainsi que
+build/lint Android et les contrôles APK sans cœur, deux ABI et alignement 16 Ko.
+Le parcours portrait complet passe avec la nouvelle composition. Après le
+dernier ajustement de cadrage, un contrôle ciblé sur l'APK final vérifie les
+trois raccourcis, le cœur, le sous-système défilant et la rotation en paysage.
+Les captures finales sont inspectées et aucun crash n'est enregistré.
+SHA-256 de cette base debug :
+`8cbc1fe1da503758fb37d65b121b509439eee3a2d8745a7735eb47c03c58bdc0`.
+
+## Nouveau jeu d'icônes
+
+Les 42 ressources vectorielles sont rasterisées par Android dans l'atlas réel,
+sans croissance du bitmap. `IconAtlasInstrumentation` passe 172 contrôles :
+formes distinctes, contenu visible, absence de débordement et lisibilité à
+24 pixels. La planche de contrôle affiche les trois palettes. Les anciens
+32 identifiants restent stables, avec dix nouveaux pictogrammes dédiés aux actions.
+
+Les 21 suites strictes et les 21 suites ASan/UBSan, build debug/test, lint et
+contrôles APK passent. Sur la même base, le parcours Android portrait complet
+exerce accueil, bibliothèque, cœurs, états et leurs actions, réglages et les trois
+thèmes. Les captures sont inspectées et aucun crash n'est enregistré. La revue
+indépendante confirme la correspondance C/Java, les UV, le marqueur blanc et
+les bornes du cache de caractères avant la base464.
+
+SHA-256 de la base debug qualifiée :
+`e6f55d97afd477f5221b104d541cc0219f411348522621b24d157e27b00e95e2`.
+Il s'agit d'essais sur émulateur API29 x86_64 avec programmes originaux et
+transport contrôlé, sans nouvelle qualification de téléphone physique ou ARM64.
+
+## Correspondance des icônes et des actions
+
+Les 48 pictogrammes sont associés aux objets et actions décrits dans
+[le guide des icônes](icons.md). Les 42 IDs existants et l'allocation de l'atlas
+restent stables. Les tests natifs contrôlent aussi les symboles réellement
+dessinés pour les catégories vides et le déchargement du cœur.
+
+Les 21 suites strictes et les 21 suites ASan/UBSan passent, ainsi que build/lint,
+base sans cœur, deux ABI et alignement 16 Ko. L'atlas Android passe 196 contrôles
+de formes, de lisibilité et de marges ; sa planche est inspectée. Le parcours
+portrait complet passe sur cette même base, avec captures inspectées pour
+import/export, états classiques, actions d'états, compte, Système et éjection
+du cœur. Aucun crash n'est enregistré. La revue indépendante ne relève aucun
+problème bloquant.
+
+SHA-256 de cette base debug :
+`9215deb7964fd043ea3038a182c9c446b6e36cd397973dfd06d1c5234c485b85`.
+Essais sur émulateur API29 x86_64 avec programmes originaux et transport
+d'archives contrôlé ; sans nouvelle qualification physique, ARM64 ou audio.

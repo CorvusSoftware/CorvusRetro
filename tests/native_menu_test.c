@@ -2,6 +2,7 @@
 // Copyright (C) 2026 CorvusSoftware
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "menu_driver.h"
+#include "interface_layout.h"
 #include "play_layout.h"
 #include <math.h>
 #include <stdio.h>
@@ -14,9 +15,18 @@ static void check(bool ok, const char *message) {
         exit(1);
     }
 }
+static bool color_between(uint32_t value, uint32_t a, uint32_t b) {
+    for (unsigned shift = 0; shift < 32; shift += 8) {
+        unsigned c = (value >> shift) & 255, x = (a >> shift) & 255, y = (b >> shift) & 255;
+        if (c < (x < y ? x : y) || c > (x > y ? x : y)) return false;
+    }
+    return true;
+}
 typedef struct {
     char text[16384], focus_label[256];
-    float selection_y;
+    cr_menu_rect focus_bounds, panel_bounds;
+    bool quick;
+    uint32_t accent;
     unsigned label_fonts, hint_fonts;
     uint32_t highlight, a_body, a_text;
     float ax, ay, ar;
@@ -28,7 +38,7 @@ typedef struct {
     float viewport_center;
     bool home_tab, settings_tab;
     unsigned switch_ends, games_drawn, header_crows, row_icons;
-    bool full_width_selection;
+    bool panel_drawn, focused_card;
     float switch_thumb, toggle_text_end;
 } capture;
 static void rect(void *ctx, float x, float y, float w, float h, uint32_t color) {
@@ -49,16 +59,23 @@ static void rect(void *ctx, float x, float y, float w, float h, uint32_t color) 
                   "notification does not cover a touch control");
         }
     }
-    if (x == 0 && w == 384 && h == 76) c->selection_y = y;
-    if (x == 0 && y == 64 && w == 384 && h == 76) c->full_width_selection = true;
-    if (x == 0 && y == 216 && w == 384 && h == 76)
+    if (fabsf(x - c->focus_bounds.x - 15) < .01f && fabsf(y - c->focus_bounds.y) < .01f &&
+        fabsf(w - c->focus_bounds.w + 30) < .01f && fabsf(h - c->focus_bounds.h) < .01f)
         c->highlight = color;
+    if (c->quick && x >= c->panel_bounds.x && y >= c->panel_bounds.y &&
+        x + w <= c->panel_bounds.x + c->panel_bounds.w + .1f &&
+        y + h <= c->panel_bounds.y + c->panel_bounds.h + .1f && color == c->accent)
+        c->panel_drawn = true;
 }
 static void circle(void *ctx, float x, float y, float r, uint32_t color) {
     (void)r;
     capture *c = ctx;
-    if (fabsf(y - 102) < .01f && r == 14) ++c->switch_ends;
-    if (fabsf(y - 102) < .01f && r == 10) c->switch_thumb = x;
+    if (r == 10 && fabsf(y - (c->focus_bounds.y + 34.5f)) < .01f) {
+        ++c->switch_ends; c->switch_thumb = x;
+    }
+    if (fabsf(x - c->focus_bounds.x - 15) < .01f &&
+        fabsf(y - c->focus_bounds.y - 15) < .01f && r == 15 && color == c->accent)
+        c->focused_card = true;
     if (x > c->ax - 1 && x < c->ax + 1 && y > c->ay - 1 && y < c->ay + 1)
         c->a_body = color;
 }
@@ -77,11 +94,13 @@ static void text(void *ctx, const char *s, float x, float y, float size, uint32_
     (void)size;
     (void)max;
     capture *c = ctx;
-    if (x == 66 && size == 16) ++c->label_fonts;
-    if (x == 66 && size == 13) ++c->hint_fonts;
-    if (x == 66 && y == c->selection_y + 29 && size == 16)
+    if (size == 16 && y > 56) ++c->label_fonts;
+    if (size == 13 && y > 56) ++c->hint_fonts;
+    if (x >= c->focus_bounds.x && x < c->focus_bounds.x + c->focus_bounds.w &&
+        y >= c->focus_bounds.y && y < c->focus_bounds.y + c->focus_bounds.h &&
+        size == (c->quick ? 14 : 16) && !c->focus_label[0])
         snprintf(c->focus_label, sizeof(c->focus_label), "%s", s);
-    if (x == 66 && y == 93) c->toggle_text_end = x + max;
+    if (size == 16 && fabsf(y - c->focus_bounds.y - 28) < .01f) c->toggle_text_end = x + max;
     size_t n = strlen(c->text);
     snprintf(c->text + n, sizeof(c->text) - n, "%s\n", s);
     if (strcmp(s, "A") == 0)
@@ -93,8 +112,8 @@ static float measure(void *ctx, const char *s, float size) {
 }
 static void icon(void *ctx, int kind, float x, float y, float size, uint32_t color) {
     capture *c = ctx;
-    if (kind == CR_ICON_CROW && y == 16) ++c->header_crows;
-    if (x == 20 && size == 32) ++c->row_icons;
+    if (kind == CR_ICON_CROW && y < 56) ++c->header_crows;
+    if (y > 56 && (size == 26 || size == 28)) ++c->row_icons;
     if (y > 600 && kind == CR_ICON_HOME) c->home_tab = true;
     if (y > 600 && kind == CR_ICON_SETTINGS) c->settings_tab = true;
     if (c->layout && kind == CR_ICON_CROW) {
@@ -122,7 +141,10 @@ static void game(void *ctx, const uint32_t *pixels, int iw, int ih, float x, flo
 static capture draw(cr_ui *u) {
     cr_play_layout p = cr_play_layout_make(u->width, u->height, u->engine.system, 160, 144);
     cr_area a = p.controls[4].area;
-    capture c = {.ax = a.x + a.w / 2, .ay = a.y + a.h / 2, .ar = a.w / 2};
+    int focused = u->feedback_target >= 0 && !u->quick ? u->feedback_target : u->focus;
+    capture c = {.ax = a.x + a.w / 2, .ay = a.y + a.h / 2, .ar = a.w / 2,
+                 .focus_bounds = cr_interface_row_bounds(u, focused), .panel_bounds = cr_interface_panel(u),
+                 .quick = u->quick, .accent = cr_theme_get(u->theme)->accent};
     cr_painter painter = {&c, rect, circle, text, measure, icon, NULL, game, NULL, NULL, line};
     cr_ui_draw(u, &painter);
     return c;
@@ -159,19 +181,23 @@ static void tap(cr_ui *u, float x, float y) {
     cr_ui_touch(u, 0, CR_TOUCH_UP, x, y);
 }
 static void row(cr_ui *u, int i) {
-    tap(u, 160, 100 + 76 * i);
+    u->focus = i; cr_ui_move(u, 0);
+    cr_menu_rect r = cr_interface_row_bounds(u, i);
+    tap(u, r.x + r.w / 2, r.y + r.h / 2);
 }
 static void tab(cr_ui *u, int i) {
-    tap(u, 64 + i * 128, 660);
+    cr_menu_rect r = cr_interface_navigation(u, i);
+    tap(u, r.x + r.w / 2, r.y + r.h / 2);
 }
 static void quick_order(cr_ui *u) {
     static const struct { int action; const char *label; } expected[] = {
-        {CR_QUICK_RESUME, "Reprendre le contenu"}, {CR_QUICK_RESTART, "Redémarrer le contenu"},
-        {CR_QUICK_CLOSE, "Fermer le contenu"}, {CR_QUICK_STATES, "Sauvegardes d’état"},
-        {CR_QUICK_GAME_SAVES, "Sauvegardes du jeu"}, {CR_QUICK_CORE_OPTIONS, "Options du cœur"},
+        {CR_QUICK_RESUME, "Reprendre"}, {CR_QUICK_LOAD_STATE, "Charger un état"},
+        {CR_QUICK_SAVE_STATE, "Sauvegarder un état"}, {CR_QUICK_RESTART, "Redémarrer"},
+        {CR_QUICK_CORE_OPTIONS, "Options du jeu"}, {CR_QUICK_CLOSE, "Quitter le jeu"},
+        {CR_QUICK_STATES, "Sauvegardes d’état"}, {CR_QUICK_GAME_SAVES, "Sauvegardes du jeu"},
         {CR_QUICK_CONTROLS, "Commandes"}, {CR_QUICK_PLAYER, "Joueur contrôlé"},
         {CR_QUICK_ACHIEVEMENTS, "Succès"}, {CR_QUICK_CORE_INFO, "Informations sur le cœur"},
-        {CR_QUICK_MAIN, "Menu principal"}
+        {CR_QUICK_MAIN, "Accueil"}
     };
     unsigned saved_players = u->engine.players;
     for (unsigned players = 1; players <= 2; ++players) {
@@ -185,7 +211,7 @@ static void quick_order(cr_ui *u) {
             cr_ui_move(u, 0);
             capture c = draw(u);
             check(!strcmp(c.focus_label, expected[i].label),
-                  "drawn quick labels follow resume, restart, close, states, saves, options, controls, player, achievements, info, main");
+                  "drawn quick labels follow the mockup first and retain every additional working tool");
         }
         check(index == CR_QUICK_COUNT - (players == 1), "quick menu exposes only applicable actions");
         if (players == 1)
@@ -222,9 +248,15 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     cr_ui_update(u, .4);
     snprintf(u->title, sizeof(u->title), "Original GBA test");
     capture c = draw(u);
-    check(strstr(c.text, "Menu rapide") && strstr(c.text, "Décharger le cœur") &&
-              strstr(c.text, "\nSous-système\n") && !strstr(c.text, "Charger un cœur"),
-          "loaded content keeps one core action after the quick menu row");
+    check(strstr(c.text, "Continuer") && strstr(c.text, "Décharger le cœur") &&
+              !strstr(c.text, "Charger un cœur"),
+          "loaded content keeps one core action below its Continue card");
+    int prior_focus = u->focus;
+    float prior_scroll = u->scroll;
+    u->focus = 5; cr_ui_move(u, 0); c = draw(u);
+    check(strstr(c.text, "\nSous-système\n") != NULL,
+          "loaded core subsystem remains reachable below the full home composition");
+    u->focus = prior_focus; u->scroll = prior_scroll;
     void *state_handle = u->engine.handle;
     for (int landscape = 0; landscape < 2; ++landscape) {
         cr_ui_size(u, landscape ? 700 : 384, landscape ? 384 : 700);
@@ -287,12 +319,13 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     int installs = core_installs;
     u->core_catalog.count = 1;
     snprintf(u->core_catalog.packs[0].id, sizeof(u->core_catalog.packs[0].id), "corvus.gb");
+    snprintf(u->core_catalog.packs[0].core_id, sizeof(u->core_catalog.packs[0].core_id), "corvus.gb");
     u->page = CR_CORE_DOWNLOADS;
-    row(u, 1);
+    row(u, 1); row(u, 1);
     check(core_installs == installs && !u->installing && u->engine.handle == handle,
           "failed battery persistence refuses installation before downloading");
     u->page = CR_MAIN;
-    row(u, 1);
+    row(u, 4);
     c = draw(u);
     check(u->page == CR_MAIN && u->engine.handle == handle && u->engine.loaded &&
               strcmp(u->title, "Original GBA test") == 0 && u->message[0] &&
@@ -309,7 +342,7 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     u->quick = false;
     check(unlink(saves) == 0, "remove battery directory obstruction");
     u->page = CR_CORE_DOWNLOADS;
-    row(u, 1);
+    row(u, 1); row(u, 1);
     check(core_installs == installs + 1 && u->installing &&
               !u->engine.api.battery_dirty(u->engine.handle),
           "installation starts only after the running game's battery is persisted");
@@ -331,11 +364,14 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     c = draw(u);
     check(u->page == CR_MAIN && u->engine.handle == handle && !u->engine.loaded &&
               !u->title[0] && strstr(c.text, "Décharger le cœur") &&
-              strstr(c.text, "\nSous-système\n") && !strstr(c.text, "Menu rapide"),
+              !strstr(c.text, "Menu rapide"),
           "closing content preserves the selected core and returns to the main menu");
+    u->focus = 5; cr_ui_move(u, 0); c = draw(u);
+    check(strstr(c.text, "\nSous-système\n") != NULL,
+          "closing content preserves the scrollable subsystem of its selected core");
     check(!u->notifications.count && !u->notifications.progress.visible && !u->notifications_loaded,
           "content close clears notifications immediately while keeping the core");
-    row(u, 0);
+    row(u, 4);
     c = draw(u);
     check(!u->engine.handle && !u->engine.loaded && !u->title[0] &&
               strstr(c.text, "Charger un cœur") && !strstr(c.text, "Décharger le cœur") &&
@@ -374,9 +410,9 @@ int main(void) {
     cr_ui_size(&u, 384, 700);
     capture c = draw(&u);
     check(c.home_tab && c.settings_tab, "navigation uses home and settings icons");
-    check(c.header_crows == 0, "menu header no longer draws the crow icon");
-    check(c.row_icons && c.label_fonts == c.row_icons && c.hint_fonts == c.row_icons,
-          "original menu icons stay32dp and labels/hints stay16/13dp");
+    check(c.header_crows == 1, "home header retains the Corvus crow brand");
+    check(c.row_icons && c.label_fonts && c.hint_fonts,
+          "native cards retain readable 16/13dp labels and hints with dedicated icons");
     u.page = CR_CORES;
     capture cores = draw(&u);
     check(strstr(cores.text, "Game Boy Advance") && !strstr(cores.text, "Expérimental"),
@@ -391,7 +427,7 @@ int main(void) {
     u.games = long_history;
     u.game_count = 1200;
     u.page = CR_GAMES;
-    u.scroll = 1000 * 76;
+    u.scroll = 1000 * 78;
     capture scrolled = draw(&u);
     check(scrolled.row_icons > 0 && scrolled.row_icons <= 10 &&
           strstr(scrolled.text, "Scroll item 1000") != NULL &&
@@ -419,159 +455,122 @@ int main(void) {
     u.page = CR_MAIN;
     u.scroll = 0;
     free(long_history);
-    check(strstr(c.text, "Charger un cœur") && strstr(c.text, "Informations") &&
-              !strstr(c.text, "Historique") && !strstr(c.text, "Décharger le cœur") &&
+    check(strstr(c.text, "Bienvenue !") && strstr(c.text, "Bibliothèque") && strstr(c.text, "Saves") &&
+              strstr(c.text, "Charger un cœur") && !strstr(c.text, "Décharger le cœur") &&
               !strstr(c.text, "\nSous-système\n"),
-          "main contains loading and information, history lives in playlists");
-    row(&u, 1);
-    check(u.page == CR_CONTENT, "content entry opens import and library choices");
+          "home exposes the real library, saves and core entry without invented content");
+    row(&u, 1); check(u.page == CR_LIBRARY, "home shortcut opens the real library");
     c = draw(&u);
-    check(strstr(c.text, "Importer un jeu") && strstr(c.text, "Bibliothèque"),
-          "content submenu displays library");
-    row(&u, 1);
-    check(u.page == CR_LIBRARY, "library selection opens saved games");
+    check(strstr(c.text, "Tous") && strstr(c.text, "Votre bibliothèque vous attend"), "empty library shows real filtering and empty state");
+    row(&u, 0); check(u.page == CR_LIBRARY_ACTIONS, "library header opens import and history tools");
     c = draw(&u);
-    check(strstr(c.text, "Importer un dossier") && strstr(c.text, "Aucun jeu"),
-          "empty library offers folder import");
-    cr_ui_back(&u);
-    cr_ui_back(&u);
-    check(u.page == CR_MAIN, "back navigation restores content parent");
-    row(&u, 0);
-    check(u.page == CR_CORES, "core menu opens before downloader");
+    check(strstr(c.text, "Importer un jeu") && strstr(c.text, "Importer un dossier") && strstr(c.text, "Historique"),
+          "library import menu keeps all existing content tools");
+    cr_ui_back(&u); cr_ui_back(&u);
+    check(u.page == CR_MAIN, "back navigation restores the home shortcut");
+    row(&u, 4); check(u.page == CR_CORES, "core menu opens before downloader");
     c = draw(&u);
     check(strstr(c.text, "Téléchargeur de cœurs"), "core menu exposes online updater");
     row(&u, 3);
-    check(u.page == CR_CORE_DOWNLOADS && core_refreshes == 1 &&
-          u.catalog_loading, "downloader starts catalog request on entry");
-    cr_core_catalog catalog = {0};
-    catalog.count = 1;
+    check(u.page == CR_CORE_DOWNLOADS && core_refreshes == 1 && u.catalog_loading,
+          "downloader starts catalog request on entry");
+    cr_core_catalog catalog = {0}; catalog.count = 1;
     snprintf(catalog.packs[0].id, sizeof(catalog.packs[0].id), "corvus.gb");
     snprintf(catalog.packs[0].name, sizeof(catalog.packs[0].name), "CorvusGB");
     snprintf(catalog.packs[0].version, sizeof(catalog.packs[0].version), "1.0");
     snprintf(catalog.packs[0].abi, sizeof(catalog.packs[0].abi), "arm64-v8a");
     snprintf(catalog.packs[0].core_id, sizeof(catalog.packs[0].core_id), "corvus.gb");
-    cr_ui_catalog(&u, &catalog);
-    c = draw(&u);
+    cr_ui_catalog(&u, &catalog); c = draw(&u);
     check(!u.catalog_loading && strstr(c.text, "CorvusGB") && strstr(c.text, "mise à jour"),
           "individual core with a different version is presented as an update");
     snprintf(catalog.packs[0].version, sizeof(catalog.packs[0].version), "0.15.0");
-    cr_ui_catalog(&u, &catalog);
-    c = draw(&u);
+    cr_ui_catalog(&u, &catalog); c = draw(&u);
     check(strstr(c.text, "Installé") && !strstr(c.text, "mise à jour"),
           "an identical installed core is marked installed instead of updated");
-    u.importing = true;
-    row(&u, 1);
-    check(core_installs == 0 && !u.installing,
-          "a pending content import cannot race a module installation");
-    u.importing = false;
-    row(&u, 1);
-    check(core_installs == 1 && strcmp(selected_pack, "corvus.gb") == 0,
-          "frontend requests one verified native core by catalog ID only");
+    row(&u, 1); check(u.page == CR_CORE_DETAILS && !core_installs,
+                         "catalog entry opens real metadata before installation");
+    u.importing = true; row(&u, 1);
+    check(core_installs == 0 && !u.installing, "a pending content import cannot race a module installation");
+    u.importing = false; row(&u, 1);
+    check(core_installs == 1 && !strcmp(selected_pack, "corvus.gb"),
+          "reinstall requests one verified native core by catalog ID only");
     check(u.installing, "download keeps a barrier until its terminal status");
-    row(&u, 1);
-    check(core_installs == 1, "a second install cannot start while one is pending");
+    row(&u, 1); check(core_installs == 1, "a second install cannot start while one is pending");
     cr_ui_install_status(&u, "Installation annulée", true);
-    row(&u, 0);
-    check(core_refreshes == 2 && u.catalog_loading,
-          "catalog can be refreshed without leaving menu");
-    cr_core_catalog empty = {0};
-    cr_ui_catalog(&u, &empty);
-    check(u.core_catalog.count == 0 && !u.catalog_loading,
-          "empty official catalog is a valid state");
-    cr_ui_back(&u);
-    cr_ui_back(&u);
-    check(u.page == CR_MAIN, "downloader returns to main menu without touching a core");
-    row(&u, 2);
-    check(u.page == CR_INFORMATION && u.depth == 1 && u.tab == 0, "information category");
+    cr_ui_back(&u); row(&u, 0);
+    check(core_refreshes == 2 && u.catalog_loading, "catalog can be refreshed without leaving menu");
+    cr_core_catalog empty = {0}; cr_ui_catalog(&u, &empty);
+    check(!u.core_catalog.count && !u.catalog_loading, "empty official catalog is a valid state");
+    cr_ui_back(&u); cr_ui_back(&u);
+    check(u.page == CR_MAIN, "downloader returns to home without touching a core");
+    tab(&u, 4); row(&u, 6);
+    check(u.page == CR_INFORMATION && u.depth == 1 && u.tab == 4, "About category retains application and licensing information");
     c = draw(&u);
     check(strstr(c.text, "Licence et crédits") && !strstr(c.text, "Informations sur le cœur"),
           "core info shown only for a real loaded core");
-    row(&u, 0);
-    c = draw(&u);
+    row(&u, 0); c = draw(&u);
     check(u.page == CR_ABOUT && !strstr(c.text, "sombre"), "about lists current themes only");
-    cr_ui_back(&u);
-    cr_ui_back(&u);
-    check(u.page == CR_MAIN && u.focus == 2 && u.depth == 0, "back restores main selection");
-    row(&u, 0);
-    row(&u, 0);
+    cr_ui_back(&u); cr_ui_back(&u);
+    check(u.page == CR_SETTINGS && u.focus == 6 && !u.depth, "back restores the About category selection");
+    tab(&u, 0); row(&u, 4); row(&u, 0);
     check(u.engine.handle && u.engine.system == 0, "real idle GB core");
     c = draw(&u);
     check(strstr(c.text, "Décharger le cœur") && !strstr(c.text, "Charger un cœur"),
-          "the same core row changes from load to unload");
-    row(&u, 1);
-    row(&u, 1);
-    check(u.page == CR_LIBRARY, "loaded core can open folder library");
-    row(&u, 0);
-    check(folder_calls == 1 && folder_system == u.engine.system &&
-          folder_extensions[0] && u.import_folder && u.importing && !u.engine.loaded,
+          "the same core card changes from load to unload");
+    tab(&u, 1); row(&u, 0); row(&u, 1);
+    check(folder_calls == 1 && folder_system == u.engine.system && folder_extensions[0] &&
+              u.import_folder && u.importing && !u.engine.loaded,
           "folder picker uses the loaded core extensions without launching a game");
     cr_import folder_done = {.system = -1};
-    snprintf(folder_done.error, sizeof(folder_done.error), "2 jeu(x) importé(s)");
-    cr_ui_import(&u, &folder_done);
+    snprintf(folder_done.error, sizeof(folder_done.error), "2 jeu(x) importé(s)"); cr_ui_import(&u, &folder_done);
     check(!u.importing && !u.import_folder && strstr(u.message, "2 jeu(x)"),
           "folder import completion restores navigation and reports the result");
-    cr_ui_back(&u);
-    cr_ui_back(&u);
-    check(u.page == CR_MAIN, "folder import returns to main through content page");
-    row(&u, 2);
-    c = draw(&u);
-    check(u.page == CR_SUBSYSTEMS && !cr_ui_running(&u) &&
-              strstr(c.text, "Deux joueurs (câble link)"),
-          "loading a core exposes the subsystem configuration before any content is loaded");
-    void *idle_handle = u.engine.handle;
-    cr_ui_confirm(&u);
-    c = draw(&u);
+    cr_ui_back(&u); cr_ui_back(&u);
+    check(u.page == CR_MAIN, "folder import returns through the library to home");
+    row(&u, 5); c = draw(&u);
+    check(u.page == CR_SUBSYSTEMS && !cr_ui_running(&u) && strstr(c.text, "Deux joueurs (câble link)"),
+          "loading a core exposes its subsystem before any content is loaded");
+    void *idle_handle = u.engine.handle; cr_ui_confirm(&u); c = draw(&u);
     check(u.page == CR_SUBSYSTEM_CONFIG && u.engine.handle == idle_handle && !u.engine.loaded &&
               strstr(c.text, "Joueur 1") && strstr(c.text, "Joueur 2"),
           "real link configuration exposes two ordered content slots before loading");
-    cr_ui_back(&u);
-    check(u.page == CR_SUBSYSTEMS && u.focus == 0, "link configuration back restores subsystem row");
-    cr_ui_back(&u);
-    check(u.page == CR_MAIN && u.focus == 2 && u.depth == 0,
-          "subsystem configuration back restores its main menu row");
-    row(&u, 3);
-    row(&u, 1);
-    c = draw(&u);
+    cr_ui_back(&u); check(u.page == CR_SUBSYSTEMS && u.focus == 0, "link back restores subsystem row");
+    cr_ui_back(&u); check(u.page == CR_MAIN && u.focus == 5 && !u.depth, "subsystem back restores its home card");
+    tab(&u, 4); row(&u, 6); row(&u, 1); c = draw(&u);
     check(u.page == CR_CORE_INFO && strstr(c.text, "CorvusGB") && strstr(c.text, "0.15.0"),
-          "real core information is reachable");
-    cr_ui_back(&u);
-    cr_ui_back(&u);
-    row(&u, 0);
-    check(!u.engine.handle, "core unloaded");
-    c = draw(&u);
+          "real core information is reachable from About");
+    cr_ui_back(&u); cr_ui_back(&u); tab(&u, 0); row(&u, 4);
+    check(!u.engine.handle, "core unloaded"); c = draw(&u);
     check(strstr(c.text, "Charger un cœur") && !strstr(c.text, "Décharger le cœur") &&
-              !strstr(c.text, "\nSous-système\n"),
-          "successful unload restores the load action");
+              !strstr(c.text, "\nSous-système\n"), "successful unload restores the load action");
     loaded_core_lifecycle(&u, root);
-    tab(&u, 1);
-    c = draw(&u);
-    check(u.page == CR_LISTS && strstr(c.text, "Historique") && !strstr(c.text, "Game Boy Advance") &&
-              !strstr(c.text, "Game Boy Color"),
-          "playlists contain history only");
-    row(&u, 0);
+    tab(&u, 1); row(&u, 0); c = draw(&u);
+    check(u.page == CR_LIBRARY_ACTIONS && strstr(c.text, "Historique"), "library tools retain history");
+    row(&u, 2);
     check(u.page == CR_GAMES && u.filter == -1 && u.tab == 1, "history category");
     cr_ui_back(&u);
-    cr_ui_move(&u, 1);
-    check(u.page == CR_LISTS && u.focus == 0, "history is the only selectable playlist");
-    tab(&u, 2);
-    c = draw(&u);
-    check(strstr(c.text, "Interface utilisateur") && strstr(c.text, "Vidéo") &&
-              strstr(c.text, "Audio") && strstr(c.text, "Commandes") &&
-              strstr(c.text, "Sauvegardes") && strstr(c.text, "RetroAchievements") &&
-              !strstr(c.text, "Affichage à l’écran"),
-          "six functional settings categories replace the former OSD container");
+    check(u.page == CR_LIBRARY_ACTIONS && u.focus == 2, "history returns to its library tool");
+    tab(&u, 4); c = draw(&u);
+    check(strstr(c.text, "Affichage") && strstr(c.text, "Système") && strstr(c.text, "Audio") &&
+          strstr(c.text, "Commandes") && strstr(c.text, "Sauvegardes") && strstr(c.text, "RetroAchievements") &&
+          strstr(c.text, "À propos"), "all seven functional settings categories remain reachable");
     // A stationary touch fades in before release, without opening the submenu.
-    cr_ui_touch_at(&u, 0, CR_TOUCH_DOWN, 160, 252, 10);
-    cr_ui_update(&u, .1);
-    c = draw(&u);
+    u.feedback_target = 2;
+    uint32_t resting_border = draw(&u).highlight;
+    cr_menu_rect audio_row = cr_interface_row_bounds(&u, 2);
+    float audio_x = audio_row.x + audio_row.w / 2, audio_y = audio_row.y + audio_row.h / 2;
+    cr_ui_touch_at(&u, 0, CR_TOUCH_DOWN, audio_x, audio_y, 10);
+    cr_ui_update(&u, .1); c = draw(&u);
+    uint32_t active_border = cr_theme_get(u.theme)->accent;
     check(u.page == CR_SETTINGS && u.feedback_alpha > .4f && u.feedback_alpha < .6f &&
-              (c.highlight >> 24) > 100 && (c.highlight >> 24) < 160,
-          "progressive touch highlight is rendered");
-    cr_ui_touch_at(&u, 0, CR_TOUCH_UP, 160, 252, 10.1);
+          c.highlight != resting_border && c.highlight != active_border &&
+          color_between(c.highlight, resting_border, active_border),
+          "progressive touch feedback renders an intermediate native card border");
+    cr_ui_touch_at(&u, 0, CR_TOUCH_UP, audio_x, audio_y, 10.1);
     check(u.page == CR_AUDIO_SETTINGS, "tap activates at release");
     bool audio = u.audio;
     c = draw(&u);
-    check(c.switch_ends == 2 && c.switch_thumb == (u.audio ? 346 : 326) && c.toggle_text_end <= 300,
+    check(c.switch_ends == 1 && c.switch_thumb == (u.audio ? 342.5f : 321.5f) && c.toggle_text_end <= 300,
           "rounded switch and label have distinct nonoverlapping bounds");
     cr_ui_touch_at(&u, 0, CR_TOUCH_DOWN, 160, 100, 20);
     cr_ui_update(&u, .3);
@@ -584,7 +583,7 @@ int main(void) {
     check(u.audio != audio && saved_audio == u.audio && writes == 1,
           "tap duration independent of frame timing");
     c = draw(&u);
-    check(c.switch_thumb == (u.audio ? 346 : 326), "switch thumb follows the actual saved setting");
+    check(c.switch_thumb == (u.audio ? 342.5f : 321.5f), "switch thumb follows the actual saved setting");
     cr_ui_touch_at(&u, 0, CR_TOUCH_DOWN, 160, 100, 40);
     cr_ui_touch_at(&u, 1, CR_TOUCH_DOWN, 160, 100, 40.01);
     cr_ui_touch_at(&u, 1, CR_TOUCH_UP, 160, 100, 40.02);
@@ -604,7 +603,7 @@ int main(void) {
     cr_ui_touch_at(&u, 0, CR_TOUCH_UP, 160, 100, 61.1);
     check(u.audio && writes == before_reset, "resetting an existing default is idempotent");
     cr_ui_back(&u);
-    check(u.page == CR_SETTINGS && u.focus == 2 && u.tab == 2, "settings parent restored");
+    check(u.page == CR_SETTINGS && u.focus == 2 && u.tab == 4, "settings parent restored");
     cr_ui_touch(&u, 0, CR_TOUCH_DOWN, 160, 100);
     cr_ui_update(&u, .1);
     cr_ui_touch(&u, 0, CR_TOUCH_MOVE, 160, 150);
@@ -612,20 +611,22 @@ int main(void) {
     cr_ui_touch(&u, 0, CR_TOUCH_UP, 160, 150);
     check(u.page == CR_SETTINGS && u.feedback_alpha == 0,
           "scroll cancels touch action and feedback");
+    row(&u, 3);
     row(&u, 0);
     row(&u, 0);
     row(&u, 1);
     check(u.page == CR_UI_SETTINGS && u.theme == CR_THEME_SHIELD,
           "theme selection returns to interface category");
     cr_ui_back(&u);
-    row(&u, 3);
+    cr_ui_back(&u);
+    row(&u, 1);
     row(&u, 0);
     row(&u, 0);
     check(u.page == CR_OVERLAY_SETTINGS && !u.show_input && saved_show == 0 && u.depth == 2,
           "touch controls preference is functional and saved in the shorter hierarchy");
     cr_ui_back(&u);
     cr_ui_back(&u);
-    check(u.page == CR_SETTINGS && u.focus == 3, "nested settings parent selection restored");
+    check(u.page == CR_SETTINGS && u.focus == 1, "nested settings parent selection restored");
     int page = u.page;
     tap(&u, -1, 690);
     check(u.page == page, "outside viewport cannot switch tabs");
@@ -669,20 +670,18 @@ int main(void) {
     tap(&u, controls.menu.x + controls.menu.w / 2, controls.menu.y + controls.menu.h / 2);
     check(u.quick && !cr_ui_running(&u), "menu target stays interactive with hidden controls");
     c = draw(&u);
-    check(c.games_drawn == 0 && c.full_width_selection,
-          "quick menu fills the native interface without drawing the game underneath");
-    const char *resume = strstr(c.text, "Reprendre le contenu");
-    const char *restart = strstr(c.text, "Redémarrer le contenu");
-    const char *close = strstr(c.text, "Fermer le contenu");
-    const char *states = strstr(c.text, "Sauvegardes d’état");
-    const char *options = strstr(c.text, "Options du cœur");
-    const char *commands = strstr(c.text, "Commandes");
-    check(resume && restart && close && states && options && commands &&
-              resume < restart && restart < close && close < states && states < options && options < commands,
-          "quick menu places core options after states and before frontend controls");
-    check(!strstr(c.text, "Charger l’état") && !strstr(c.text, "Sauvegarder l’état") &&
-              !strstr(c.text, "Shaders") && !strstr(c.text, "Triches"),
-          "quick root contains only working menus and nests state actions");
+    check(c.games_drawn == 1 && c.panel_drawn,
+          "quick menu draws a native rounded panel above the paused game frame");
+    const char *resume = strstr(c.text, "Reprendre");
+    const char *load = strstr(c.text, "Charger un état");
+    const char *save = strstr(c.text, "Sauvegarder un état");
+    const char *restart = strstr(c.text, "Redémarrer");
+    const char *options = strstr(c.text, "Options du jeu");
+    const char *close = strstr(c.text, "Quitter le jeu");
+    check(resume && load && save && restart && options && close &&
+              resume < load && load < save && save < restart && restart < options && options < close,
+          "the first six quick actions follow the supplied mockup");
+    check(!strstr(c.text, "Shaders") && !strstr(c.text, "Triches"), "quick root contains working actions only");
     quick_order(&u);
     u.focus = cr_ui_quick_row(&u, CR_QUICK_RESTART);
     cr_ui_confirm(&u);
@@ -709,8 +708,9 @@ int main(void) {
     cr_ui_back(&u);
     check(u.quick && u.focus == cr_ui_quick_row(&u, CR_QUICK_ACHIEVEMENTS) && u.tab == quick_tab,
           "achievements returns to its quick row and navigation tab");
-    tap(&u, 28, 28);
-    check(!u.quick && cr_ui_running(&u), "quick header back resumes the game");
+    cr_menu_rect panel = cr_interface_panel(&u);
+    tap(&u, panel.x + panel.w - 25, panel.y + 28);
+    check(!u.quick && cr_ui_running(&u), "quick-panel close button resumes the game");
     tap(&u, controls.hide.x + controls.hide.w / 2, controls.hide.y + controls.hide.h / 2);
     check(!u.show_input, "hide target remains reversible after a menu round trip");
     tap(&u, controls.hide.x + controls.hide.w / 2, controls.hide.y + controls.hide.h / 2);

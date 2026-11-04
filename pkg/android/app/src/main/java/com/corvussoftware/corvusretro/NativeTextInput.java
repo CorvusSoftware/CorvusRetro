@@ -21,14 +21,18 @@ import android.view.inputmethod.InputMethodManager;
 final class NativeTextInput {
     private final MainActivity activity;
     private Editor editor;
+    private volatile long requestedTicket;
 
     NativeTextInput(MainActivity activity) { this.activity = activity; }
 
-    void open(int field, String initial, boolean secret) {
+    void open(int field, String initial, boolean secret, long ticket) {
+        if (field < 0 || field > 4 || secret != (field == 2) || ticket == 0) return;
+        requestedTicket = ticket;
         activity.runOnUiThread(() -> {
-            if (!activity.isAlive()) return;
+            if (!activity.isAlive() || requestedTicket != ticket) return;
             if (editor != null) editor.complete(false, false);
-            editor = new Editor(field, initial, secret);
+            if (field == 0) return;
+            editor = new Editor(field, initial, secret, ticket);
             activity.addContentView(editor, new ViewGroup.LayoutParams(1, 1));
             editor.requestFocus();
             Editor active = editor;
@@ -40,19 +44,25 @@ final class NativeTextInput {
     }
 
     void cancel() {
-        if (editor != null) editor.complete(false);
+        requestedTicket = 0;
+        if (editor != null) editor.complete(false, false);
     }
 
     private final class Editor extends View {
         private final int field;
         private final boolean secret;
+        private final long ticket;
         private final SpannableStringBuilder value;
         private boolean finished;
-        Editor(int field, String initial, boolean secret) {
+        Editor(int field, String initial, boolean secret, long ticket) {
             super(activity);
-            this.field = field; this.secret = secret;
+            this.field = field; this.secret = secret; this.ticket = ticket;
             value = new SpannableStringBuilder(initial == null ? "" : initial);
-            value.setFilters(new InputFilter[] {new InputFilter.LengthFilter(secret ? 128 : 64)});
+            if (field >= 3) {
+                int limit = field == 3 ? 127 : 95;
+                value.setFilters(new InputFilter[] {(source,start,end,destination,dstart,dend) ->
+                        Utf8Text.filter(source,start,end,destination,dstart,dend,limit)});
+            } else value.setFilters(new InputFilter[] {new InputFilter.LengthFilter(secret ? 128 : 64)});
             Selection.setSelection(value, value.length());
             setFocusable(true); setFocusableInTouchMode(true);
             setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS);
@@ -84,7 +94,10 @@ final class NativeTextInput {
                 }
             };
         }
-        private void preview() { if (!finished) MainActivity.textInputResult(-field, value.toString(), true); }
+        private void preview() {
+            if (!finished && activity.isAlive() && requestedTicket == ticket)
+                MainActivity.textInputResult(-field, value.toString(), true, ticket);
+        }
         @Override public boolean onKeyDown(int code, KeyEvent event) {
             if (code == KeyEvent.KEYCODE_DEL) {
                 int start = Math.max(0, Selection.getSelectionStart(value));
@@ -121,7 +134,8 @@ final class NativeTextInput {
             if (getParent() instanceof ViewGroup) ((ViewGroup) getParent()).removeView(this);
             if (editor == this) editor = null;
             activity.getWindow().getDecorView().requestFocus();
-            if (notify) MainActivity.textInputResult(field, text, accepted);
+            if (notify && activity.isAlive() && requestedTicket == ticket)
+                MainActivity.textInputResult(field, text, accepted, ticket);
         }
     }
 }
