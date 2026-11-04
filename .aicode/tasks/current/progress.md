@@ -12,3 +12,5 @@
   version de cœur. Pas de changement de cette garde ni des formats batterie.
 - Preuves de la fonctionnalité : ancienne tâche archivée dans setup/release0240 ;
   24 tests natifs et instrumentés, 37JVM, portrait/paysage et atlas201 verts.
+
+Préparation0.24.0 : références des tests de version mises à jour pour Core0.16.0 ; 24/24 tests natifs locaux et régressions engine/menu sous ASan/UBSan/leaks réussis.

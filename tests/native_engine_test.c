@@ -145,7 +145,7 @@ int main(void) {
               "closing absent content preserves an idle selected core", &engine);
         corvus_core_info info = {.struct_size = sizeof(info)};
         check(engine.api.get_info(&info) && info.version &&
-                  strcmp(info.version, "0.15.0") == 0,
+                  strcmp(info.version, "0.16.0") == 0,
               "pinned core version via CorvusAPI", &engine);
         check(!cr_engine_step(&engine, 0), "idle frame rejected", &engine);
         const uint32_t consoles[] = {4, 6, 5};
