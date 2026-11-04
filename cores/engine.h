@@ -19,7 +19,9 @@ typedef struct cr_engine {
     corvus_achievements_api achievements;
     corvus_options_api options;
     corvus_subsystem_api subsystems;
+    corvus_cheats_api cheats_api;
     struct cr_engine_options *saved_options;
+    struct cr_engine_cheats *active_cheats;
     struct cr_battery_worker *battery_worker;
     unsigned players;
     int system;
@@ -48,6 +50,12 @@ size_t cr_engine_option_count(const cr_engine *engine);
 bool cr_engine_option(const cr_engine *engine, size_t index, corvus_core_option *out);
 uint32_t cr_engine_option_value(const cr_engine *engine, const char *key);
 bool cr_engine_set_option(cr_engine *engine, const char *key, uint32_t value);
+/* Owner-thread operations on a loaded player; replacement copies all code strings. */
+uint32_t cr_engine_cheat_capabilities(const cr_engine *engine, unsigned player);
+bool cr_engine_validate_cheat(cr_engine *engine, unsigned player, const char *code);
+bool cr_engine_replace_cheats(cr_engine *engine, unsigned player,
+                              const char *const *codes, size_t count);
+size_t cr_engine_cheat_count(const cr_engine *engine, unsigned player);
 size_t cr_engine_subsystem_count(const cr_engine *engine);
 bool cr_engine_subsystem(const cr_engine *engine, size_t index, corvus_subsystem_info *out);
 bool cr_engine_can_reset(const cr_engine *engine);

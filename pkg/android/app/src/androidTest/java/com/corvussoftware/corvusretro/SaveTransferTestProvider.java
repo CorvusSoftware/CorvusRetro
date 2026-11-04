@@ -37,7 +37,7 @@ public final class SaveTransferTestProvider extends ContentProvider {
             throw new IllegalArgumentException("Unknown synthetic document");
         String name = uri.getLastPathSegment();
         if (!Arrays.asList("battery.sav", "battery.SRM", "wrong.state", "empty.sav", "large.sav",
-                "output.sav", "output.srm").contains(name))
+                "output.sav", "output.srm", "codes.cht", "output.cht").contains(name))
             throw new IllegalArgumentException("Unknown synthetic document");
         return name;
     }
@@ -59,7 +59,8 @@ public final class SaveTransferTestProvider extends ContentProvider {
         File file = new File(directory, name);
         if (!output) {
             try (FileOutputStream stream = new FileOutputStream(file)) {
-                if ("large.sav".equals(name)) stream.write(new byte[1024 * 1024 + 1]);
+                if ("codes.cht".equals(name)) stream.write(("cheats = 1\ncheat0_desc = \"Test triche\"\ncheat0_code = \"32000000 0042\"\ncheat0_enable = true\ncheat0_handler = 0\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                else if ("large.sav".equals(name)) stream.write(new byte[1024 * 1024 + 1]);
                 else if (!"empty.sav".equals(name)) stream.write(battery());
             } catch (IOException failure) { throw new FileNotFoundException("Fixture unavailable"); }
         }

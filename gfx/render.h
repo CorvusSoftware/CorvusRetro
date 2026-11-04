@@ -56,10 +56,11 @@ enum {
     CR_ICON_LOCK,
     CR_ICON_SLIDERS,
     CR_ICON_FILTER,
+    CR_ICON_CHEATS,
     CR_ICON_COUNT
 };
 /* Mirrored by MainActivity: text glyphs must never overwrite the icon block. */
-enum { CR_ICON_ATLAS_BASE = 464, CR_ICON_ATLAS_CAPACITY = 48 };
+enum { CR_ICON_ATLAS_BASE = 463, CR_ICON_ATLAS_CAPACITY = 49 };
 typedef struct {
     void *context;
     void (*rect)(void *, float, float, float, float, uint32_t);

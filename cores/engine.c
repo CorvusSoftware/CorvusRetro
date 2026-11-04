@@ -68,6 +68,87 @@ static bool sdk_error(cr_engine *engine) {
 static void success(cr_engine *engine) {
     engine->error[0] = '\0';
 }
+struct cr_engine_cheats {
+    char **codes[2];
+    size_t count[2];
+};
+static void free_cheat_codes(char **codes, size_t count) {
+    for (size_t i = 0; i < count; ++i) free(codes[i]);
+    free(codes);
+}
+static void clear_cheats(cr_engine *engine) {
+    if (!engine->active_cheats) return;
+    for (unsigned player = 0; player < 2; ++player)
+        free_cheat_codes(engine->active_cheats->codes[player], engine->active_cheats->count[player]);
+    free(engine->active_cheats);
+    engine->active_cheats = NULL;
+}
+uint32_t cr_engine_cheat_capabilities(const cr_engine *engine, unsigned player) {
+    if (!engine || !engine->handle || !engine->loaded || player >= engine->players ||
+        player >= 2 || !engine->cheats_api.capabilities) return 0;
+    return engine->cheats_api.capabilities(engine->handle, player);
+}
+size_t cr_engine_cheat_count(const cr_engine *engine, unsigned player) {
+    if (!engine || !engine->loaded || player >= engine->players || player >= 2 ||
+        !engine->active_cheats) return 0;
+    return engine->active_cheats->count[player];
+}
+static bool cheat_code_valid(const char *code) {
+    if (!code) return false;
+    size_t size = strnlen(code, CORVUS_CHEATS_MAX_CODE_BYTES + 1u);
+    return size && size <= CORVUS_CHEATS_MAX_CODE_BYTES;
+}
+bool cr_engine_validate_cheat(cr_engine *engine, unsigned player, const char *code) {
+    if (!engine) return false;
+    if (!cr_engine_cheat_capabilities(engine, player) || !engine->cheats_api.validate)
+        return fail(engine, "Codes de triche indisponibles pour ce joueur");
+    if (!cheat_code_valid(code)) return fail(engine, "Code de triche invalide ou trop long");
+    if (!engine->cheats_api.validate(engine->handle, player, code)) return sdk_error(engine);
+    success(engine);
+    return true;
+}
+bool cr_engine_replace_cheats(cr_engine *engine, unsigned player,
+                              const char *const *codes, size_t count) {
+    if (!engine) return false;
+    if (!cr_engine_cheat_capabilities(engine, player) || !engine->cheats_api.replace)
+        return fail(engine, "Codes de triche indisponibles pour ce joueur");
+    if (count > CORVUS_CHEATS_MAX_CODES || (count && !codes))
+        return fail(engine, "Liste de codes de triche invalide");
+    for (size_t i = 0; i < count; ++i)
+        if (!cheat_code_valid(codes[i])) return fail(engine, "Code de triche invalide ou trop long");
+    char **copied = count ? calloc(count, sizeof(*copied)) : NULL;
+    if (count && !copied) return fail(engine, "Mémoire insuffisante");
+    for (size_t i = 0; i < count; ++i) {
+        copied[i] = strdup(codes[i]);
+        if (!copied[i]) {
+            free_cheat_codes(copied, count);
+            return fail(engine, "Mémoire insuffisante");
+        }
+    }
+    struct cr_engine_cheats *cache = engine->active_cheats;
+    if (!cache) cache = calloc(1, sizeof(*cache));
+    if (!cache) { free_cheat_codes(copied, count); return fail(engine, "Mémoire insuffisante"); }
+    /* Allocate first: a failed allocation must never change the provider's active list. */
+    if (!engine->cheats_api.replace(engine->handle, player, (const char *const *)copied, count)) {
+        if (!engine->active_cheats) free(cache);
+        free_cheat_codes(copied, count);
+        return sdk_error(engine);
+    }
+    free_cheat_codes(cache->codes[player], cache->count[player]);
+    cache->codes[player] = copied;
+    cache->count[player] = count;
+    engine->active_cheats = cache;
+    success(engine);
+    return true;
+}
+static bool copy_cheats(cr_engine *candidate, const cr_engine *engine) {
+    for (unsigned player = 0; player < engine->players; ++player) {
+        size_t count = cr_engine_cheat_count(engine, player);
+        if (count && !cr_engine_replace_cheats(candidate, player,
+                         (const char *const *)engine->active_cheats->codes[player], count)) return false;
+    }
+    return true;
+}
 static bool valid_system(cr_engine *engine, int system) {
     return cr_registry_get(system) != NULL || fail(engine, "Cœur incompatible ou indisponible");
 }
@@ -577,6 +658,15 @@ static void negotiate_configuration(cr_engine *engine) {
         !engine->options.count || !engine->options.describe ||
         !engine->options.get_value || !engine->options.set_value)
         memset(&engine->options, 0, sizeof(engine->options));
+    symbol = dlsym(engine->module, CORVUS_CHEATS_ENTRYPOINT);
+    corvus_get_cheats_api_fn cheats = NULL;
+    if (symbol) memcpy(&cheats, &symbol, sizeof(cheats));
+    engine->cheats_api.struct_size = sizeof(engine->cheats_api);
+    if (!cheats || !cheats(CORVUS_CHEATS_API_VERSION, &engine->cheats_api) ||
+        engine->cheats_api.struct_size < sizeof(engine->cheats_api) ||
+        engine->cheats_api.api_version != CORVUS_CHEATS_API_VERSION ||
+        !engine->cheats_api.capabilities || !engine->cheats_api.validate || !engine->cheats_api.replace)
+        memset(&engine->cheats_api, 0, sizeof(engine->cheats_api));
     symbol = dlsym(engine->module, CORVUS_SUBSYSTEM_ENTRYPOINT);
     corvus_get_subsystem_api_fn subsystems = NULL;
     if (symbol) memcpy(&subsystems, &symbol, sizeof(subsystems));
@@ -633,6 +723,7 @@ static void release_handle(cr_engine *engine) {
         dlclose(engine->module);
     free(engine->saved_options);
     engine->saved_options = NULL;
+    clear_cheats(engine);
     free(engine->output);
     free(engine->pixels);
     engine->handle = NULL;
@@ -644,6 +735,7 @@ static void release_handle(cr_engine *engine) {
     memset(&engine->achievements, 0, sizeof(engine->achievements));
     memset(&engine->options, 0, sizeof(engine->options));
     memset(&engine->subsystems, 0, sizeof(engine->subsystems));
+    memset(&engine->cheats_api, 0, sizeof(engine->cheats_api));
     memset(engine->content_paths, 0, sizeof(engine->content_paths));
     engine->players = 0;
     engine->second_id[0] = engine->subsystem_id[0] = '\0';
@@ -1529,6 +1621,7 @@ bool cr_engine_import_battery(cr_engine *engine, unsigned player, const uint8_t 
     for (unsigned i = 0; ok && i < engine->players; ++i)
         if (cr_engine_battery_size(&candidate, i) != sizes[i])
             ok = fail(&candidate, "Format batterie incompatible après redémarrage");
+    if (ok) ok = copy_cheats(&candidate, engine);
     if (!ok && candidate.error[0]) fail(engine, candidate.error);
     if (ok) ok = save_auto_before_exit(engine);
     if (ok) ok = commit_import(engine, player, snapshots, sizes, live_backup);
@@ -1663,6 +1756,7 @@ bool cr_engine_unload_game(cr_engine *engine) {
     if (!save_before_exit(engine))
         return false;
     engine->api.unload_game(engine->handle);
+    clear_cheats(engine);
     free(engine->pixels);
     engine->pixels = NULL;
     /* The core still owns a host callback pointing at this heap context. */

@@ -4,6 +4,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "menu_driver.h"
 #include "menu_entries.h"
+#include "menu_cheat.h"
 #include "menu_cbs.h"
 #include "menu_setting.h"
 #include "menu_internal.h"
@@ -40,13 +41,14 @@ static float body_bottom(const cr_ui *u) {
 
 static void clamp_scroll(cr_ui *u) {
     float content = cr_interface_content_height(u, cr_menu_entry_count(u));
-    if (u->page == CR_ABOUT || u->page == CR_LICENSE || u->page == CR_CORE_INFO ||
+    if (u->page == CR_ABOUT || u->page == CR_LICENSE || u->page == CR_CORE_INFO || u->page == CR_CHEAT_TEXT ||
         ((u->page == CR_SUBSYSTEMS || u->page == CR_CORE_OPTIONS) && !cr_menu_entry_count(u)))
         content = fmaxf(400, u->text_height);
     float max = fmaxf(0, content - fmaxf(1, body_bottom(u) - cr_interface_content_top(u)));
     u->scroll = fminf(max, fmaxf(0, u->scroll));
 }
 static void view(cr_ui *u, int p) {
+    if (cr_menu_cheat_page(u->page) && !cr_menu_cheat_page(p)) cr_menu_cheats_cancel_file(u);
     if (u->ui_editing || u->ra_editing) {
         u->ui_editing = u->ra_editing = 0;
         memset(u->ra_preview, 0, sizeof(u->ra_preview));
@@ -215,6 +217,7 @@ void cr_ui_achievement_frame(cr_ui *u) {
     if (u->ra_enabled && u->engine.players <= 1) cr_cheevos_frame(u->achievements);
 }
 void cr_ui_text_result(cr_ui *u, int field, const char *text, bool accepted) {
+    if (cr_menu_cheats_text_result(u, field, text, accepted)) return;
     if (u->ui_editing == 3 && (field == 3 || field == -3)) {
         snprintf(u->library_query, sizeof(u->library_query), "%.127s", field == 3 && !accepted ? u->library_original_query : text);
         u->scroll = 0; u->focus = cr_menu_library_count(u) ? 1 : 0;
@@ -292,6 +295,7 @@ void cr_ui_init(cr_ui *u, cr_platform p, const char *root) {
     cr_ui_reload(u);
 }
 void cr_ui_destroy(cr_ui *u) {
+    cr_menu_cheats_destroy(u);
     cr_menu_finish_save_transfer(u);
     cr_cheevos_destroy(u->achievements);
     u->achievements = NULL;
@@ -397,6 +401,8 @@ void cr_ui_update(cr_ui *u, double seconds) {
 
 
 void cr_ui_back(cr_ui *u) {
+    if (cr_menu_cheats_cancel_edit(u)) return;
+    cr_menu_cheats_cancel_file(u);
     if (u->page == CR_LIBRARY && u->library_search) {
         u->ui_editing = 0;
         if (u->platform.edit_text) u->platform.edit_text(u->platform.context, 0, "", false);
@@ -659,6 +665,10 @@ void cr_ui_touch_at(cr_ui *u, int id, int phase, float x, float y, double event_
             if (u->platform.edit_text) u->platform.edit_text(u->platform.context, 3, u->library_query, false);
             return;
         }
+        if (t == -302 && u->page == CR_CHEAT_TEXT) {
+            if (u->platform.submit_text) u->platform.submit_text(u->platform.context);
+            return;
+        }
         if (t == -201 && u->page == CR_LIBRARY) { cr_menu_push_page(u, CR_LIBRARY_ACTIONS); return; }
         if (t == -202 && u->page == CR_LIBRARY) {
             u->ui_editing = 0;
@@ -774,6 +784,12 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         case CR_CORE_DETAILS: title = "Installer un cœur"; break;
         case CR_LIBRARY_ACTIONS: title = "Bibliothèque"; break;
         case CR_GAME_ACTIONS: title = "Options du jeu"; break;
+        case CR_CHEATS: title = "Codes de triche"; break;
+        case CR_CHEAT_ENTRY: title = "Modifier le code"; break;
+        case CR_CHEAT_SETTINGS: title = "Réglages des codes"; break;
+        case CR_CHEAT_DELETE: title = "Supprimer ce code ?"; break;
+        case CR_CHEAT_CLEAR: title = "Effacer la liste ?"; break;
+        case CR_CHEAT_TEXT: title = u->ui_editing == 5 ? "Nom du code" : "Code de triche"; break;
         case CR_SYSTEM_SETTINGS: title = "Système"; break;
         case CR_REMOVE_CORES:
             title = "Cœurs téléchargés";
@@ -896,6 +912,8 @@ void cr_ui_draw(cr_ui *u, const cr_painter *p) {
         int count = cr_menu_entry_count(u);
         cr_interface_draw(u, p, title, has_back(u), count, cr_menu_entry_visual);
         if (p->clip) p->clip(p->context, 0, 56, w, fmaxf(1, body_bottom(u) - 56));
+        if (u->page == CR_CHEAT_TEXT)
+            u->text_height = paragraphs(p, cr_menu_cheats_preview(u), 20, 92, w - 40, 24, fg, u->scroll, body_bottom(u));
         if (u->page == CR_ABOUT)
             u->text_height = paragraphs(
                 p,

@@ -34,6 +34,13 @@ typedef struct {
     char path[4096], error[512];
     bool cancelled;
 } cr_save_transfer_result;
+typedef struct {
+    uint64_t request;
+    uint8_t *data;
+    size_t size;
+    char error[512];
+    bool cancelled;
+} cr_cheat_file_result;
 
 typedef struct {
     void *context;
@@ -62,5 +69,8 @@ typedef struct {
     void (*remove_core)(void *, const char *core_id);
     void (*game_image)(void *, const char *game_id, const char *url);
     void (*share_state)(void *, const char *name, const uint8_t *, size_t);
+    bool (*cheat_file)(void *, uint64_t, bool exporting, const char *, const uint8_t *, size_t);
+    void (*finish_cheat_file)(void *, uint64_t);
+    void (*submit_text)(void *);
 } cr_platform;
 #endif

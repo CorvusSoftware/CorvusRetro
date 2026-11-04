@@ -49,7 +49,7 @@ public final class InterfaceRedesignInstrumentation extends Instrumentation {
     private final Map<String, Object> oldPreferences = new HashMap<>();
     private volatile int archiveRequests;
     private int checks;
-    private boolean landscape, quickOnly;
+    private boolean landscape, quickOnly, cheatsOnly;
     private File fixtures;
     private String oldGames;
     private float originalWidth, originalHeight;
@@ -290,6 +290,7 @@ public final class InterfaceRedesignInstrumentation extends Instrumentation {
                 android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT));
         waitFor(()->activity.safeWindowArea()!=null && (width()>height())==landscape,"safe requested orientation");
         originalWidth=width();originalHeight=height();
+        if (cheatsOnly) { runCheats(); return; }
         state(0,-1,0,0);tap(width()-24,28);state(0,-1,0,0);shot("01-home");
         tab(1,25);shot("02-library-grid");
         tap(width()-74,28);editing(3,0);
@@ -316,7 +317,7 @@ public final class InterfaceRedesignInstrumentation extends Instrumentation {
             choose(2);page(40);choose(1);page(41);choose(0);state(8,2,1,0);
             waitFor(this::greenPreview,"reordered quick load restores actual game pixels");
             key(KeyEvent.KEYCODE_BACK);state(8,2,1,1);choose(6);page(20);shot("quick-core-options");
-            back(8);state(8,2,1,1);focus(11);shot("quick-menu-bottom");choose(11);state(0,2,0,0);
+            back(8);state(8,2,1,1);focus(12);shot("quick-menu-bottom");choose(12);state(0,2,0,0);
             tab(4,2);shot("09-settings");return;
         }
         choose(3);page(40);waitFor(()->entries().length>=1,"native new state is committed");shot("07-state-list");
@@ -339,7 +340,7 @@ public final class InterfaceRedesignInstrumentation extends Instrumentation {
         choose(3);page(18);shot("classic-states");choose(0);state(8,2,1,0);
         File states=new File(context.getFilesDir(),"states");File[] manual=states.listFiles(f->f.getName().startsWith(fixtureIds.get(2)+"-")&&f.getName().endsWith(".state")&&!f.getName().endsWith(".auto.state"));
         check(manual!=null&&manual.length==1,"legacy manual save stays available beside named states");
-        key(KeyEvent.KEYCODE_BACK);state(8,2,1,1);focus(11);shot("quick-menu-bottom");choose(11);state(0,2,0,0);
+        key(KeyEvent.KEYCODE_BACK);state(8,2,1,1);focus(12);shot("quick-menu-bottom");choose(12);state(0,2,0,0);
         tab(4,2);shot("09-settings");choose(5);page(34);shot("achievement-settings");
         choose(1);page(35);shot("account-fields");back(34);back(2);choose(0);page(10);shot("10-display");back(2);
         choose(2);page(11);choose(1);page(29);choose(5);page(11);
@@ -357,6 +358,56 @@ public final class InterfaceRedesignInstrumentation extends Instrumentation {
         waitFor(()->archiveRequests>beforeReinstall&&number("installing")==0,"explicit reinstall uses the existing verified installer");
         check(entries().length==2&&new GameLibrary(context).find(fixtureIds.get(2))!=null,"install and reinstall retain stable game and state identities");
     }
+    private void runCheats() throws Exception {
+        state(0,-1,0,0); tab(3,3); choose(2); state(0,2,0,0);
+        tab(1,25); float chip=(width()-56)/4; tap(16+3*(chip+8)+chip/2,79);
+        firstLibraryCard(); state(8,2,1,0); key(KeyEvent.KEYCODE_BACK); state(8,2,1,1);
+        choose(7); page(47); choose(2); page(52); editing(6,-1);
+        imeSetText("32000000 0042"); imeAction(true); page(48); normalViewport();
+        choose(0); check(number("cheats")==0,"toggle stages cheats until Apply");
+        back(47); choose(1); waitFor(()->number("cheats")==1,"Apply submits to Android native core");
+        shot("cheats-active"); choose(7); page(48); choose(1); page(52); editing(5,-1);
+        imeSetText("PV émeraude 🐦"); imeAction(true); page(48); normalViewport();
+        choose(2); page(52); editing(6,-1); long obsolete=ticket();
+        imeSetText("invalid"); imeAction(true); page(52);
+        waitFor(()->ticket()!=obsolete,"invalid cheat keeps editor with new ticket");
+        MainActivity.textInputResult(6,"32000000 0001",true,obsolete); staysEditing(6,-1);
+        imeSetText("32000000 0042");
+        // Header confirmation commits the current OS editor, not the last asynchronous preview.
+        tap(width()-27,28); page(48); normalViewport(); back(47);
+        choose(5); page(49); choose(1); back(47); choose(7); page(48); choose(0);
+        waitFor(()->number("cheats")==0,"automatic toggle clears active list");
+        choose(0); waitFor(()->number("cheats")==1,"automatic toggle reapplies list"); back(47);
+        android.net.Uri output=android.net.Uri.parse("content://"+SaveTransferTestProvider.AUTHORITY+"/output.cht");
+        IntentFilter exportFilter=new IntentFilter(Intent.ACTION_CREATE_DOCUMENT);
+        exportFilter.addCategory(Intent.CATEGORY_OPENABLE); exportFilter.addDataType("*/*");
+        ActivityMonitor export=addMonitor(exportFilter,
+                new ActivityResult(Activity.RESULT_OK,new Intent().setData(output)),true);
+        choose(4); waitFor(()->export.getHits()==1,"export uses Android document picker"); removeMonitor(export);
+        waitFor(()-> {
+            try(InputStream in=getTargetContext().getContentResolver().openInputStream(output)) {
+                ByteArrayOutputStream data=new ByteArrayOutputStream(); byte[] block=new byte[4096]; int count;
+                while((count=in.read(block))!=-1)data.write(block,0,count);
+                String text=data.toString(StandardCharsets.UTF_8.name());
+                return text.contains("PV émeraude 🐦")&&text.contains("32000000 0042");
+            } catch(Exception absent) { return false; }
+        },"export roundtrips standard UTF-8 and code snapshot through JNI and SAF");
+        SystemClock.sleep(500);
+        choose(6); page(51); choose(0); page(47); waitFor(()->number("cheats")==0,"clear empties native core");
+        android.net.Uri input=android.net.Uri.parse("content://"+SaveTransferTestProvider.AUTHORITY+"/codes.cht");
+        IntentFilter importFilter=new IntentFilter(Intent.ACTION_OPEN_DOCUMENT);
+        importFilter.addCategory(Intent.CATEGORY_OPENABLE); importFilter.addDataType("*/*");
+        ActivityMonitor importer=addMonitor(importFilter,
+                new ActivityResult(Activity.RESULT_OK,new Intent().setData(input)),true);
+        choose(3); waitFor(()->importer.getHits()==1,"import uses Android document picker"); removeMonitor(importer);
+        waitFor(()-> {
+            File profile=new File(getTargetContext().getFilesDir(),"cheats/"+fixtureIds.get(2)+".cht");
+            return profile.isFile()&&new String(bytes(profile),StandardCharsets.UTF_8).contains("Test triche");
+        },"import persists private profile");
+        SystemClock.sleep(800); choose(1); waitFor(()->number("cheats")==1,"imported .cht applies to native core");
+        shot("cheats-imported"); back(8); state(8,2,1,1); choose(12); state(0,2,0,0);
+        check(number("cheats")==0,"close clears cheats and retains selected core");
+    }
     private void restore() throws Exception {
         if(activity!=null) {runOnMainSync(activity::finish);waitFor(activity::isDestroyed,"native Activity is fully destroyed before fixture cleanup");}
         SharedPreferences.Editor edit=getTargetContext().getSharedPreferences("corvus",Context.MODE_PRIVATE).edit();
@@ -372,7 +423,7 @@ public final class InterfaceRedesignInstrumentation extends Instrumentation {
         for(String id:fixtureIds) {
             deleteOwned(new File(files,"roms/"+id+".rom"));
             deleteOwned(new File(files,"states/library/"+id));
-            for(String area:new String[]{"saves","states"}) {
+            for(String area:new String[]{"saves","states","cheats"}) {
                 File[] owned=new File(files,area).listFiles(f->f.getName().startsWith(id+".")||f.getName().startsWith(id+"-"));
                 if(owned!=null)for(File file:owned)deleteOwned(file);
             }
@@ -389,6 +440,7 @@ public final class InterfaceRedesignInstrumentation extends Instrumentation {
     @Override public void onCreate(Bundle args) {
         super.onCreate(args);landscape="landscape".equals(args.getString("orientation","portrait"));
         quickOnly="true".equals(args.getString("quick_only","false"));
+        cheatsOnly="true".equals(args.getString("cheats_only","false"));
         fixtures=new File(args.getString("fixture_dir",""));start();
     }
     @Override public void onStart() {

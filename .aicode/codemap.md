@@ -18,3 +18,5 @@ La [carte structurelle](../docs/repository-structure.md) compare ces frontières
 aux fichiers RetroArch réellement lus à la révision 168c451a le 4 novembre 2026.
 La séparation suit les responsabilités : navigation/actions, géométrie, dessin,
 primitives visuelles, stockage et services Android.
+
+- `cheats/cheat_store.[ch]` possède le format `.cht` borné et le stockage atomique. `menu/menu_cheat.[ch]` possède les profils par jeu/joueur et leur édition. `cores/engine.c` négocie l’extension optionnelle CorvusAPI et conserve une copie des listes actives. Android `CheatFiles` et la boîte JNI transportent seulement des documents bornés. Voir [codes de triche](../docs/cheats.md).

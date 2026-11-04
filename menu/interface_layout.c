@@ -129,6 +129,7 @@ int cr_interface_target(const cr_ui *u, float x, float y, int count, bool back) 
     }
     if (y < 56) {
         if (back && x < 52) return -2;
+        if (u->page == CR_CHEAT_TEXT && x >= u->width - 52) return -302;
         if (u->page == CR_LIBRARY) {
             if (x >= u->width - 48) return -201;
             if (x >= u->width - 96) return -200;

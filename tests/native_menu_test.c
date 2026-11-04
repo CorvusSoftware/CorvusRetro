@@ -195,7 +195,8 @@ static void quick_order(cr_ui *u) {
         {CR_QUICK_RESUME, "Reprendre"}, {CR_QUICK_RESTART, "Redémarrer"},
         {CR_QUICK_LOAD_STATE, "Charger un état"}, {CR_QUICK_SAVE_STATE, "Sauvegarder un état"},
         {CR_QUICK_STATES, "États classiques"}, {CR_QUICK_GAME_SAVES, "Sauvegardes .sav / .srm"},
-        {CR_QUICK_CORE_OPTIONS, "Options du cœur"}, {CR_QUICK_CONTROLS, "Commandes"},
+        {CR_QUICK_CORE_OPTIONS, "Options du cœur"}, {CR_QUICK_CHEATS, "Codes de triche"},
+        {CR_QUICK_CONTROLS, "Commandes"},
         {CR_QUICK_PLAYER, "Joueur contrôlé"}, {CR_QUICK_ACHIEVEMENTS, "Succès"},
         {CR_QUICK_CORE_INFO, "Informations sur le cœur"}, {CR_QUICK_MAIN, "Accueil"},
         {CR_QUICK_CLOSE, "Quitter le jeu"}

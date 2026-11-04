@@ -42,7 +42,7 @@ public final class MainActivity extends NativeActivity {
     static { System.loadLibrary("corvusretro"); }
     private static final int OPEN_CONTENT = 10;
     private static final int OPEN_FOLDER = 11;
-    private static final int ICON_ATLAS_BASE = 464;
+    private static final int ICON_ATLAS_BASE = 463;
     private static final int[] EXTRA_GLYPHS = {0x153, 0x152, 0x2190, 0x2191, 0x2192, 0x2193, 0x2026, 0x2018, 0x2019};
     private static final int[] ICONS = {R.drawable.ic_core, R.drawable.ic_corvus, R.drawable.ic_content,
             R.drawable.ic_library, R.drawable.ic_settings, R.drawable.ic_history, R.drawable.ic_info,
@@ -56,13 +56,14 @@ public final class MainActivity extends NativeActivity {
             R.drawable.ic_rename, R.drawable.ic_duplicate, R.drawable.ic_share, R.drawable.ic_trash,
             R.drawable.ic_more, R.drawable.ic_check, R.drawable.ic_exit, R.drawable.ic_add,
             R.drawable.ic_system, R.drawable.ic_import, R.drawable.ic_export, R.drawable.ic_lock,
-            R.drawable.ic_sliders, R.drawable.ic_filter};
+            R.drawable.ic_sliders, R.drawable.ic_filter, R.drawable.ic_cheats};
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final Object importLock = new Object();
     private GameLibrary library;
     private CoreRepository coreRepository;
     private AchievementSound achievementSound;
     private SaveTransfers saveTransfers;
+    private CheatFiles cheatFiles;
     private RetroAchievementsService achievements;
     private RetroAchievementsImages achievementImages;
     private FrontendImages frontendImages;
@@ -111,6 +112,7 @@ public final class MainActivity extends NativeActivity {
     static native void coreModulesUpdated(String[] paths);
     static native void coreInstallStatus(String message, boolean finished);
     private static native void saveTransferResult(long request, String path, String error, boolean cancelled);
+    private static native void cheatFileResult(long request, byte[] bytes, String error, boolean cancelled);
     private static native void controllerDevicesChanged(int[] deviceIds, long[] generations, String[] names);
 
     private void publishControllerDevices() {
@@ -147,12 +149,26 @@ public final class MainActivity extends NativeActivity {
             @Override public boolean alive() { return isAlive(); }
             @Override public boolean canPick() {
                 synchronized (importLock) {
-                    return !destroyed && !pickerOpen && !copying && pending == null && folderFiles == null;
+                    return !destroyed && !pickerOpen && !copying && pending == null && folderFiles == null
+                            && (cheatFiles == null || !cheatFiles.busy());
                 }
             }
             @Override public void pick(Intent intent, int code) { startActivityForResult(intent, code); }
             @Override public void result(long request, String path, String error, boolean cancelled) {
                 if (isAlive()) saveTransferResult(request, path, error, cancelled);
+            }
+        });
+        cheatFiles = new CheatFiles(getContentResolver(), io, new CheatFiles.Host() {
+            @Override public boolean alive() { return isAlive(); }
+            @Override public boolean canPick() {
+                synchronized (importLock) {
+                    return !destroyed && !pickerOpen && !copying && pending == null && folderFiles == null
+                            && !saveTransfers.busy();
+                }
+            }
+            @Override public void pick(Intent intent, int code) { startActivityForResult(intent, code); }
+            @Override public void result(long request, byte[] bytes, String error, boolean cancelled) {
+                if (isAlive()) cheatFileResult(request, bytes, error, cancelled);
             }
         });
         achievementSound = new AchievementSound(this);
@@ -245,6 +261,7 @@ public final class MainActivity extends NativeActivity {
         }
         textInput.cancel();
         saveTransfers.close();
+        cheatFiles.close();
         achievements.close();
         achievementImages.close();
         frontendImages.close();
@@ -257,6 +274,10 @@ public final class MainActivity extends NativeActivity {
         runOnUiThread(() -> saveTransfers.request(request, operation, title, snapshot));
     }
     public void finishSaveTransfer(long request) { saveTransfers.finish(request); }
+    public void cheatFile(long request, boolean exporting, String title, byte[] snapshot) {
+        runOnUiThread(() -> cheatFiles.request(request, exporting, title, snapshot));
+    }
+    public void finishCheatFile(long request) { cheatFiles.finish(request); }
     public void refreshCoreCatalog() { coreRepository.refresh(); }
     public void installCorePack(String packId) { coreRepository.install(packId); }
     public boolean canRemoveCore(String id) { return coreRepository.canRemove(id); }
@@ -318,6 +339,7 @@ public final class MainActivity extends NativeActivity {
         textInputTicket = ticket;
         textInput.open(field, initial, secret, ticket);
     }
+    public void submitText(long ticket) { textInput.submit(ticket); }
     public float density() { return getResources().getDisplayMetrics().density; }
     public String filesRoot() { return getFilesDir().getAbsolutePath(); }
     public String[] games() {
@@ -365,6 +387,7 @@ public final class MainActivity extends NativeActivity {
     public void pickContent(int system) {
         runOnUiThread(() -> {
             if (saveTransfers.busy()) { notifyError("Terminez le transfert de sauvegarde déjà ouvert"); return; }
+            if (cheatFiles.busy()) { notifyError("Terminez le transfert de codes déjà ouvert"); return; }
             synchronized (importLock) { if (destroyed || pickerOpen || copying || pending != null || folderFiles != null) return; }
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE);
             try {
@@ -379,6 +402,7 @@ public final class MainActivity extends NativeActivity {
     public void pickFolder(int system, String extensions) {
         runOnUiThread(() -> {
             if (saveTransfers.busy()) { notifyError("Terminez le transfert de sauvegarde déjà ouvert"); return; }
+            if (cheatFiles.busy()) { notifyError("Terminez le transfert de codes déjà ouvert"); return; }
             synchronized (importLock) {
                 if (destroyed || pickerOpen || copying || pending != null || folderFiles != null) return;
             }
@@ -398,6 +422,7 @@ public final class MainActivity extends NativeActivity {
     @Override protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
         if (saveTransfers.activityResult(request, result, data)) return;
+        if (cheatFiles.activityResult(request, result, data)) return;
         if (request == OPEN_FOLDER) {
             pickerOpen = false;
             if (result != RESULT_OK || data == null || data.getData() == null) {

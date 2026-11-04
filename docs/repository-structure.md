@@ -18,6 +18,7 @@ services implémentés dans CorvusRetro.
 | `audio/drivers/aaudio.c` | `audio/drivers/aaudio.c` | Sortie audio native |
 | `input/play_layout.c` | `input/` | Géométrie des contrôles |
 | `cores/` | `cores/` et chargement dynamique | Registre, moteurs et contenu |
+| `cheats/cheat_store.[ch]`, `menu/menu_cheat.[ch]` | Gestionnaire de listes de triche et menus dédiés | Format `.cht`, profils par contenu/joueur, application et transferts |
 | `cores/state_store.[ch]` | Services de sauvegarde séparés des pilotes de menu | Stockage transactionnel des états nommés et aperçus |
 | `gfx/widgets/notifications.[ch]` | `gfx/widgets/` | Animation et affichage des notifications |
 | `deps/` | `deps/` | Bibliothèques externes versionnées |

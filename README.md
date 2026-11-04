@@ -127,6 +127,7 @@ Ces commandes couvrent les tests natifs, les vérifications mémoire et le proje
 | [Icônes](docs/icons.md) | Jeu vectoriel, palettes et contrat de l'atlas |
 | [Commandes tactiles](docs/controls.md) | Boutons, gestes et orientation |
 | [Interface de jeu](docs/game-interface.md) | Profils par console et menu rapide |
+| [Codes de triche](docs/cheats.md) | Listes par jeu/joueur, application et fichiers `.cht` |
 | [Sauvegardes du jeu](docs/save-files.md) | Import et export batterie `.sav` et `.srm` |
 | [Paramètres et sous-paramètres](docs/settings-plan.md) | Catégories, valeurs et fonctionnement |
 | [Menus du cœur](docs/core-menus.md) | Sous-systèmes, options et capacités actuelles |
