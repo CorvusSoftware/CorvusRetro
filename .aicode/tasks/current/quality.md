@@ -1,10 +1,14 @@
 CorvusSoftware Quality Gate
-Status: PASS
+Status: PASS (validation locale)
 Risk: STANDARD
 
-Implémentation :21 suites strictes,21 ASan/UBSan, atlas196, parcours Android portrait et revue sans finding bloquant.
-Livraison :8 tests de publication ; CI du head de PR, CI main, signature et publication réussies. Source3b5cc44189f0cb346b17a604769d5ddd80cddbbb.
-APK public : signature durable/provenance/ABI/16Ko/zéro cœur/son original et identité des octets vérifiés.
-Upgrade signé30->31 : données, UID, première installation, ASUS et historique conservés, captures inspectées, aucun nouveau crash de l'application.
-Limites : API29x86_64 émulé, pas de nouvelle qualification physique/ARM64/réseau public/audio.
-Preuves détaillées : docs/validation-android.md, /workspace/setup/release0230.
+-21 suites natives et 21 ASan/UBSan passent.
+-Ordre, sélection et cibles du menu rapide vérifiés pour un/deux joueurs et deux orientations ; bouton supprimé sans cible cachée.
+-Build/lint et APK sans cœur, deux ABI et16Ko passent. Atlas196 inspecté dans les trois palettes.
+-Android API29 x86_64 : parcours ciblés portrait/paysage réussis, captures inspectées, aucun crash enregistré.
+-PNG du lanceur identique aux octets de l'avatar officiel ; SVG du petit modèle lisibles.
+-Revue indépendante sans finding bloquant.
+
+APKdebug SHA256 :edee3f440048ca6c7e635fbcdb22203c8311673d263395d075542a4aae570338
+CI finale : consulter les checks du head publié avant sortie du brouillon.
+Limites : pas de nouvelle qualification physique/ARM64/audio/réseau public. Le runner historique RetroAchievementsInstrumentation, déjà fondé sur d'anciens parcours de menus, n'est pas revendiqué validé.

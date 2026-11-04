@@ -1,5 +1,6 @@
-PASS :21 suites natives strictes et21 ASan/UBSan, atlas196 et parcours Android de la refonte.
-PASS :8 tests de publication, CI PR/main, build signé et publication sur source exacte.
-PASS : signature durable/provenance/ABI/16Ko/zéro cœur/MP3 et octets publics identiques.
-PASS : upgrade signé0.22.2/code30 vers0.23.0/code31, UID/données/ASUS/historique, captures des menus et À propos, aucun nouveau crash applicatif.
-Limites : pas de nouvelle qualification physique/ARM64/audio/réseau public.
+PASS P0 : dessin et cible du bouton haut absents, Réglages accessible par onglet.
+PASS P0 : ordre/libellés et cibles clavier/tactile de toutes les actions,1/2joueurs, portrait/paysage.
+PASS P1 : PNG officiel intact, glyphes et atlas : 48 icônes, 196 contrôles, captures du titre et des deux extrémités du menu.
+PASS P1 :21 suites strictes et 21 ASan, build/lint et packaging sans cœur/deux ABI/16Ko.
+PASS P1 : Android portrait/paysage ciblé, création/chargement d'état réel, options du cœur, fermeture avec cœur conservé ; zéro crash.
+CI : contrôler le head de la PR publiée. Limites physiques/ARM64/audio/réseau public conservées.

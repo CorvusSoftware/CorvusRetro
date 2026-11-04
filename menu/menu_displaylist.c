@@ -14,10 +14,10 @@
 typedef cr_menu_row row;
 static const char *binding_labels[10] = {"Haut", "Bas", "Gauche", "Droite", "A", "B", "Start", "Select", "L", "R"};
 static const int quick_order[CR_QUICK_COUNT] = {
-    CR_QUICK_RESUME, CR_QUICK_LOAD_STATE, CR_QUICK_SAVE_STATE, CR_QUICK_RESTART,
-    CR_QUICK_CORE_OPTIONS, CR_QUICK_CLOSE, CR_QUICK_STATES,
-    CR_QUICK_GAME_SAVES, CR_QUICK_CONTROLS, CR_QUICK_PLAYER,
-    CR_QUICK_ACHIEVEMENTS, CR_QUICK_CORE_INFO, CR_QUICK_MAIN
+    CR_QUICK_RESUME, CR_QUICK_RESTART,
+    CR_QUICK_LOAD_STATE, CR_QUICK_SAVE_STATE, CR_QUICK_STATES, CR_QUICK_GAME_SAVES,
+    CR_QUICK_CORE_OPTIONS, CR_QUICK_CONTROLS, CR_QUICK_PLAYER,
+    CR_QUICK_ACHIEVEMENTS, CR_QUICK_CORE_INFO, CR_QUICK_MAIN, CR_QUICK_CLOSE
 };
 static const char *core_name(int index) {
     const cr_core_descriptor *core = cr_registry_get(index);
@@ -240,12 +240,12 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
         index = quick_at(u, index);
         static const char *labels[CR_QUICK_COUNT] = {
             "Reprendre le contenu", "Redémarrer le contenu", "Fermer le contenu",
-            "Sauvegardes d’état", "Options du cœur", "Commandes", "Succès", "Informations sur le cœur",
-            "Accueil", "Joueur contrôlé", "Sauvegardes du jeu", "Charger un état", "Sauvegarder un état"
+            "États classiques", "Options du cœur", "Commandes", "Succès", "Informations sur le cœur",
+            "Accueil", "Joueur contrôlé", "Sauvegardes .sav / .srm", "Charger un état", "Sauvegarder un état"
         };
         static const char *hints[CR_QUICK_COUNT] = {
             "Retourner au jeu", "Relancer le contenu actuel", "Garder le cœur chargé",
-            "Sauvegarder ou charger l’état du jeu", "Réglages proposés par le cœur", "Surimpression tactile",
+            "État manuel et automatique", "Réglages proposés par le cœur", "Surimpression tactile",
             "Compte et succès du jeu", "Version et fonctions disponibles", "Retourner aux menus",
             "Choisir le joueur du tactile et du clavier", "Importer ou exporter la mémoire batterie (.sav / .srm)",
             "Choisir une sauvegarde de ce jeu", "Créer une nouvelle sauvegarde nommée"
@@ -265,7 +265,6 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
             snprintf(r.hint, sizeof(r.hint), "Joueur %u - toucher pour changer", u->input_player + 1);
         if (index == CR_QUICK_RESUME) snprintf(r.label, sizeof(r.label), "Reprendre");
         if (index == CR_QUICK_RESTART) snprintf(r.label, sizeof(r.label), "Redémarrer");
-        if (index == CR_QUICK_CORE_OPTIONS) snprintf(r.label, sizeof(r.label), "Options du jeu");
         if (index == CR_QUICK_CLOSE) { snprintf(r.label, sizeof(r.label), "Quitter le jeu"); r.destructive = true; }
     } else if (u->page == CR_CORE_OPTIONS) {
         corvus_core_option option;

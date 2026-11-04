@@ -270,7 +270,7 @@ Certificat durable SHA-256 :
 APK qualifié SHA-256 :
 `24d07ad24098a0f9d4ac697a93d9f52be57562ccc032d784d0f784f8f4bef063`.
 Les sources et sommes de contrôle de l'artefact signé ont été vérifiées, ainsi
-que les deux bibliothèques frontend, les segments ELF et l'alignement16Ko.
+que les deux bibliothèques frontend, les segments ELF et l'alignement 16 Ko.
 
 Aucune exécution ARM64 ou sur appareil physique n'a été réalisée pour ce lot.
 Les épisodes SystemUI non réactif au démarrage des émulateurs ont été inspectés
@@ -355,7 +355,7 @@ Build signé : [41316133776](https://github.com/CorvusSoftware/CorvusRetro/actio
 APK qualifié SHA-256 :
 `18beba18ca7bf117680faa0143da8a84e348c43b5d7991e1037e05da0d764e53`.
 Certificat durable : celui de la qualification0.19.0 ci-dessus. Provenance et
-sommes vérifiées, alignement16Ko, zéro cœur, fournisseur synthétique absent.
+sommes vérifiées, alignement 16 Ko, zéro cœur, fournisseur synthétique absent.
 
 Les tests d'écran utilisent l'émulateur et des programmes originaux. Ils ne
 prouvent pas une exécution ARM64, un appareil physique, une manette Bluetooth/USB
@@ -413,7 +413,7 @@ Le certificat conserve l'empreinte
 L'APK téléchargé depuis la release publique est identique octet pour octet à
 l'artefact signé testé ; SHA-256 :
 `890a3912a4e77959e9892ce4a9732dc3d9179bb26c5d112dab376619fc94f0b1`.
-Les deux frontends arm64-v8a/x86_64, l'alignement16Ko, l'absence de cœur et
+Les deux frontends arm64-v8a/x86_64, l'alignement 16 Ko, l'absence de cœur et
 l'absence du provider de tests ont été vérifiés. Le MP3 du succès conserve son
 hash d'origine malgré le nom de ressource optimisé par AAPT dans l'APK release.
 
@@ -789,3 +789,26 @@ résolu avant la qualification, sans changer l'APK.
 Les validations de la refonte et des 48 icônes restent applicables ; seuls le
 numéro de version, À propos et les liens README ont changé depuis leur contrôle.
 Pas de nouvelle qualification physique, ARM64, réseau public ou écoute audio.
+
+## Accueil, classement du menu rapide et identité de l'organisation
+
+Le bouton Réglages du titre est absent du dessin et du ciblage ; son onglet
+reste accessible. Les tests natifs vérifient l'ordre de toutes les actions et
+leurs cibles après défilement, en portrait/paysage et pour un/deux joueurs.
+Les 21 suites strictes et 21 ASan/UBSan passent, ainsi que build/lint Android et
+contrôles de base sans cœur, deux ABI et alignement 16 Ko.
+
+L'atlas Android passe196 contrôles, avec planche inspectée dans les trois
+palettes. Le fichier du lanceur est identique à l'avatar officiel récupéré :
+SHA256 `896f74c6c33739cf4a267eb068dc496b5e006b0aefb905fc91bacad2e82f8881`. Les petits glyphes sont des déclinaisons vectorielles
+du même modèle.
+
+Les parcours Android ciblés portrait et paysage passent : ancien bouton sans
+action, navigation, création et chargement d'état avec aperçu du framebuffer,
+options du cœur, défilement jusqu'à Quitter et fermeture avec cœur conservé.
+Les captures sont inspectées et aucun crash n'est enregistré. Le dialogue
+System UI du démarrage a été fermé avant reprise des essais.
+
+Base debug qualifiée : `edee3f440048ca6c7e635fbcdb22203c8311673d263395d075542a4aae570338`.
+Émulateur API29 x86_64, programmes originaux et transport d'archives contrôlé ;
+pas de nouvelle qualification physique, ARM64, réseau public ou audio.

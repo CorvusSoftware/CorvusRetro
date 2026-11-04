@@ -670,7 +670,6 @@ void cr_ui_touch_at(cr_ui *u, int id, int phase, float x, float y, double event_
             u->library_filter = -t - 211; u->scroll = 0; u->focus = cr_menu_library_count(u) ? 1 : 0;
             return;
         }
-        if (t == -300) { cr_menu_push_page(u, CR_SETTINGS); return; }
         if (t <= -100 && t >= -104) {
             static const int pages[] = {CR_MAIN, CR_LIBRARY, CR_SAVES_LIBRARY, CR_CORES, CR_SETTINGS};
             cr_ui_reload(u);

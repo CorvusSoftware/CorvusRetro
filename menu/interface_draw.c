@@ -88,9 +88,6 @@ static void header(const cr_ui *u, const cr_painter *p, const cr_theme *theme, c
         float width = p->measure ? p->measure(p->context, "Corvus", 21) : 70;
         text(p, "Retro", 64 + width, 35, 21,
              u->theme == CR_THEME_ASUS ? theme->header_text : theme->accent, u->width - 120 - width);
-        cr_widget_round(p, (cr_menu_rect){u->width - 47, 9, 36, 36}, 12,
-                         cr_widget_mix(cr_widget_mix(theme->header, theme->accent, .13f), theme->focus, pressing(u, -300)));
-        icon(p, CR_ICON_SETTINGS, u->width - 40, 16, 22, theme->header_icon);
         return;
     }
     if (back) {

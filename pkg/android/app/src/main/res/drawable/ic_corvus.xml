@@ -4,6 +4,11 @@
      SPDX-License-Identifier: AGPL-3.0-only -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp" android:height="24dp"
-    android:viewportWidth="24" android:viewportHeight="24">
-    <path android:fillColor="#FFFFFF" android:fillType="evenOdd" android:pathData="M12,2.5 L18.8,5.8 L21.7,10.7 L18,9.6 L21,16 L16.8,14.6 L12,22 L7.2,14.6 L3,16 L6,9.6 L2.3,10.7 L5.2,5.8 Z M6.2,7.3 L10.4,10.3 L7.2,9.8 Z M17.8,7.3 L16.8,9.8 L13.6,10.3 Z M11.4,11.8 L12,14 L12.6,11.8 L12,18 Z" />
+    android:viewportWidth="360" android:viewportHeight="360">
+    <group android:translateX="-50" android:translateY="-50">
+        <path android:fillColor="#FFFFFF" android:fillType="nonZero" android:pathData="M230,60 L286,83 L303,110 L283,106 L332,142 L361,179 L338,204 L335,156 L261,211 L230,187 L199,211 L125,156 L126,205 L102,179 L129,142 L177,106 L153,111 L174,83 Z" />
+        <path android:fillColor="#FFFFFF" android:fillType="nonZero" android:pathData="M145,190 L185,216 L151,211 Z M315,190 L275,216 L309,211 Z" />
+        <path android:fillColor="#FFFFFF" android:fillType="nonZero" android:pathData="M102,202 L67,251 L100,232 L73,296 L125,254 L118,286 L188,343 L157,260 L170,266 L166,252 Z M358,202 L393,251 L360,232 L387,296 L335,254 L342,286 L272,343 L303,260 L290,266 L294,252 Z" />
+        <path android:fillColor="#FFFFFF" android:fillType="evenOdd" android:pathData="M230,205 L281,250 L230,401 L179,250 Z M208,231 L214,265 L196,240 Z M252,231 L246,265 L264,240 Z M230,239 L233,375 L230,394 L227,375 Z" />
+    </group>
 </vector>
