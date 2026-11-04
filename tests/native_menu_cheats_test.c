@@ -101,6 +101,8 @@ int main(void) {
     check(u.page == CR_CHEAT_ENTRY, "valid code saved", &u);
     action(&u,ACT_CHEAT_ENABLE);
     check(find(&u,ACT_CHEAT_ENABLE).checked && !cr_engine_cheat_count(&u.engine,0), "toggle stages default", &u);
+    action(&u,ACT_CHEAT_NAME); cr_ui_text_result(&u,5,"",true);
+    check(!strcmp(find(&u,ACT_CHEAT_NAME).hint,"Code 1"),"empty name keeps readable generated label",&u);
     action(&u,ACT_CHEAT_NAME); cr_ui_text_result(&u,5,"PV émeraude",true);
     action(&u,ACT_CHEAT_CODE); cr_ui_text_result(&u,6,"invalid",true);
     check(u.page == CR_CHEAT_TEXT && f.field == 6, "invalid code keeps editor", &u);

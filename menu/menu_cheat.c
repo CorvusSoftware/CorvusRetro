@@ -249,7 +249,10 @@ bool cr_menu_cheats_text_result(cr_ui *u, int field, const char *text, bool acce
     cr_cheat_profile next = {0}; bool ok = copy(u, &next);
     if (ok) {
         cr_cheat_entry *c = &next.entries[u->cheats->selected];
-        if (number == 5) memcpy(c->name, text, strlen(text) + 1);
+        if (number == 5) {
+            if (text[0]) memcpy(c->name, text, strlen(text) + 1);
+            else snprintf(c->name, sizeof(c->name), "Code %d", u->cheats->selected + 1);
+        }
         else {
             snprintf(c->code, sizeof(c->code), "%s", text);
             if ((c->enabled || c->code[0]) && !cr_engine_validate_cheat(&u->engine, u->cheats->player, c->code)) {
