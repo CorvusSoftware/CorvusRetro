@@ -7,3 +7,5 @@ Les 21 suites natives strictes et 21 ASan/UBSan passent ; les tests vérifient a
 Base debug SHA256 :edee3f440048ca6c7e635fbcdb22203c8311673d263395d075542a4aae570338. Preuves : /workspace/setup/home-quick-branding. Un dialogue System UI du boot a été fermé avant reprise du contrôle ; pas de modification de l'APK pour le contourner.
 
 Livraison en PR, contrôler CI du head publié avant sortie du brouillon. Pas de fusion/release pour cette nouvelle demande ; version et signature de publication inchangées.
+
+Nouvelle autorisation explicite du mainteneur : une fois terminé, fusionner PR #31 et publier la version corrective. Préparation0.23.1/code32, même certificat durable. CI GitHub encore en file au début de cette reprise ; contrôler le nouveau head avant fusion, puis CI main, build signé, qualification de la mise à jour31->32 et publication exacte. Reprise : /workspace/setup/release0231/state.json.
