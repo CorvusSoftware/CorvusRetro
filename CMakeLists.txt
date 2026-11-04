@@ -76,7 +76,7 @@ file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/generated/cr_bundled_cores.h"
     CONTENT "${_corvus_catalog}")
 
 option(CORVUS_SANITIZE "Instrument the original portable C code" OFF)
-set(CORVUS_INCLUDE_DIRS "${CORVUS_ROOT}/menu" "${CORVUS_ROOT}/cores"
+set(CORVUS_INCLUDE_DIRS "${CORVUS_ROOT}" "${CORVUS_ROOT}/menu" "${CORVUS_ROOT}/cores"
     "${CORVUS_ROOT}/frontend" "${CORVUS_ROOT}/frontend/drivers"
     "${CORVUS_ROOT}/gfx" "${CORVUS_ROOT}/gfx/drivers" "${CORVUS_ROOT}/input" "${CORVUS_ROOT}/audio/drivers" "${CORVUS_ROOT}/tasks" "${CORVUS_ROOT}/gfx/widgets")
 find_package(Threads REQUIRED)
@@ -85,7 +85,8 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CORVUS_MENU_SOURCES
     menu/menu_driver.c menu/menu_displaylist.c menu/menu_setting.c menu/cbs/menu_cbs_ok.c
-    menu/interface_layout.c menu/interface_draw.c menu/widgets.c menu/theme.c)
+    menu/interface_layout.c menu/interface_draw.c menu/widgets.c menu/theme.c
+    menu/menu_cheat.c cheats/cheat_store.c)
 add_library(corvus_frontend STATIC cores/engine.c cores/state_store.c cores/core_registry.c
     ${CORVUS_MENU_SOURCES} gfx/viewport.c input/play_layout.c input/overlay.c
     input/controller_ports.c gfx/widgets/notifications.c)
@@ -131,6 +132,34 @@ else()
         "$<TARGET_FILE:engine_configuration_normal>" "$<TARGET_FILE:engine_configuration_reordered>"
         "$<TARGET_FILE:engine_configuration_legacy>" "$<TARGET_FILE:engine_configuration_malformed>"
         "$<TARGET_FILE:engine_configuration_states>")
+    add_executable(native_cheat_store_test tests/native_cheat_store_test.c)
+    target_link_libraries(native_cheat_store_test PRIVATE corvus_frontend)
+    target_compile_options(native_cheat_store_test PRIVATE -Wall -Wextra -Werror)
+    add_test(NAME native_cheat_store COMMAND native_cheat_store_test)
+    add_executable(native_engine_cheats_test tests/native_engine_cheats_test.c)
+    target_link_libraries(native_engine_cheats_test PRIVATE corvus_frontend)
+    target_compile_options(native_engine_cheats_test PRIVATE -Wall -Wextra -Werror)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        target_compile_definitions(native_cheat_store_test PRIVATE CR_CHEAT_TEST_FAILURES)
+        target_link_options(native_cheat_store_test PRIVATE
+            "-Wl,--wrap=fsync" "-Wl,--wrap=malloc" "-Wl,--wrap=calloc" "-Wl,--wrap=realloc")
+        target_compile_definitions(native_engine_cheats_test PRIVATE CR_TEST_WRAP_CHEAT_ALLOC)
+        target_link_options(native_engine_cheats_test PRIVATE "-Wl,--wrap=calloc" "-Wl,--wrap=strdup")
+    endif()
+    set(CORVUS_CHEAT_TEST_TARGETS native_cheat_store_test native_engine_cheats_test)
+    set(_corvus_cheat_fixtures "")
+    foreach(variant RANGE 1 6)
+        add_library(engine_cheats_invalid_${variant} SHARED tests/native_engine_cheats_test.c)
+        target_link_libraries(engine_cheats_invalid_${variant} PRIVATE CorvusAPI::CorvusAPI)
+        target_compile_options(engine_cheats_invalid_${variant} PRIVATE -Wall -Wextra -Werror)
+        target_compile_definitions(engine_cheats_invalid_${variant} PRIVATE CR_CHEATS_FIXTURE=${variant})
+        add_dependencies(native_engine_cheats_test engine_cheats_invalid_${variant})
+        list(APPEND CORVUS_CHEAT_TEST_TARGETS engine_cheats_invalid_${variant})
+        list(APPEND _corvus_cheat_fixtures "$<TARGET_FILE:engine_cheats_invalid_${variant}>")
+    endforeach()
+    add_dependencies(native_engine_cheats_test engine_configuration_legacy)
+    add_test(NAME native_engine_cheats COMMAND native_engine_cheats_test
+        "$<TARGET_FILE:engine_configuration_legacy>" ${_corvus_cheat_fixtures})
     add_executable(native_frontend_test "${CORVUS_ROOT}/tests/native_frontend_test.c")
     target_link_libraries(native_frontend_test PRIVATE corvus_frontend)
     target_compile_options(native_frontend_test PRIVATE -Wall -Wextra -Werror)
@@ -190,6 +219,10 @@ else()
     add_dependencies(native_configuration_menu_test engine_configuration_states)
     add_test(NAME native_configuration_menu COMMAND native_configuration_menu_test
         "$<TARGET_FILE:engine_configuration_states>")
+    add_executable(native_menu_cheats_test tests/native_menu_cheats_test.c)
+    target_link_libraries(native_menu_cheats_test PRIVATE corvus_frontend)
+    target_compile_options(native_menu_cheats_test PRIVATE -Wall -Wextra -Werror)
+    add_test(NAME native_menu_cheats COMMAND native_menu_cheats_test)
     add_executable(native_core_removal_test tests/native_core_removal_test.c)
     target_link_libraries(native_core_removal_test PRIVATE corvus_frontend)
     target_compile_options(native_core_removal_test PRIVATE -Wall -Wextra -Werror)
@@ -239,10 +272,10 @@ else()
     target_compile_options(native_notifications_test PRIVATE -Wall -Wextra -Werror)
     add_test(NAME native_notifications COMMAND native_notifications_test)
     if(CORVUS_SANITIZE)
-        foreach(target native_interface_test native_state_store_test native_audio_sync_test native_async_battery_test native_audio_test native_core_removal_test corvus_frontend corvus_cheevos native_notifications_test native_cheevos_test native_achievement_tasks_test native_engine_test native_engine_configuration_test engine_configuration_normal engine_configuration_reordered engine_configuration_legacy engine_configuration_malformed engine_configuration_states native_frontend_test native_viewport_test native_controls_test native_menu_test native_configuration_menu_test native_controller_ports_test native_save_transfer_test native_media_settings_test native_settings_menu_test native_registry_test)
+        foreach(target ${CORVUS_CHEAT_TEST_TARGETS} native_interface_test native_state_store_test native_audio_sync_test native_async_battery_test native_audio_test native_core_removal_test corvus_frontend corvus_cheevos native_notifications_test native_cheevos_test native_achievement_tasks_test native_engine_test native_engine_configuration_test engine_configuration_normal engine_configuration_reordered engine_configuration_legacy engine_configuration_malformed engine_configuration_states native_frontend_test native_viewport_test native_controls_test native_menu_test native_menu_cheats_test native_configuration_menu_test native_controller_ports_test native_save_transfer_test native_media_settings_test native_settings_menu_test native_registry_test)
             target_compile_options(${target} PRIVATE -g -O1 -fsanitize=address,undefined -fno-omit-frame-pointer)
         endforeach()
-        foreach(target native_interface_test native_state_store_test native_audio_sync_test native_async_battery_test native_audio_test native_core_removal_test native_notifications_test native_cheevos_test native_achievement_tasks_test native_engine_test native_engine_configuration_test engine_configuration_normal engine_configuration_reordered engine_configuration_legacy engine_configuration_malformed engine_configuration_states native_frontend_test native_viewport_test native_controls_test native_menu_test native_configuration_menu_test native_controller_ports_test native_save_transfer_test native_media_settings_test native_settings_menu_test native_registry_test)
+        foreach(target ${CORVUS_CHEAT_TEST_TARGETS} native_interface_test native_state_store_test native_audio_sync_test native_async_battery_test native_audio_test native_core_removal_test native_notifications_test native_cheevos_test native_achievement_tasks_test native_engine_test native_engine_configuration_test engine_configuration_normal engine_configuration_reordered engine_configuration_legacy engine_configuration_malformed engine_configuration_states native_frontend_test native_viewport_test native_controls_test native_menu_test native_menu_cheats_test native_configuration_menu_test native_controller_ports_test native_save_transfer_test native_media_settings_test native_settings_menu_test native_registry_test)
             target_link_options(${target} PRIVATE -fsanitize=address,undefined)
         endforeach()
     endif()

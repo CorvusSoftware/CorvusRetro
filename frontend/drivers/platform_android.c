@@ -330,7 +330,7 @@ void android_main(struct android_app *app) {
     unsigned last_players = ~0u, last_controlled = ~0u;
     int last_page = -1, last_core = -2, last_content = -1, last_quick = -1, last_theme = -1,
         last_active = -1, last_show_input = -1, last_installing = -1, last_ui_editing = -1, last_focus = -1;
-    size_t last_query_length = SIZE_MAX;
+    size_t last_query_length = SIZE_MAX, last_cheats = SIZE_MAX;
 #endif
     while (!app->destroyRequested) {
         bool active = a->window && a->resumed;
@@ -359,7 +359,7 @@ void android_main(struct android_app *app) {
             cr_achievement_response_dispose(&response);
         }
         int text_field;
-        char input_text[513];
+        char input_text[4097];
         bool accepted;
         if (cr_android_text_result(&text_field, input_text, sizeof(input_text), &accepted)) {
             cr_ui_text_result(&a->ui, text_field, input_text, accepted);
@@ -371,6 +371,11 @@ void android_main(struct android_app *app) {
         cr_save_transfer_result save_result;
         if (cr_android_save_transfer_result(&save_result))
             cr_ui_save_transfer_result(&a->ui, &save_result);
+        cr_cheat_file_result cheat_result;
+        if (cr_android_cheat_file_result(&cheat_result)) {
+            cr_ui_cheat_file_result(&a->ui, &cheat_result);
+            free(cheat_result.data);
+        }
         cr_core_catalog core_catalog;
         if (cr_android_core_catalog(&core_catalog))
             cr_ui_catalog(&a->ui, &core_catalog);
@@ -400,12 +405,14 @@ void android_main(struct android_app *app) {
             last_theme != a->ui.theme || last_active != active || last_show_input != a->ui.show_input ||
             last_installing != a->ui.installing || last_players != a->ui.engine.players ||
             last_controlled != a->ui.input_player || last_ui_editing != a->ui.ui_editing ||
-            last_query_length != strlen(a->ui.library_query) || last_focus != a->ui.focus) {
+            last_query_length != strlen(a->ui.library_query) || last_focus != a->ui.focus ||
+            last_cheats != cr_engine_cheat_count(&a->ui.engine, 0)) {
             __android_log_print(ANDROID_LOG_DEBUG, "CorvusRetro",
-                                "frontend page=%d core=%d content=%d quick=%d theme=%d active=%d show_input=%d installing=%d players=%u controlled=%u search_length=%zu editing=%d focus=%d",
+                                "frontend page=%d core=%d content=%d quick=%d theme=%d active=%d show_input=%d installing=%d players=%u controlled=%u search_length=%zu editing=%d focus=%d cheats=%zu",
                                 a->ui.page, a->ui.engine.system, a->ui.engine.loaded, a->ui.quick,
                                 a->ui.theme, active, a->ui.show_input, a->ui.installing, a->ui.engine.players, a->ui.input_player,
-                                strlen(a->ui.library_query), a->ui.ui_editing, a->ui.focus);
+                                strlen(a->ui.library_query), a->ui.ui_editing, a->ui.focus,
+                                cr_engine_cheat_count(&a->ui.engine, 0));
             last_page = a->ui.page;
             last_core = a->ui.engine.system;
             last_content = a->ui.engine.loaded;
@@ -419,6 +426,7 @@ void android_main(struct android_app *app) {
             last_query_length = strlen(a->ui.library_query);
             last_ui_editing = a->ui.ui_editing;
             last_focus = a->ui.focus;
+            last_cheats = cr_engine_cheat_count(&a->ui.engine, 0);
         }
 #endif
         if (running != a->was_running) {

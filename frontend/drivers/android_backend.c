@@ -22,6 +22,11 @@ static pthread_mutex_t save_mutex = PTHREAD_MUTEX_INITIALIZER;
 static uint64_t save_request;
 static cr_save_transfer_result save_result;
 static bool save_ready, save_delivered;
+static pthread_mutex_t cheat_mutex = PTHREAD_MUTEX_INITIALIZER;
+static uint64_t cheat_request, cheat_last_request;
+static cr_cheat_file_result cheat_result;
+static bool cheat_ready, cheat_delivered;
+#define CR_ANDROID_CHEAT_BYTES (2u * 1024u * 1024u)
 static ALooper *import_looper;
 static pthread_mutex_t core_mutex = PTHREAD_MUTEX_INITIALIZER;
 static char pending_modules[CR_MAX_CORES][4096];
@@ -34,7 +39,7 @@ static bool core_status_ready;
 static bool core_status_finished;
 
 static pthread_mutex_t text_mutex = PTHREAD_MUTEX_INITIALIZER;
-static char text_value[513];
+static char text_value[4097];
 static int text_field;
 static bool text_ready, text_accepted;
 static uint64_t text_generation;
@@ -44,7 +49,7 @@ static cr_controller_device controller_devices[CR_CONTROLLER_DEVICE_CAP];
 static char controller_names[CR_CONTROLLER_DEVICE_CAP][128];
 static size_t controller_count;
 static bool controller_ready;
-static void string_copy(JNIEnv *, jstring, char *, size_t);
+static bool string_copy(JNIEnv *, jstring, char *, size_t);
 static void wake_frontend(void) {
     pthread_mutex_lock(&import_mutex);
     if (import_looper) ALooper_wake(import_looper);
@@ -127,29 +132,32 @@ bool cr_android_clear_error(cr_android *p) {
     __android_log_write(ANDROID_LOG_ERROR, "CorvusRetro", "Erreur de service Android");
     return true;
 }
-static void string_copy(JNIEnv *env, jstring value, char *out, size_t cap) {
+static bool string_copy(JNIEnv *env, jstring value, char *out, size_t cap) {
     if (!cap)
-        return;
+        return false;
     out[0] = 0;
     if (!value)
-        return;
+        return true;
     const jchar *src = (*env)->GetStringChars(env, value, NULL);
     if (!src)
-        return;
+        return false;
     jsize length = (*env)->GetStringLength(env, value);
     size_t at = 0;
+    bool exact = true;
     for (jsize i = 0; i < length; i++) {
         uint32_t c = src[i];
         if (c >= 0xd800 && c <= 0xdbff && i + 1 < length && src[i + 1] >= 0xdc00 &&
             src[i + 1] <= 0xdfff) {
             c = 0x10000 + ((c - 0xd800) << 10) + (src[++i] - 0xdc00);
-        } else if (c >= 0xd800 && c <= 0xdfff)
-            c = '?';
-        if (!c)
-            c = '?';
+        } else if (c >= 0xd800 && c <= 0xdfff) {
+            c = '?'; exact = false;
+        }
+        if (!c) { c = '?'; exact = false; }
         unsigned n = c < 0x80 ? 1 : c < 0x800 ? 2 : c < 0x10000 ? 3 : 4;
-        if (at + n >= cap)
+        if (at + n >= cap) {
+            exact = false;
             break;
+        }
         if (n == 1)
             out[at++] = (char)c;
         else {
@@ -168,6 +176,37 @@ static void string_copy(JNIEnv *env, jstring value, char *out, size_t cap) {
     }
     out[at] = 0;
     (*env)->ReleaseStringChars(env, value, src);
+    return exact;
+}
+/* NewStringUTF expects modified UTF-8, while menu strings contain standard UTF-8. */
+static jstring utf8_string(JNIEnv *env, const char *text) {
+    if (!text) return NULL;
+    size_t length = strnlen(text, 4097);
+    if (length > 4096) return NULL;
+    jchar utf16[4096];
+    jsize count = 0;
+    for (size_t at = 0; at < length;) {
+        uint32_t c = (uint8_t)text[at++];
+        unsigned remaining = 0;
+        uint32_t minimum = 0;
+        if (c >= 0xc2 && c <= 0xdf) { c &= 31; remaining = 1; minimum = 0x80; }
+        else if (c >= 0xe0 && c <= 0xef) { c &= 15; remaining = 2; minimum = 0x800; }
+        else if (c >= 0xf0 && c <= 0xf4) { c &= 7; remaining = 3; minimum = 0x10000; }
+        else if (c >= 0x80) return NULL;
+        if (remaining > length - at) return NULL;
+        while (remaining--) {
+            uint8_t next = (uint8_t)text[at++];
+            if ((next & 0xc0) != 0x80) return NULL;
+            c = (c << 6) | (next & 63);
+        }
+        if (c < minimum || c > 0x10ffff || (c >= 0xd800 && c <= 0xdfff)) return NULL;
+        if (c >= 0x10000) {
+            c -= 0x10000;
+            utf16[count++] = (jchar)(0xd800 | (c >> 10));
+            utf16[count++] = (jchar)(0xdc00 | (c & 1023));
+        } else utf16[count++] = (jchar)c;
+    }
+    return (*env)->NewString(env, utf16, count);
 }
 JNIEXPORT void JNICALL Java_com_corvussoftware_corvusretro_MainActivity_coreCatalogUpdated(
     JNIEnv *env, jclass cls, jobjectArray rows, jstring error) {
@@ -215,16 +254,22 @@ JNIEXPORT void JNICALL Java_com_corvussoftware_corvusretro_MainActivity_coreCata
 JNIEXPORT void JNICALL Java_com_corvussoftware_corvusretro_MainActivity_textInputResultNative(
     JNIEnv *env, jclass cls, jint field, jstring text, jboolean accepted, jlong ticket) {
     (void)cls;
-    if (!field || field < -4 || field > 4) return;
+    if (!field || field < -6 || field > 6) return;
     int input = field < 0 ? -field : field;
-    size_t limit = input == 3 ? 128 : input == 4 ? 96 : sizeof(text_value);
+    size_t limit = input == 3 || input == 5 ? 128 : input == 4 ? 96 : input == 6 ? 4097 : 513;
     pthread_mutex_lock(&text_mutex);
     if (!ticket || (uint64_t)ticket != text_generation || input != text_active_field ||
         (field < 0 && !accepted)) {
         pthread_mutex_unlock(&text_mutex);
         return;
     }
-    string_copy(env, text, text_value, limit);
+    bool exact = string_copy(env, text, text_value, limit);
+    if ((*env)->ExceptionCheck(env)) { pthread_mutex_unlock(&text_mutex); return; }
+    if (input >= 5 && (!text || !exact)) {
+        memset(text_value, 0, sizeof(text_value));
+        if (field < 0) { pthread_mutex_unlock(&text_mutex); return; }
+        accepted = JNI_FALSE;
+    }
     text_field = field; text_accepted = accepted; text_ready = true;
     if (field > 0) text_active_field = 0;
     pthread_mutex_unlock(&text_mutex);
@@ -235,7 +280,8 @@ bool cr_android_text_result(int *field, char *text, size_t size, bool *accepted)
     bool ready = text_ready;
     if (ready) {
         *field = text_field; *accepted = text_accepted;
-        snprintf(text, size, "%s", text_value);
+        if (size && strlen(text_value) < size) memcpy(text, text_value, strlen(text_value) + 1);
+        else { if (size) text[0] = 0; *accepted = false; }
         memset(text_value, 0, sizeof(text_value));
         text_ready = false;
     }
@@ -351,6 +397,56 @@ bool cr_android_save_transfer_result(cr_save_transfer_result *out) {
     pthread_mutex_unlock(&save_mutex);
     return ready;
 }
+JNIEXPORT void JNICALL Java_com_corvussoftware_corvusretro_MainActivity_cheatFileResult(
+    JNIEnv *env, jclass cls, jlong request, jbyteArray bytes, jstring error, jboolean cancelled) {
+    (void)cls;
+    if (request <= 0) return;
+    pthread_mutex_lock(&cheat_mutex);
+    bool expected = cheat_request == (uint64_t)request && !cheat_delivered;
+    pthread_mutex_unlock(&cheat_mutex);
+    if (!expected) return;
+    cr_cheat_file_result result = {.request = (uint64_t)request, .cancelled = cancelled != JNI_FALSE};
+    if (!string_copy(env, error, result.error, sizeof(result.error)))
+        snprintf(result.error, sizeof(result.error), "Réponse de codes trop longue");
+    if (!result.cancelled && !result.error[0]) {
+        jsize size = bytes ? (*env)->GetArrayLength(env, bytes) : -1;
+        if (size < 0 || (size_t)size > CR_ANDROID_CHEAT_BYTES)
+            snprintf(result.error, sizeof(result.error), "Liste de codes absente ou trop grande");
+        else if (size) {
+            result.data = malloc((size_t)size);
+            if (!result.data) snprintf(result.error, sizeof(result.error), "Mémoire insuffisante");
+            else {
+                result.size = (size_t)size;
+                (*env)->GetByteArrayRegion(env, bytes, 0, size, (jbyte *)result.data);
+            }
+        }
+    }
+    if ((*env)->ExceptionCheck(env)) { free(result.data); return; }
+    pthread_mutex_lock(&cheat_mutex);
+    if (cheat_request == (uint64_t)request && !cheat_delivered) {
+        cheat_result = result; result.data = NULL;
+        cheat_ready = cheat_delivered = true;
+    }
+    pthread_mutex_unlock(&cheat_mutex);
+    free(result.data);
+    wake_frontend();
+}
+bool cr_android_cheat_file_result(cr_cheat_file_result *out) {
+    pthread_mutex_lock(&cheat_mutex);
+    bool ready = cheat_ready;
+    if (ready) {
+        *out = cheat_result;
+        cheat_result.data = NULL; cheat_result.size = 0; cheat_ready = false;
+    }
+    pthread_mutex_unlock(&cheat_mutex);
+    return ready;
+}
+static void clear_cheat_file(void) {
+    pthread_mutex_lock(&cheat_mutex);
+    cheat_request = 0; cheat_ready = cheat_delivered = false;
+    free(cheat_result.data); memset(&cheat_result, 0, sizeof(cheat_result));
+    pthread_mutex_unlock(&cheat_mutex);
+}
 bool cr_android_import(cr_import *out) {
     pthread_mutex_lock(&import_mutex);
     bool ready = import_ready;
@@ -364,6 +460,7 @@ bool cr_android_import(cr_import *out) {
 bool cr_android_init(cr_android *p, struct android_app *app) {
     memset(p, 0, sizeof(*p));
     p->app = app;
+    clear_cheat_file();
     pthread_mutex_lock(&text_mutex);
     if (!++text_generation) ++text_generation;
     text_active_field = 0;
@@ -398,6 +495,9 @@ bool cr_android_init(cr_android *p, struct android_app *app) {
     METHOD(set_preference, "preferenceSet", "(Ljava/lang/String;I)V");
     METHOD(pick, "pickContent", "(I)V");
     METHOD(pick_folder, "pickFolder", "(ILjava/lang/String;)V");
+    METHOD(cheat_file, "cheatFile", "(JZLjava/lang/String;[B)V");
+    METHOD(finish_cheat_file, "finishCheatFile", "(J)V");
+    METHOD(submit_text, "submitText", "(J)V");
     METHOD(save_transfer, "saveTransfer", "(JILjava/lang/String;[B)V");
     METHOD(finish_save_transfer, "finishSaveTransfer", "(J)V");
     METHOD(finish, "finishImport", "(ZILjava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
@@ -449,6 +549,7 @@ bool cr_android_init(cr_android *p, struct android_app *app) {
     return true;
 }
 void cr_android_destroy(cr_android *p) {
+    clear_cheat_file();
     pthread_mutex_lock(&save_mutex);
     save_request = 0; save_ready = save_delivered = false;
     memset(&save_result, 0, sizeof(save_result));
@@ -675,7 +776,7 @@ static void save_achievement_credentials(void *ctx, const char *user, const char
 }
 static void edit_text(void *ctx, int field, const char *text, bool secret) {
     cr_android *p = ctx;
-    if (field < 0 || field > 4 || secret != (field == 2)) return;
+    if (field < 0 || field > 6 || secret != (field == 2)) return;
     pthread_mutex_lock(&text_mutex);
     if (!++text_generation) ++text_generation;
     uint64_t ticket = text_generation;
@@ -683,12 +784,61 @@ static void edit_text(void *ctx, int field, const char *text, bool secret) {
     text_ready = false;
     memset(text_value, 0, sizeof(text_value));
     pthread_mutex_unlock(&text_mutex);
-    jstring initial = (*p->env)->NewStringUTF(p->env, text);
+    jstring initial = utf8_string(p->env, text);
     if (initial) {
         (*p->env)->CallVoidMethod(p->env, p->app->activity->clazz, p->edit_text,
                                  field, initial, (jboolean)secret, (jlong)ticket);
         (*p->env)->DeleteLocalRef(p->env, initial);
     }
+    cr_android_clear_error(p);
+}
+static void submit_text(void *context) {
+    cr_android *p = context;
+    pthread_mutex_lock(&text_mutex);
+    uint64_t ticket = text_active_field == 5 || text_active_field == 6 ? text_generation : 0;
+    pthread_mutex_unlock(&text_mutex);
+    if (!ticket) return;
+    (*p->env)->CallVoidMethod(p->env, p->app->activity->clazz, p->submit_text, (jlong)ticket);
+    cr_android_clear_error(p);
+}
+static bool cheat_file(void *context, uint64_t request, bool exporting, const char *title,
+                       const uint8_t *bytes, size_t size) {
+    cr_android *p = context;
+    if (!request || request > INT64_MAX || size > CR_ANDROID_CHEAT_BYTES ||
+        (size && !bytes) || (!exporting && (bytes || size))) return false;
+    pthread_mutex_lock(&cheat_mutex);
+    bool available = !cheat_request && request > cheat_last_request;
+    pthread_mutex_unlock(&cheat_mutex);
+    if (!available) return false;
+    jstring name = utf8_string(p->env, title ? title : "");
+    jbyteArray data = exporting ? (*p->env)->NewByteArray(p->env, (jsize)size) : NULL;
+    bool ok = name && (!exporting || data) && !cr_android_clear_error(p);
+    if (ok && size) (*p->env)->SetByteArrayRegion(p->env, data, 0, (jsize)size, (const jbyte *)bytes);
+    ok = ok && !cr_android_clear_error(p);
+    if (ok) {
+        pthread_mutex_lock(&cheat_mutex);
+        cheat_request = cheat_last_request = request;
+        cheat_ready = cheat_delivered = false;
+        pthread_mutex_unlock(&cheat_mutex);
+        (*p->env)->CallVoidMethod(p->env, p->app->activity->clazz, p->cheat_file,
+                                 (jlong)request, (jboolean)exporting, name, data);
+        ok = !cr_android_clear_error(p);
+        if (!ok) clear_cheat_file();
+    }
+    if (name) (*p->env)->DeleteLocalRef(p->env, name);
+    if (data) (*p->env)->DeleteLocalRef(p->env, data);
+    cr_android_clear_error(p);
+    return ok;
+}
+static void finish_cheat_file(void *context, uint64_t request) {
+    cr_android *p = context;
+    pthread_mutex_lock(&cheat_mutex);
+    if (cheat_request == request) {
+        cheat_request = 0; cheat_ready = cheat_delivered = false;
+        free(cheat_result.data); memset(&cheat_result, 0, sizeof(cheat_result));
+    }
+    pthread_mutex_unlock(&cheat_mutex);
+    (*p->env)->CallVoidMethod(p->env, p->app->activity->clazz, p->finish_cheat_file, (jlong)request);
     cr_android_clear_error(p);
 }
 static bool save_transfer(void *context, uint64_t request, int operation, const char *title,
@@ -782,5 +932,5 @@ cr_platform cr_android_services(cr_android *p) {
     return (cr_platform){p, pref, set_pref, pick, finish, games, touch, credits,
                          appearance, quit, refresh_catalog, install_pack, install_pending,
                          achievement_request, achievement_credentials, save_achievement_credentials, edit_text,
-                         pick_folder, save_transfer, finish_save_transfer, controller_info, achievement_sound, can_remove_core, remove_core, game_image, share_state};
+                         pick_folder, save_transfer, finish_save_transfer, controller_info, achievement_sound, can_remove_core, remove_core, game_image, share_state, cheat_file, finish_cheat_file, submit_text};
 }

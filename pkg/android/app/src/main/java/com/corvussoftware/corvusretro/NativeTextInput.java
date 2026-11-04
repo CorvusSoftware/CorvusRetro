@@ -26,7 +26,7 @@ final class NativeTextInput {
     NativeTextInput(MainActivity activity) { this.activity = activity; }
 
     void open(int field, String initial, boolean secret, long ticket) {
-        if (field < 0 || field > 4 || secret != (field == 2) || ticket == 0) return;
+        if (field < 0 || field > 6 || secret != (field == 2) || ticket == 0) return;
         requestedTicket = ticket;
         activity.runOnUiThread(() -> {
             if (!activity.isAlive() || requestedTicket != ticket) return;
@@ -48,6 +48,13 @@ final class NativeTextInput {
         if (editor != null) editor.complete(false, false);
     }
 
+    void submit(long ticket) {
+        activity.runOnUiThread(() -> {
+            if (activity.isAlive() && requestedTicket == ticket && editor != null && editor.ticket == ticket)
+                editor.complete(true);
+        });
+    }
+
     private final class Editor extends View {
         private final int field;
         private final boolean secret;
@@ -57,12 +64,13 @@ final class NativeTextInput {
         Editor(int field, String initial, boolean secret, long ticket) {
             super(activity);
             this.field = field; this.secret = secret; this.ticket = ticket;
-            value = new SpannableStringBuilder(initial == null ? "" : initial);
+            value = new SpannableStringBuilder();
             if (field >= 3) {
-                int limit = field == 3 ? 127 : 95;
+                int limit = field == 6 ? 4096 : field == 3 || field == 5 ? 127 : 95;
                 value.setFilters(new InputFilter[] {(source,start,end,destination,dstart,dend) ->
-                        Utf8Text.filter(source,start,end,destination,dstart,dend,limit)});
+                        Utf8Text.filter(source,start,end,destination,dstart,dend,limit,field == 6)});
             } else value.setFilters(new InputFilter[] {new InputFilter.LengthFilter(secret ? 128 : 64)});
+            value.append(initial == null ? "" : initial);
             Selection.setSelection(value, value.length());
             setFocusable(true); setFocusableInTouchMode(true);
             setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS);
@@ -71,6 +79,7 @@ final class NativeTextInput {
         @Override public InputConnection onCreateInputConnection(EditorInfo info) {
             info.inputType = InputType.TYPE_CLASS_TEXT | (secret
                     ? InputType.TYPE_TEXT_VARIATION_PASSWORD : InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+            if (field == 6) info.inputType |= InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
             info.imeOptions = EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_EXTRACT_UI
                     | EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING;
             info.initialSelStart = info.initialSelEnd = value.length();
@@ -87,8 +96,12 @@ final class NativeTextInput {
                 }
                 @Override public boolean performEditorAction(int action) { complete(true); return true; }
                 @Override public boolean sendKeyEvent(KeyEvent event) {
-                    if (event.getKeyCode() == KeyEvent.KEYCODE_ENTER && event.getAction() == KeyEvent.ACTION_UP) {
-                        complete(true); return true;
+                    if (event.getKeyCode() == KeyEvent.KEYCODE_ENTER) {
+                        if (event.getAction() == KeyEvent.ACTION_UP) {
+                            if (field == 6) return commitText("\n", 1);
+                            complete(true);
+                        }
+                        return true;
                     }
                     return super.sendKeyEvent(event);
                 }
@@ -106,7 +119,14 @@ final class NativeTextInput {
                 else if (start > 0) value.delete(Character.offsetByCodePoints(value, start, -1), start);
                 preview(); return true;
             }
-            if (code == KeyEvent.KEYCODE_ENTER) { complete(true); return true; }
+            if (code == KeyEvent.KEYCODE_ENTER) {
+                if (field != 6) { complete(true); return true; }
+                int start = Math.max(0, Selection.getSelectionStart(value));
+                int end = Math.max(start, Selection.getSelectionEnd(value));
+                value.replace(start, end, "\n");
+                Selection.setSelection(value, Math.min(start + 1, value.length()));
+                preview(); return true;
+            }
             int unicode = event.getUnicodeChar();
             if (unicode > 0 && !Character.isISOControl(unicode)) {
                 int start = Math.max(0, Selection.getSelectionStart(value));

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #define _POSIX_C_SOURCE 200809L
 #include "menu_cbs.h"
+#include "menu_cheat.h"
 #include "menu_internal.h"
 #include "menu_setting.h"
 #include "core_registry.h"
@@ -129,6 +130,7 @@ static void load_named_state(cr_ui *u, const cr_state_entry *entry) {
             opened = cr_engine_open_subsystem(&u->engine, core, entry->subsystem_id, ids, files);
         } else opened = cr_engine_open(&u->engine, core, entry->game_id, paths[0]);
         if (!result(u, opened)) return;
+        cr_menu_cheats_loaded(u);
         ++u->core_revision;
         u->input_player = 0;
         cr_notifications_clear(&u->notifications);
@@ -155,6 +157,7 @@ static void open_game(cr_ui *u, int system, const char *id, const char *title, c
     }
     if (!result(u, cr_engine_open(&u->engine, system, id, path)))
         return;
+    cr_menu_cheats_loaded(u);
     ++u->core_revision;
     u->input_player = 0;
     cr_notifications_clear(&u->notifications);
@@ -179,6 +182,7 @@ static void start_subsystem(cr_ui *u) {
         snprintf(files[i], sizeof(files[i]), "%s/roms/%s.rom", u->engine.root, ids[i]);
     if (!result(u, cr_engine_open_subsystem(&u->engine, u->engine.system,
                                           subsystem.id, ids, paths))) return;
+    cr_menu_cheats_loaded(u);
     ++u->core_revision;
     u->input_player = 0;
     cr_notifications_clear(&u->notifications);
@@ -299,6 +303,7 @@ static bool import_save_file(cr_ui *u) {
     return ok;
 }
 void cr_menu_activate(cr_ui *u, row r) {
+    if (cr_menu_cheat_activate(u, r)) return;
     if (u->controller_capture >= 0) return;
     if ((r.action == ACT_CORE_REMOVE || r.action == ACT_CORE_REMOVE_CONFIRM) &&
         (u->save_request || u->importing || u->installing)) {
@@ -409,6 +414,7 @@ void cr_menu_activate(cr_ui *u, row r) {
             !u->platform.can_remove_core(u->platform.context,u->remove_core_id)) break;
         if (u->engine.handle && u->engine.system == slot) {
             if (!result(u,cr_engine_close(&u->engine))) break;
+            cr_menu_cheats_destroy(u);
             ++u->core_revision; clear_link_selection(u);
             u->option_key[0]=0; u->input_player=0; u->title[0]=0;
             cr_cheevos_unload_game(u->achievements); cr_notifications_clear(&u->notifications);
@@ -629,6 +635,7 @@ void cr_menu_activate(cr_ui *u, row r) {
         break;
     case ACT_UNLOAD:
         if (result(u, cr_engine_close(&u->engine))) {
+            cr_menu_cheats_destroy(u);
             ++u->core_revision;
             clear_link_selection(u);
             u->option_key[0] = 0;
@@ -694,6 +701,7 @@ void cr_menu_activate(cr_ui *u, row r) {
     }
     case ACT_SELECT:
         if (result(u, cr_engine_select(&u->engine, r.value))) {
+            cr_menu_cheats_destroy(u);
             ++u->core_revision;
             clear_link_selection(u);
             u->option_key[0] = 0;
@@ -846,6 +854,7 @@ void cr_menu_quick_action(cr_ui *u, int action) {
         break;
     case CR_QUICK_CLOSE:
         if (result(u, cr_engine_unload_game(&u->engine))) {
+            cr_menu_cheats_destroy(u);
             cr_menu_achievement_sync(u, false);
             u->title[0] = 0;
             u->input_player = 0;
@@ -861,6 +870,7 @@ void cr_menu_quick_action(cr_ui *u, int action) {
     case CR_QUICK_STATES:
         u->auto_state_available = cr_engine_has_auto_state(&u->engine);
         cr_menu_push_page(u, CR_SAVESTATES); break;
+    case CR_QUICK_CHEATS: cr_menu_cheats_open(u); break;
     case CR_QUICK_CORE_OPTIONS: cr_menu_push_page(u, CR_CORE_OPTIONS); break;
     case CR_QUICK_CONTROLS: cr_menu_push_page(u, CR_OVERLAY_SETTINGS); break;
     case CR_QUICK_ACHIEVEMENTS: cr_menu_push_page(u, CR_ACHIEVEMENTS); break;

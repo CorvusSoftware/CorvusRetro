@@ -1,8 +1,11 @@
-CorvusSoftware Quality Gate
-Status: PASS
-Risk: STANDARD
-CI exacte de PR et main, signature durable et publication réussies.
-Provenance et octets publics, deux ABI/16Ko/zéro cœur, son original et À propos vérifiés.
-Upgrade signé31->32 réussi ; contrôles automatiques du titre, du logo, de l'historique et du thème.
-Source :29b091945b4213e3a72ddcd83fecf1fa3656709b. Preuves : docs/validation-android.md et /workspace/setup/release0231.
-Limites : pas de nouvelle inspection manuelle des captures signées ni de qualification physique/ARM64/audio/réseau public.
+# Quality gate
+
+PARTIAL pendant la qualification Android et la CI frontend.
+
+Contrat et fournisseur : tests/CI exacts verts dans les PR API7/Core13.
+Frontend : tests natifs, sanitizers, build/lint/JVM, APK et revue indépendants
+vérifiés. Le finding sur le collage a été corrigé et couvert en JVM.
+
+Ne pas annoncer la fonctionnalité disponible dans les cœurs du catalogue actuel :
+les nouveaux modules restent à qualifier/publier par CorvusRepository après les
+PR dépendantes. APK de base toujours sans cœur. Aucun test physique de codes.

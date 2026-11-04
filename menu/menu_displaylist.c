@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #define _POSIX_C_SOURCE 200809L
 #include "menu_entries.h"
+#include "menu_cheat.h"
 #include "menu_cbs.h"
 #include "menu_setting.h"
 #include "core_registry.h"
@@ -16,7 +17,7 @@ static const char *binding_labels[10] = {"Haut", "Bas", "Gauche", "Droite", "A",
 static const int quick_order[CR_QUICK_COUNT] = {
     CR_QUICK_RESUME, CR_QUICK_RESTART,
     CR_QUICK_LOAD_STATE, CR_QUICK_SAVE_STATE, CR_QUICK_STATES, CR_QUICK_GAME_SAVES,
-    CR_QUICK_CORE_OPTIONS, CR_QUICK_CONTROLS, CR_QUICK_PLAYER,
+    CR_QUICK_CORE_OPTIONS, CR_QUICK_CHEATS, CR_QUICK_CONTROLS, CR_QUICK_PLAYER,
     CR_QUICK_ACHIEVEMENTS, CR_QUICK_CORE_INFO, CR_QUICK_MAIN, CR_QUICK_CLOSE
 };
 static const char *core_name(int index) {
@@ -141,6 +142,7 @@ static int removable_cores(const cr_ui *u) {
 }
 int cr_menu_entry_count(const cr_ui *u) {
     if (u->quick) return CR_QUICK_COUNT - (u->engine.players > 1 ? 0 : 1);
+    if (cr_menu_cheat_page(u->page)) return cr_menu_cheat_count(u);
     if (u->page == CR_CORE_OPTIONS) return (int)cr_engine_option_count(&u->engine);
     if (u->page == CR_SUBSYSTEMS) return (int)cr_engine_subsystem_count(&u->engine);
     if (u->page == CR_CORE_OPTION_VALUES) {
@@ -241,19 +243,20 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
         static const char *labels[CR_QUICK_COUNT] = {
             "Reprendre le contenu", "Redémarrer le contenu", "Fermer le contenu",
             "États classiques", "Options du cœur", "Commandes", "Succès", "Informations sur le cœur",
-            "Accueil", "Joueur contrôlé", "Sauvegardes .sav / .srm", "Charger un état", "Sauvegarder un état"
+            "Accueil", "Joueur contrôlé", "Sauvegardes .sav / .srm", "Charger un état", "Sauvegarder un état", "Codes de triche"
         };
         static const char *hints[CR_QUICK_COUNT] = {
             "Retourner au jeu", "Relancer le contenu actuel", "Garder le cœur chargé",
             "État manuel et automatique", "Réglages proposés par le cœur", "Surimpression tactile",
             "Compte et succès du jeu", "Version et fonctions disponibles", "Retourner aux menus",
             "Choisir le joueur du tactile et du clavier", "Importer ou exporter la mémoire batterie (.sav / .srm)",
-            "Choisir une sauvegarde de ce jeu", "Créer une nouvelle sauvegarde nommée"
+            "Choisir une sauvegarde de ce jeu", "Créer une nouvelle sauvegarde nommée",
+            "Gérer et appliquer les codes de ce jeu"
         };
         static const int icons[CR_QUICK_COUNT] = {
             CR_ICON_PLAY, CR_ICON_RESTART, CR_ICON_EXIT, CR_ICON_SAVES,
             CR_ICON_SLIDERS, CR_ICON_INPUT, CR_ICON_ACHIEVEMENTS, CR_ICON_INFO,
-            CR_ICON_HOME, CR_ICON_INPUT, CR_ICON_SAVES, CR_ICON_IMPORT, CR_ICON_SAVES
+            CR_ICON_HOME, CR_ICON_INPUT, CR_ICON_SAVES, CR_ICON_IMPORT, CR_ICON_SAVES, CR_ICON_CHEATS
         };
         fill(&r, labels[index], hints[index], icons[index], ACT_QUICK_ACTION, index);
         r.disabled = (index == CR_QUICK_RESTART && !cr_engine_can_reset(&u->engine)) ||
@@ -266,6 +269,8 @@ row cr_menu_entry_get(const cr_ui *u, int index) {
         if (index == CR_QUICK_RESUME) snprintf(r.label, sizeof(r.label), "Reprendre");
         if (index == CR_QUICK_RESTART) snprintf(r.label, sizeof(r.label), "Redémarrer");
         if (index == CR_QUICK_CLOSE) { snprintf(r.label, sizeof(r.label), "Quitter le jeu"); r.destructive = true; }
+    } else if (cr_menu_cheat_page(u->page)) {
+        return cr_menu_cheat_entry(u, index);
     } else if (u->page == CR_CORE_OPTIONS) {
         corvus_core_option option;
         if (cr_engine_option(&u->engine, (size_t)index, &option)) {

@@ -96,7 +96,12 @@ static void header(const cr_ui *u, const cr_painter *p, const cr_theme *theme, c
         icon(p, CR_ICON_BACK, 14, 16, 24, theme->header_text);
     }
     text(p, title, back ? 52 : 18, 35, 20, theme->header_text,
-         u->width - (back ? 64 : 36) - (u->page == CR_LIBRARY ? 80 : 0));
+         u->width - (back ? 64 : 36) - (u->page == CR_LIBRARY ? 80 : u->page == CR_CHEAT_TEXT ? 52 : 0));
+    if (u->page == CR_CHEAT_TEXT) {
+        if (p->circle && pressing(u, -302) > 0)
+            p->circle(p->context, u->width - 27, 28, 20, theme->focus);
+        icon(p, CR_ICON_CHECK, u->width - 39, 16, 24, theme->header_text);
+    }
     if (u->page == CR_LIBRARY) {
         uint32_t bg = cr_widget_mix(theme->header, theme->focus, pressing(u, -200));
         if (p->circle && pressing(u, -200) > 0) p->circle(p->context, u->width - 72, 28, 20, bg);

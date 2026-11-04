@@ -1,4 +1,12 @@
-Le bouton haut dupliquait l'onglet Réglages et conservait une cible dédiée-300. Sa suppression couvre le dessin, le ciblage et l'action.
-Le menu rapide plaçait Quitter au milieu des outils et mélangeait états nommés, états classiques et batterie. Ordre/labels corrigés sans changer les actions ou leurs IDs.
-Le petit corbeau précédent avait un modèle différent de l'organisation. Le lanceur utilise désormais le PNG d'avatar intact ; les petits glyphes reprennent les traits du modèle. L'essai de détourage généré a été rejeté.
-Revue indépendante : aucun finding bloquant. Le runner historique RetroAchievementsInstrumentation était déjà désynchronisé avant cette tâche ; qualification Android actuelle via InterfaceRedesignInstrumentation en mode `quick_only`.
+# Faits et décisions
+
+- RetroArch applique les entrées activées du gestionnaireEMU(handler0), avec
+  staging, application explicite et options après chargement/modification.
+- Handler1 appartient à sa recherche mémoire ; refus explicite dans cette version.
+- Les noms `.cht` conservent les échappements de guillemets/backslashes ; les
+  codes multilignes sont exportés avec espaces. Import UTF-8, BOM facultatif.
+- Extension CorvusAPI optionnelle par joueur, sans changer ABI0. Remplacement
+  atomique ; les anciennes listes survivent à une erreur et aux restaurations.
+- Mode normal RetroAchievements conservé. Aucun mode Hardcore simulé.
+- Une sélection InputFilter doit être retournée intacte lors d'un collage refusé.
+- Profils indépendants `<id>.cht`/`<id>.p2.cht`, y compris mêmeROM sur deuxjoueurs.

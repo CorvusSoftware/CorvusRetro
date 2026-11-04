@@ -57,7 +57,8 @@ enum {
     CR_CORE_DETAILS,
     CR_LIBRARY_ACTIONS,
     CR_SYSTEM_SETTINGS,
-    CR_GAME_ACTIONS
+    CR_GAME_ACTIONS,
+    CR_CHEATS, CR_CHEAT_ENTRY, CR_CHEAT_SETTINGS, CR_CHEAT_DELETE, CR_CHEAT_CLEAR, CR_CHEAT_TEXT
 };
 /* Stable quick-menu row IDs; unsupported core operations stay disabled. */
 enum {
@@ -74,6 +75,7 @@ enum {
     CR_QUICK_GAME_SAVES,
     CR_QUICK_LOAD_STATE,
     CR_QUICK_SAVE_STATE,
+    CR_QUICK_CHEATS,
     CR_QUICK_COUNT
 };
 enum { CR_TOUCH_DOWN, CR_TOUCH_MOVE, CR_TOUCH_UP, CR_TOUCH_CANCEL };
@@ -141,6 +143,7 @@ typedef struct cr_ui {
     struct cr_state_entry *saved_states;
     size_t saved_state_count;
     int selected_state;
+    struct cr_menu_cheats *cheats;
     double message_time, time;
 } cr_ui;
 void cr_ui_init(cr_ui *, cr_platform, const char *);
@@ -163,6 +166,7 @@ bool cr_ui_running(const cr_ui *);
 int cr_content_system(const char *, int);
 void cr_ui_import(cr_ui *, const cr_import *);
 void cr_ui_save_transfer_result(cr_ui *, const cr_save_transfer_result *);
+void cr_ui_cheat_file_result(cr_ui *, const cr_cheat_file_result *);
 void cr_ui_message(cr_ui *, const char *);
 void cr_ui_reload(cr_ui *);
 void cr_ui_catalog(cr_ui *, const cr_core_catalog *);
