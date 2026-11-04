@@ -763,3 +763,29 @@ SHA-256 de cette base debug :
 `9215deb7964fd043ea3038a182c9c446b6e36cd397973dfd06d1c5234c485b85`.
 Essais sur émulateur API29 x86_64 avec programmes originaux et transport
 d'archives contrôlé ; sans nouvelle qualification physique, ARM64 ou audio.
+
+## Livraison 0.23.0
+
+PR #30 fusionnée sur autorisation du mainteneur. Source de l'APK :
+`3b5cc44189f0cb346b17a604769d5ddd80cddbbb`, tag `v0.23.0`, versionCode31.
+La CI [PR](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41845581313),
+la CI [main](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41846084262),
+le build [signé](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41846654391)
+et la [publication](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41848226713) passent.
+
+SHA-256 de l'APK public :
+`ce0646e9a585c7ddf8fd517e2839c4c1b1dd8374db8443c86ded132a8ceb0ddd`.
+Les octets publics sont identiques à l'artefact signé qualifié. Certificat durable
+`cb431e5abf3ae73ddd5c706a9c485ff6e627be2135bb2557b6191f04ac3a5211` inchangé.
+Provenance, deux ABI, alignement 16 Ko, absence de cœur et MP3 original vérifiés.
+
+Mise à jour signée 0.22.2/code30 vers 0.23.0/code31 sur émulateur API29 x86_64 :
+UID, dossier de données, première installation, thème ASUS et jeu historique
+conservés. Les captures de l'accueil, de la bibliothèque, des sauvegardes, des
+cœurs, des réglages et d'À propos sont inspectées ; aucun nouveau crash de
+l'application observé. Un dialogue System UI au démarrage de l'émulateur a été
+résolu avant la qualification, sans changer l'APK.
+
+Les validations de la refonte et des 48 icônes restent applicables ; seuls le
+numéro de version, À propos et les liens README ont changé depuis leur contrôle.
+Pas de nouvelle qualification physique, ARM64, réseau public ou écoute audio.

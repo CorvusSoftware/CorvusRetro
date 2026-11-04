@@ -1,5 +1,5 @@
-Livraison autorisée par le mainteneur : PR #30 et CorvusRetro0.23.0/code31.
-1. Version APK, À propos et README cohérents ; tests de publication et CI du head exact.
-2. Fusionner PR #30, vérifier CI main et signature durable.
-3. Qualifier l'APK signé (provenance, certificat, ABI, alignement, mise à jour et menus), publier le tag et les octets qualifiés.
-4. Vérifier release/APK public et consigner les preuves.
+Livraison0.23.0 autorisée par le mainteneur.
+1. DONE : version31, À propos et README, tests de publication et CI de PR.
+2. DONE : fusion PR #30, CI main et signature durable.
+3. DONE : qualification de la base et mise à jour signée, tag et publication exacte.
+4. DONE : vérification des octets publics ; documentation des preuves.

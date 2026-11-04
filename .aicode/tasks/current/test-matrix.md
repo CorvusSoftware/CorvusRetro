@@ -1,5 +1,5 @@
-PASS P0 : sauver/charger/auto, import/export, reset, mot de passe, filtre, système et liste/grille.
-PASS P0 : catégories vides et éjection effectivement dessinées sans miniature générique.
-PASS P1 :48 ressources, IDs et allocation stables, atlas196, planche inspectée.
-PASS P1 :21 suites natives et21 ASan, build/lint/contrôlesAPK, parcours Android portrait complet, captures et revue.
-CI du commit publié à contrôler dans PR #30 avant sortie du brouillon.
+PASS :21 suites natives strictes et21 ASan/UBSan, atlas196 et parcours Android de la refonte.
+PASS :8 tests de publication, CI PR/main, build signé et publication sur source exacte.
+PASS : signature durable/provenance/ABI/16Ko/zéro cœur/MP3 et octets publics identiques.
+PASS : upgrade signé0.22.2/code30 vers0.23.0/code31, UID/données/ASUS/historique, captures des menus et À propos, aucun nouveau crash applicatif.
+Limites : pas de nouvelle qualification physique/ARM64/audio/réseau public.

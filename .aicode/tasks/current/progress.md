@@ -1,11 +1,10 @@
-État : implémentation et vérification locale terminées, PR #30.
+État : DONE, livraison CorvusRetro0.23.0/code31.
 
-Les icônes décrivent leur fonction : Système, Import, Export, Verrou, Curseurs et Filtre ajoutés dans la réserve existante ; audio, liste, sauvegardes, redémarrage et liaison redessinés. Les cartes d'action et écrans vides ne masquent plus les symboles avec une GBA générique. Continuer retrouve le jeu courant.
+PR #30 fusionnée sur autorisation explicite du mainteneur, source APK3b5cc44189f0cb346b17a604769d5ddd80cddbbb. Nouvelle interface et48 icônes publiées avec états nommés ; écran de jeu préservé. Version APK, À propos et README cohérents.
 
-Actions, 42 anciens IDs, dimensions et allocation de l'atlas conservés. Pas de modification du jeu, des moteurs, de l'audio ou des dépendances.
+CI PR41845581313, main41846084262, signé41846654391 et publication41848226713 réussis. APK public identique aux octets signés et qualifiés : SHA256ce0646e9a585c7ddf8fd517e2839c4c1b1dd8374db8443c86ded132a8ceb0ddd. Certificat durable, provenance, deux ABI, alignement16Ko, zéro cœur, MP3 original vérifiés.
 
-Preuves locales : 21 suites natives, 21 suites ASan/UBSan, build/lint Android, contrôles APK et atlas196 passent. Parcours Android portrait complet et captures des menus concernés inspectés ; crash.log vide. Revue indépendante sans finding bloquant. Preuves hors dépôt : /workspace/setup/icon-meaning.
+Upgrade30->31 API29x86_64 sans effacement : UID10116, données, première installation, ASUS et jeu historique conservés ; menus et À propos inspectés, aucun nouveau crash de l'application. Dialogue System UI du boot résolu avant test. Preuves hors dépôt : /workspace/setup/release0230.
 
-Publication dans PR #30 ; vérifier la CI du commit publié avant sortie du brouillon. Aucune fusion ni release dans cette tâche.
-
-Nouvelle demande du mainteneur : fusionner PR #30 et sortir la version. Autorisation explicite reçue après validation des icônes. Préparation0.23.0/code31 ; mettre à jour version APK, À propos et liens README. Vérifier la CI du nouveau head, fusionner, attendre CI main et build signé, qualifier l'APK signé/mise à jour, puis tag et publication exacte. État de livraison hors dépôt : /workspace/setup/release0230/state.json.
+Release : https://github.com/CorvusSoftware/CorvusRetro/releases/tag/v0.23.0
+Limites : pas de nouvelle qualification téléphone physique/ARM64/audio/réseau public. Moteurs/API/pins et anciennes releases conservés.

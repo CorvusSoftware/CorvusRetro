@@ -1,7 +1,10 @@
 CorvusSoftware Quality Gate
-Status: PARTIAL (livraison0.23.0 en cours)
+Status: PASS
 Risk: STANDARD
 
-L'implémentation et les icônes restent qualifiées :21 suites strictes,21 ASan, atlas196, parcours Android portrait et revue sans finding bloquant ; CI41834024842 du head5e2cec9 réussie.
-La nouvelle autorisation couvre fusion et release. Version0.23.0/code31 préparée ; CI du nouveau head, signature durable, qualification et publication à terminer selon le plan.
-Preuves et reprise : /workspace/setup/release0230/state.json.
+Implémentation :21 suites strictes,21 ASan/UBSan, atlas196, parcours Android portrait et revue sans finding bloquant.
+Livraison :8 tests de publication ; CI du head de PR, CI main, signature et publication réussies. Source3b5cc44189f0cb346b17a604769d5ddd80cddbbb.
+APK public : signature durable/provenance/ABI/16Ko/zéro cœur/son original et identité des octets vérifiés.
+Upgrade signé30->31 : données, UID, première installation, ASUS et historique conservés, captures inspectées, aucun nouveau crash de l'application.
+Limites : API29x86_64 émulé, pas de nouvelle qualification physique/ARM64/réseau public/audio.
+Preuves détaillées : docs/validation-android.md, /workspace/setup/release0230.
