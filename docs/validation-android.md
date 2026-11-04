@@ -706,3 +706,20 @@ avec captures inspectées et aucun crash enregistré. Les limites du
 dispositif de validation restent celles de la refonte : émulateur API29 x86_64,
 programmes originaux et transport d'archives contrôlé, sans appareil physique,
 exécution ARM64, réseau public ou écoute audio qualifiés.
+
+## Proportions de l'accueil
+
+Les anciennes hauteurs fixes laissaient environ 146 dp sous la carte du cœur
+dans le viewport 384 x 696 dp. La composition partage désormais sa géométrie
+adaptative entre dessin, toucher, focus et défilement. Les régressions vérifient
+360 x 640, 384 x 696 et 392 x 824 dp : cinq cartes visibles, marge basse bornée,
+cibles exactes et accès au sous-système supplémentaire par défilement.
+
+Les 21 suites natives strictes et les 21 suites ASan/UBSan passent, ainsi que
+build/lint Android et les contrôles APK sans cœur, deux ABI et alignement 16 Ko.
+Le parcours portrait complet passe avec la nouvelle composition. Après le
+dernier ajustement de cadrage, un contrôle ciblé sur l'APK final vérifie les
+trois raccourcis, le cœur, le sous-système défilant et la rotation en paysage.
+Les captures finales sont inspectées et aucun crash n'est enregistré.
+SHA-256 de cette base debug :
+`8cbc1fe1da503758fb37d65b121b509439eee3a2d8745a7735eb47c03c58bdc0`.

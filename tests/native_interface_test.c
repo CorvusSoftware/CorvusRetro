@@ -8,6 +8,7 @@
 #include "core_registry.h"
 #include "state_store.h"
 #include <ftw.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -146,6 +147,34 @@ static void same_session(cr_ui *u,void *handle,const char *id,const uint8_t *exp
 static int cleanup(const char *path,const struct stat *status,int type,struct FTW *walk) {
     (void)status;(void)type;(void)walk;return remove(path);
 }
+static void home_dimensions(cr_ui *u) {
+    const float sizes[][2]={{360,640},{384,696},{392,824}};
+    for (size_t i=0;i<sizeof(sizes)/sizeof(*sizes);++i) {
+        cr_ui_size(u,sizes[i][0],sizes[i][1]);u->scroll=0;
+        cr_menu_rect hero=cr_interface_home_hero(u),resume=cr_interface_row_bounds(u,0);
+        cr_menu_rect shortcuts=cr_interface_row_bounds(u,1),core=cr_interface_row_bounds(u,4);
+        cr_menu_rect navigation=cr_interface_navigation(u,0);
+        check(hero.y>=56 && hero.y+hero.h<resume.y,"home illustration and welcome block precede Continue");
+        check(resume.y+resume.h<shortcuts.y && shortcuts.y+shortcuts.h<core.y,
+              "home cards retain separate vertical spaces");
+        check(navigation.y-core.y-core.h>=12 && navigation.y-core.y-core.h<=24,
+              "home composition fills portrait height without the former empty bottom area");
+        for (int card=0;card<5;++card) {
+            cr_menu_rect bounds=cr_interface_row_bounds(u,card);
+            check(bounds.h>=48 && bounds.y+bounds.h<=cr_interface_bottom(u),
+                  "every main home card fits above navigation with a usable touch height");
+            check(cr_interface_target(u,bounds.x+bounds.w/2,bounds.y+bounds.h/2,5,false)==card,
+                  "resized home card keeps its exact touch target");
+        }
+        float content=cr_interface_content_height(u,6);
+        u->scroll=fmaxf(0,content-(cr_interface_bottom(u)-cr_interface_content_top(u)));
+        cr_menu_rect subsystem=cr_interface_row_bounds(u,5);
+        check(subsystem.y+subsystem.h<=cr_interface_bottom(u)+.01f &&
+              cr_interface_target(u,subsystem.x+subsystem.w/2,subsystem.y+subsystem.h/2,6,false)==5,
+              "optional subsystem stays scrollable below the complete home composition");
+    }
+    u->scroll=0;
+}
 int main(void) {
     char root[]="/tmp/corvus-interface-XXXXXX",path[4096];fixture f={0};
     check(mkdtemp(root)!=NULL,"private integration fixture");
@@ -168,6 +197,7 @@ int main(void) {
     cr_ui u;current=&u;
     cr_ui_init(&u,(cr_platform){.context=&f,.games=games,.touch=touch,.pick=pick,.edit_text=edit,
         .refresh_core_catalog=refresh,.install_core_pack=install,.share_state=share},root);
+    home_dimensions(&u);
     cr_ui_size(&u,384,720);
     const int pages[]={CR_MAIN,CR_LIBRARY,CR_SAVES_LIBRARY,CR_CORES,CR_SETTINGS};
     for(int i=0;i<5;++i) {tab(&u,i);check(u.page==pages[i] && u.tab==i,"all five visible tabs navigate to their actual roots");}

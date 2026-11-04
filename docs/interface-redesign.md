@@ -12,6 +12,15 @@ L'accueil donne accès à la dernière partie réelle, à la bibliothèque, aux 
 et au cœur actif. Charger/décharger un cœur et ses sous-systèmes restent
 accessibles. Une partie ne peut démarrer qu'après chargement du cœur associé.
 
+L'accueil adapte les proportions du bandeau, de Continuer, des trois raccourcis
+et du cœur à la hauteur disponible entre en-tête et navigation. Dans le viewport
+portrait de référence 384 x 696 dp, leurs hauteurs sont respectivement 218, 106,
+92 et 92 dp, avec 16 dp sous la carte du cœur. Le facteur reste borné pour
+préserver la lisibilité sur petits écrans et fenêtres hautes ; le paysage garde
+une présentation compacte. Le sous-système, lorsqu'un cœur est chargé, reste
+une entrée supplémentaire accessible par défilement. L'illustration conserve
+son ratio et les zones tactiles utilisent les mêmes rectangles que le dessin.
+
 La bibliothèque présente les jeux importés en grille ou en liste, avec recherche
 et filtres Tous/GB/GBC/GBA fondés sur l'identité durable du système. Les jeux
 restent visibles lorsque leur cœur est désinstallé. Le menu de bibliothèque

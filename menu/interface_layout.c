@@ -5,7 +5,20 @@
 #include "core_registry.h"
 #include <math.h>
 
-static float home_hero(const cr_ui *u) { return u->height < 500 ? 112 : 150; }
+typedef struct {
+    float hero, resume, shortcut, core, hero_gap, shortcut_gap, core_gap;
+} home_metrics;
+static home_metrics home(const cr_ui *u) {
+    if (u->height < 500 || u->width > u->height)
+        return (home_metrics){112, 82, 78, 78, 10, 12, 12};
+    /* Fit the five-card composition between the header and bottom navigation. */
+    float scale = fminf(1.25f, fmaxf(.8f, (u->height - 144) / 552));
+    return (home_metrics){218 * scale, 106 * scale, 92 * scale, 92 * scale,
+                          16 * scale, 14 * scale, 14 * scale};
+}
+cr_menu_rect cr_interface_home_hero(const cr_ui *u) {
+    return (cr_menu_rect){16, 64 - u->scroll, fmaxf(1, u->width - 32), home(u).hero};
+}
 static bool library_list(const cr_ui *u) { return u->library_list || u->library_query[0]; }
 static unsigned columns(const cr_ui *u) { return u->width >= 700 ? 4 : 2; }
 static float grid_width(const cr_ui *u) {
@@ -54,14 +67,17 @@ cr_menu_rect cr_interface_row_bounds(const cr_ui *u, int row) {
                               fmaxf(1, panel.w - 24), step - 3};
     }
     if (u->page == CR_MAIN) {
-        float top = 64 + home_hero(u) + 10 - scroll;
-        if (row == 0) return (cr_menu_rect){16, top, fmaxf(1, u->width - 32), 82};
+        home_metrics m = home(u);
+        float top = 64 + m.hero + m.hero_gap - scroll;
+        if (row == 0) return (cr_menu_rect){16, top, fmaxf(1, u->width - 32), m.resume};
         if (row >= 1 && row <= 3) {
             float width = fmaxf(1, (u->width - 52) / 3);
-            return (cr_menu_rect){16 + (row - 1) * (width + 10), top + 94, width, 78};
+            return (cr_menu_rect){16 + (row - 1) * (width + 10),
+                top + m.resume + m.shortcut_gap, width, m.shortcut};
         }
-        return (cr_menu_rect){16, top + 184 + (row - 4) * 88,
-                              fmaxf(1, u->width - 32), row == 4 ? 78 : 68};
+        float core_top = top + m.resume + m.shortcut_gap + m.shortcut + m.core_gap;
+        return (cr_menu_rect){16, row == 4 ? core_top : core_top + m.core + 10 + (row - 5) * 78,
+                              fmaxf(1, u->width - 32), row == 4 ? m.core : 68};
     }
     if (u->page == CR_LIBRARY) {
         if (row == 0) return (cr_menu_rect){u->width - 48, 6, 44, 44};
@@ -85,8 +101,10 @@ float cr_interface_content_height(const cr_ui *u, int count) {
     if (count <= 0) return 0;
     if (u->quick) return count * 49.0f;
     if (u->page == CR_STATE_ACTIONS) return count * 46.0f;
-    if (u->page == CR_MAIN)
-        return 64 + home_hero(u) + 10 + 184 + fmaxf(0, count - 5) * 88 + 78 - 64;
+    if (u->page == CR_MAIN) {
+        cr_menu_rect last = cr_interface_row_bounds(u, count > 5 ? count - 1 : 4);
+        return last.y + u->scroll + last.h - 64;
+    }
     if (u->page == CR_LIBRARY && !library_list(u)) {
         unsigned games = count > 0 ? (unsigned)count - 1 : 0;
         return ((games + columns(u) - 1) / columns(u)) * (grid_width(u) * 1.26f + 12);

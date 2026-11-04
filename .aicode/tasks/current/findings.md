@@ -1,7 +1,3 @@
-# Découpage natif
-
-Architecture et diff relus indépendamment sans finding concret. Listes, réglages, actions et orchestration sont séparés, avec données de lignes indépendantes du renderer et contrats privés.
-
-La comparaison ponctuelle de 93 fonctions, de la lecture initiale, des enums et des globals confirme la préservation. La compilation a capturé deux omissions mécaniques corrigées : compteur déplacé avec les transferts et nom du callback plateforme préservé.
-
-21/21 strictes et 21/21 ASan/UBSan, core-free, build/lint/APK et parcours Android portrait/paysage passent. Captures inspectées, aucun crash enregistré. La dernière barrière avant PR prête reste la CI de la tête exacte.
+Accueil : hauteurs fixes et hero défini dans deux fichiers causaient une composition trop courte. Le hero utilise désormais la géométrie commune, avec répartition de l'espace portrait et cadrage sans étirement.
+Sous-système : sixième entrée défilante. Deux anciennes assertions exigeaient les six lignes sans défilement ; l'assertion du sous-système est conservée après focus/défilement, les cinq cartes de base restent visibles.
+Revue indépendante et recheck : aucun finding. Tests natifs/ASan, build/lint/APK, parcours portrait et contrôles ciblés finaux passent ; captures inspectées, aucun crash enregistré. CI exacte reste la dernière barrière avant PR prête.

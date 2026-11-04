@@ -249,8 +249,14 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     snprintf(u->title, sizeof(u->title), "Original GBA test");
     capture c = draw(u);
     check(strstr(c.text, "Continuer") && strstr(c.text, "Décharger le cœur") &&
-              strstr(c.text, "\nSous-système\n") && !strstr(c.text, "Charger un cœur"),
+              !strstr(c.text, "Charger un cœur"),
           "loaded content keeps one core action below its Continue card");
+    int prior_focus = u->focus;
+    float prior_scroll = u->scroll;
+    u->focus = 5; cr_ui_move(u, 0); c = draw(u);
+    check(strstr(c.text, "\nSous-système\n") != NULL,
+          "loaded core subsystem remains reachable below the full home composition");
+    u->focus = prior_focus; u->scroll = prior_scroll;
     void *state_handle = u->engine.handle;
     for (int landscape = 0; landscape < 2; ++landscape) {
         cr_ui_size(u, landscape ? 700 : 384, landscape ? 384 : 700);
@@ -358,8 +364,11 @@ static void loaded_core_lifecycle(cr_ui *u, const char *root) {
     c = draw(u);
     check(u->page == CR_MAIN && u->engine.handle == handle && !u->engine.loaded &&
               !u->title[0] && strstr(c.text, "Décharger le cœur") &&
-              strstr(c.text, "\nSous-système\n") && !strstr(c.text, "Menu rapide"),
+              !strstr(c.text, "Menu rapide"),
           "closing content preserves the selected core and returns to the main menu");
+    u->focus = 5; cr_ui_move(u, 0); c = draw(u);
+    check(strstr(c.text, "\nSous-système\n") != NULL,
+          "closing content preserves the scrollable subsystem of its selected core");
     check(!u->notifications.count && !u->notifications.progress.visible && !u->notifications_loaded,
           "content close clears notifications immediately while keeping the core");
     row(u, 4);

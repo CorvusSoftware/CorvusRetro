@@ -126,49 +126,64 @@ static void mountain(const cr_painter *p, float x, float top, float base, float 
     }
 }
 static void hero(const cr_ui *u, const cr_painter *p, const cr_theme *theme) {
-    float height = u->height < 500 ? 112 : 150;
-    cr_menu_rect r = {16, 64 - u->scroll, u->width - 32, height};
+    cr_menu_rect r = cr_interface_home_hero(u);
+    bool compact = u->height < 500 || u->width > u->height;
+    float height = compact ? r.h : r.h - 86;
     cr_widget_card(p, r, theme, false);
     cr_widget_gradient(p, (cr_menu_rect){r.x + 1, r.y + 1, r.w - 2, r.h - 2}, 14,
                        cr_widget_mix(theme->background, theme->accent, .25f), theme->background);
-    if (!image(p, "asset:home", (cr_menu_rect){r.x + 2, r.y + 2, r.w - 4, r.h - 4})) {
-        clip(p, r.x + 3, r.y + 3, r.w - 6, r.h - 6);
-        for (int i = 0; i < 14; ++i) {
-            float x = r.x + 16 + fmodf(i * 47.0f, fmaxf(1, r.w - 30));
-            float y = r.y + 12 + fmodf(i * 19.0f, height * .4f);
-            if (p->circle) p->circle(p->context, x, y, i % 3 ? .8f : 1.2f,
-                                     cr_widget_mix(theme->accent, 0xffffffff, .6f));
+    float art_top = fmaxf(56, r.y + 3), art_bottom = fminf(cr_interface_bottom(u), r.y + height - 3);
+    if (art_bottom > art_top) {
+        clip(p, r.x + 3, art_top, r.w - 6, art_bottom - art_top);
+        float width = compact ? r.w - 4 : fmaxf(r.w - 4, (height - 4) * 512 / 224);
+        cr_menu_rect art = compact ? (cr_menu_rect){r.x + 2, r.y + 2, r.w - 4, r.h - 4}
+            : (cr_menu_rect){r.x + (r.w - width) / 2, r.y + height - 2 - width * 224 / 512,
+                             width, width * 224 / 512};
+        if (!image(p, "asset:home", art)) {
+            for (int i = 0; i < 14; ++i) {
+                float x = r.x + 16 + fmodf(i * 47.0f, fmaxf(1, r.w - 30));
+                float y = r.y + 12 + fmodf(i * 19.0f, height * .4f);
+                if (p->circle) p->circle(p->context, x, y, i % 3 ? .8f : 1.2f,
+                                         cr_widget_mix(theme->accent, 0xffffffff, .6f));
+            }
+            mountain(p, r.x + r.w * .28f, r.y + height * .3f, r.y + height - 4, r.w * .36f,
+                     cr_widget_mix(theme->background, theme->accent, .29f));
+            mountain(p, r.x + r.w * .56f, r.y + height * .42f, r.y + height - 4, r.w * .4f,
+                     cr_widget_mix(theme->background, theme->accent, .17f));
+            mountain(p, r.x + r.w * .14f, r.y + height * .58f, r.y + height - 4, r.w * .21f, theme->background);
+            cr_widget_console(p, (cr_menu_rect){r.x + r.w * .68f, r.y + 11, r.w * .26f, height * .63f}, 1, theme);
         }
-        mountain(p, r.x + r.w * .28f, r.y + height * .3f, r.y + height - 4, r.w * .36f,
-                 cr_widget_mix(theme->background, theme->accent, .29f));
-        mountain(p, r.x + r.w * .56f, r.y + height * .42f, r.y + height - 4, r.w * .4f,
-                 cr_widget_mix(theme->background, theme->accent, .17f));
-        mountain(p, r.x + r.w * .14f, r.y + height * .58f, r.y + height - 4, r.w * .21f, theme->background);
-        cr_widget_console(p, (cr_menu_rect){r.x + r.w * .68f, r.y + 11, r.w * .26f, height * .63f}, 1, theme);
     }
     clip(p, 0, 56, u->width, cr_interface_bottom(u) - 56);
-    cr_widget_gradient(p, (cr_menu_rect){r.x + 2, r.y + r.h * .48f, r.w - 4, r.h * .5f}, 0,
+    cr_widget_gradient(p, (cr_menu_rect){r.x + 2, r.y + height * (compact ? .48f : .72f),
+                       r.w - 4, height * (compact ? .5f : .28f)}, 0,
                        theme->background & 0x00ffffff, theme->background);
-    text(p, "Bienvenue !", r.x + 14, r.y + r.h - 36, 23, theme->text, r.w - 28);
-    text(p, "Retrouvez vos jeux et vos sauvegardes.", r.x + 14, r.y + r.h - 14,
-         12, theme->muted, r.w - 28);
+    text(p, "Bienvenue !", r.x + 14, r.y + r.h - (compact ? 36 : 62), 23, theme->text, r.w - 28);
+    if (compact) text(p, "Retrouvez vos jeux et vos sauvegardes.", r.x + 14, r.y + r.h - 14,
+                      12, theme->muted, r.w - 28);
+    else {
+        text(p, "Reprenez votre dernière partie", r.x + 14, r.y + r.h - 38, 12, theme->muted, r.w - 28);
+        text(p, "ou explorez votre bibliothèque.", r.x + 14, r.y + r.h - 20, 12, theme->muted, r.w - 28);
+    }
 }
 static void home_row(const cr_ui *u, const cr_painter *p, const cr_theme *theme, cr_menu_row row, int index) {
     cr_menu_rect r = cr_interface_row_bounds(u, index);
     cr_widget_card(p, r, theme, selected(u, index));
     uint32_t fg = row.disabled ? theme->muted : theme->text;
+    float center = r.y + r.h / 2;
     if (index >= 1 && index <= 3) {
-        icon(p, row.icon, r.x + r.w / 2 - 14, r.y + 15, 28, theme->icon);
-        cr_widget_center(p, row.label, r.x + r.w / 2, r.y + 61, 12, fg, r.w - 8);
+        icon(p, row.icon, r.x + r.w / 2 - 16, center - 28, 32, theme->icon);
+        cr_widget_center(p, row.label, r.x + r.w / 2, center + 27, 12, fg, r.w - 8);
         return;
     }
-    thumbnail(p, &row, (cr_menu_rect){r.x + 10, r.y + 12, 56, 56}, theme);
-    text(p, row.label, r.x + 78, r.y + 31, 16, fg, r.w - 128);
-    text(p, row.hint, r.x + 78, r.y + 53, 13, theme->muted, r.w - 128);
+    float thumb = fminf(index == 0 ? 80 : 56, r.h - 16), left = thumb + 22;
+    thumbnail(p, &row, (cr_menu_rect){r.x + 10, center - thumb / 2, thumb, thumb}, theme);
+    text(p, row.label, r.x + left, center - 8, 16, fg, r.w - left - 50);
+    text(p, row.hint, r.x + left, center + 14, 13, theme->muted, r.w - left - 50);
     if (index == 0) {
-        if (p->circle) p->circle(p->context, r.x + r.w - 28, r.y + 40, 17, row.disabled ? theme->divider : theme->accent);
-        icon(p, CR_ICON_PLAY, r.x + r.w - 38, r.y + 30, 20, row.disabled ? theme->muted : 0xffffffff);
-    } else icon(p, CR_ICON_NEXT, r.x + r.w - 34, r.y + 29, 20, theme->muted);
+        if (p->circle) p->circle(p->context, r.x + r.w - 28, center, 20, row.disabled ? theme->divider : theme->accent);
+        icon(p, CR_ICON_PLAY, r.x + r.w - 38, center - 10, 20, row.disabled ? theme->muted : 0xffffffff);
+    } else icon(p, CR_ICON_NEXT, r.x + r.w - 34, center - 10, 20, theme->muted);
 }
 static void library_controls(const cr_ui *u, const cr_painter *p, const cr_theme *theme) {
     if (p->rect) p->rect(p->context, 0, 56, u->width, cr_interface_content_top(u) - 56, theme->background);
