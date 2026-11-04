@@ -1,5 +1,5 @@
-STANDARD : correspondances des icônes, sans changement des actions ou dimensions.
-1. Terminé : cartographier les entrées et corriger les substitutions de miniatures.
-2. Terminé : six symboles dédiés, anciens IDs et atlas inchangés.
-3. Terminé localement : tests natifs du modèle/rendu, atlas Android, captures et revue.
-4. Livraison : PR #30, contrôle de la CI du commit publié, puis sortie du brouillon. Pas de fusion/release.
+Livraison autorisée par le mainteneur : PR #30 et CorvusRetro0.23.0/code31.
+1. Version APK, À propos et README cohérents ; tests de publication et CI du head exact.
+2. Fusionner PR #30, vérifier CI main et signature durable.
+3. Qualifier l'APK signé (provenance, certificat, ABI, alignement, mise à jour et menus), publier le tag et les octets qualifiés.
+4. Vérifier release/APK public et consigner les preuves.
