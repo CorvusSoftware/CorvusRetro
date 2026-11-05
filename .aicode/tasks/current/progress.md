@@ -1,16 +1,14 @@
 # Livraison 0.24.0
 
-État : ACTIVE. Autorisation explicite de fusion, sortie et mise à jour des cœurs.
-
-- PR32 fusionnée après CI verte du commit73392c1 ; merge01f3e03.
-- API7/Core13 déjà fusionnées par le mainteneur.
-- Core PR14 fusionnée après 6 contrôles verts : cebbc10de76e319ce5deb613a9df750804608174, version0.16.0 et API588326f. CI main et publication des archives en cours.
-- Retro0.24.0/code33, À propos, README, pin Core final et test Android paramétrable prêts.
-- Base signée0.23.1/code32 vérifiée : UID10116, données, historique et thèmeASUS conservés comme référence d’upgrade.
-- Catalogue historique CorvusRetro0.18.0 à conserver intact.
-- Les états nommés0.15.0 restent stockés, mais la garde existante exige la même
-  version de cœur. Pas de changement de cette garde ni des formats batterie.
-- Preuves de la fonctionnalité : ancienne tâche archivée dans setup/release0240 ;
-  24 tests natifs et instrumentés, 37JVM, portrait/paysage et atlas201 verts.
-
-Préparation0.24.0 : références des tests de version mises à jour pour Core0.16.0 ; 24/24 tests natifs locaux et régressions engine/menu sous ASan/UBSan/leaks réussis.
+État : DONE. PR32/33 fusionnées sur autorisation ; APK0.24.0/code33 publié,
+source`826bbf86d7d682772e801690d86eca1d7a87bdc8`. CI préparation41932276773, main41932715340,
+signé41933214823 et publication effective42017261496 réussies.
+APK public SHA256`04b2b93d70456c0921e1f1e8732d2b2c9ddf5eda20058d50d9c3e2084a2868dd`, identique à la base qualifiée.
+Certificat durable, zéro cœur, deux ABI16Ko, son original et provenance vérifiés.
+Upgrade32->33 API29x86_64 : UID/données/historique/ASUS conservés, captures inspectées.
+Core0.16.0 publié indépendamment, catalogue v1 promu et CI verte ; flux historique intact.
+Runtime public : trois modules x64 installés/découverts, GBA triche portrait4099/paysage4512 PASS.
+Limites : pas d'exécution physique ARM64 ; défaut visuel de navigation préexistant
+confirmé sur0.23.1 et0.24.0 dans l'émulateur logiciel, sans correction revendiquée.
+Dispatch de publication dupliqué42017261434 refusé après réussite du push42017261496 ;
+aucun asset remplacé, workflow actif. Voir docs/validation-android.md.

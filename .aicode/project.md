@@ -61,3 +61,11 @@ Livraison0.22.2 : PR #28 fusionnée sur demande explicite, source APK f83ecd694f
 Livraison0.23.0 : PR #30 fusionnée sur autorisation, source APK3b5cc44189f0cb346b17a604769d5ddd80cddbbb/tagv0.23.0/code31. CI PR41845581313, main41846084262, signé41846654391 et publié41848226713 réussis. APK public SHA256ce0646e9a585c7ddf8fd517e2839c4c1b1dd8374db8443c86ded132a8ceb0ddd, octets identiques à la base qualifiée ; certificat durable, deux ABI/16Ko/zéro cœur, MP3 et provenance vérifiés. Upgrade signé30->31 conserve UID10116, données, première installation, ASUS et Corvus-preserved.gba ; nouveaux menus/À propos inspectés, aucun nouveau crash applicatif. Une ANR System UI au boot de l'émulateur a été résolue avant qualification ; APK intact. Pas de nouveau test physique/ARM64/audio/réseau public. Voir docs/validation-android.md.
 
 Livraison0.23.1 : PR #31, source APK29b091945b4213e3a72ddcd83fecf1fa3656709b/tagv0.23.1/code32. CI PR41878516891, main41882858763, signé41883818990 et publié41884748183 réussis. APK publicb1a4fb6f7322c6a016694e1802472f1955544d044be5e181971f360cbadb4cb9, identique à la base qualifiée, certificat durable et pins conservés. Upgrade31->32 API29x86_64 : UID/données/ASUS/historique conservés, captures contrôlées automatiquement ; pas de nouvelle inspection manuelle ou qualification physique/ARM64/audio/réseau public. Voir docs/validation-android.md.
+
+Livraison0.24.0/code33 : source APK`826bbf86d7d682772e801690d86eca1d7a87bdc8`, tagv0.24.0,
+publicSHA`04b2b93d70456c0921e1f1e8732d2b2c9ddf5eda20058d50d9c3e2084a2868dd`. Core0.16.0/API588326f dans
+CorvusRepositoryv0.16.0, catalogue v1 promu ; voir docs/validation-android.md.
+Le push de tag peut déclencher un publisher même après une courte désactivation ;
+ne pas cumuler push et dispatch. Le doublon a été refusé sans écrasement, et les
+octets publics ont été contrôlés. Défaut visuel de navigation logiciel déjà présent
+en0.23.1 observé pendant l'upgrade ; pas de nouveau défaut attribué à cette sortie.

@@ -837,3 +837,45 @@ inspection manuelle des captures signées. Aucun nouveau crash applicatif observ
 Les essais fonctionnels ciblés portrait/paysage de la correction restent
 qualifiés ; seuls version, À propos et README ont changé depuis ces essais.
 Pas de nouvelle qualification physique, ARM64, réseau public ou audio.
+
+## Livraison 0.24.0 et cœurs 0.16.0
+
+PR32 et PR33 fusionnées sur autorisation du mainteneur. Source de l'APK :
+`826bbf86d7d682772e801690d86eca1d7a87bdc8`, tag `v0.24.0`, versionCode33.
+CI de préparation[41932276773](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41932276773),
+main[41932715340](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41932715340),
+build signé[41933214823](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/41933214823)
+et publication[42017261496](https://github.com/CorvusSoftware/CorvusRetro/actions/runs/42017261496) réussis.
+APK public SHA256 : `04b2b93d70456c0921e1f1e8732d2b2c9ddf5eda20058d50d9c3e2084a2868dd`.
+Les octets publics sont identiques à la base signée qualifiée : certificat durable,
+provenance, version0.24.0, deux ABI, alignement16Ko, zéro cœur et MP3 original vérifiés.
+
+Mise à jour signée0.23.1/code32 vers0.24.0/code33 sur API29x86_64 : même UID,
+répertoire de données et première installation ; historique et thème ASUS conservés.
+Captures signées inspectées, À propos indique0.24.0 et Core0.16.0 ; aucun nouveau
+crash applicatif. Un défaut visuel intermittent de la barre de navigation reste
+observé sur cet émulateur à rendu logiciel : il existe aussi en version signée0.23.1,
+et le pied de page À propos est identique pixel pour pixel. Aucune correction
+ni qualification physique de ce défaut n'est revendiquée ici.
+
+Core0.16.0 : source`cebbc10de76e319ce5deb613a9df750804608174`, API
+`588326f289f60f2961351e32730e3ecddd8ebe72`, CI source41931403008 réussie.
+[Lot CorvusRepositoryv0.16.0](https://github.com/CorvusSoftware/CorvusRepository/releases/tag/v0.16.0)
+construit et publié par41932376500 : six ZIP GB/GBC/GBA pour ARM64 et x86_64,
+provenance, SHA, tailles, membre unique, ABI, ELF16Ko et exports triche vérifiés
+sur les vrais fichiers publics. Trois modules x86_64 installés/découverts ;
+parcours GBA triche/IME/JNI/SAF réussi en portrait4099 et paysage4512 vérifications.
+Pas de nouvelle exécution physique ARM64 ; cette architecture est compilée et contrôlée structurellement.
+
+PR catalogue8 fusionnée après qualification, sourceRepository
+`676e6aaf980fc5324546493e1bf77c2f40d3d165`, CI41933537606 réussie.
+Le catalogue public v1 contient les six nouvelles références exactes ; le flux
+historique0.18.0 reste inchangé. Les sauvegardes batterie.sav/.srm gardent leur format ;
+les anciens états0.15.0 restent conservés et exigent cette version du cœur.
+
+L'événement push du tag a publié l'APK qualifié. Le dispatch explicite42017261434,
+concurrent, a ensuite refusé la création car cette release existait déjà. Aucun
+octet n'a été remplacé. La publication effective42017261496 est verte et le
+fichier public correspond exactement à la base testée ; le workflow reste actif.
+Preuves locales : `/workspace/setup/release0240`,
+`/workspace/setup/cheats-public-0.16.0` et `/workspace/setup/core-distribution-0.16.0`.
